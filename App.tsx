@@ -7,7 +7,8 @@ import { View, Text } from 'react-native';
 import SignupScreen from "./src/screens/SignupScreen";
 import {supabase} from "./src/supabase";
 import LoginScreen from "./src/screens/LoginScreen";
-import MainScreen from "./src/screens/MainScreen"; // Keep for potential loading state
+import MainScreen from "./src/screens/MainScreen";
+import GroupsScreen from "./src/screens/GroupsScreen"; // Keep for potential loading state
 
 // --- Define the ParamList ---
 // List all screens in your app that this stack navigator will handle
@@ -15,6 +16,9 @@ export type RootStackParamList = {
     Login: undefined; // undefined means no parameters expected for Login route
     Signup: undefined;
     Main: undefined;
+    Groups: undefined;
+    Matching: { currentGroupId: string; currentGroupName: string };
+    Chat: { groupId: string; groupName: string };
     // Add other screens here later, e.g.:
     // Groups: undefined;
     // Chat: { groupId: string; groupName: string };
@@ -75,6 +79,7 @@ export default function App() {
                     // User is signed in
                     <>
                         <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }}/>
+                        <Stack.Screen name="Groups" component={GroupsScreen} options={{ headerShown: false }}/>
                         {/* Add other authenticated screens here */}
                     </>
                 )}
