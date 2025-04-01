@@ -1,0 +1,80 @@
+# supabase/config.toml
+
+# Set the project ID from your Supabase project
+project_id = "nqtycfrgzjiehatokmfn"
+
+# --- Default Port Configurations (Usually safe to keep defaults) ---
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+# --- Auth Settings (Based on the remote config from your diff) ---
+[auth]
+enabled = true
+site_url = "https://v0-grapple-email-verification.vercel.app" # From remote config
+additional_redirect_urls = []                            # From remote config
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+# NOTE: User settings like enable_confirmations, etc., go under [auth.email] or [auth.sms]
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true # From remote config
+verify_enabled = true # From remote config
+
+[auth.mfa.phone]
+enroll_enabled = false # Assuming default/remote setting
+verify_enabled = false # Assuming default/remote setting
+
+# Email Auth Settings (Based on remote config from your diff)
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true             # From remote config (This enables email verification)
+secure_password_change = false
+max_frequency = "1m0s"                # From remote config
+otp_length = 6
+otp_expiry = 86400                    # From remote config
+
+# Email templates section (Usually left empty unless customizing)
+[auth.email.template]
+
+# SMS Auth Settings (Assuming defaults, as not shown in diff)
+[auth.sms]
+enable_signup = false
+# Add other SMS settings here if you enable them remotely
+
+# --- Other Standard Sections (Keep defaults unless you have specific needs) ---
+
+# In-memory storage options
+[storage]
+file_size_limit = "50MiB"
+
+# Settings for the Realtime service
+[realtime]
+enabled = true
+# Specify schemas and tables for Realtime if needed, e.g.:
+# realtime.schemas = ["public"]
+# realtime.tables = ["messages", "groups"] # Add tables you want Realtime on
+
+# Analytics settings
+[analytics]
+enabled = false
+# Add settings if you configure analytics
+
+# Functions settings
+[functions]
+# Add specific function settings if needed
