@@ -9,6 +9,7 @@ import {RootStackNavigationProp} from "../../App";
 const LoginScreen = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     // --- Type the navigation hook ---
     // Use the specific screen name 'Login' if you need route params, or just RootStackParamList for general navigation
     const navigation = useNavigation<RootStackNavigationProp<'Login'>>();
@@ -49,14 +50,17 @@ const LoginScreen = () => {
                 autoCapitalize="none" // Good practice for emails
                 autoComplete="email"
             />
-            <TextInput
-                style={styles.input}
-                placeholder="Password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="password"
-            />
+            <View>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword} // Toggle visibility based on state
+                    autoComplete="password"
+                />
+                <Button title={showPassword ? "Hide password" : "Show password"} onPress={() => setShowPassword(!showPassword)} />
+            </View>
             <Button title="Login" onPress={handleLogin}/>
             {/* Make sure Signup is also in RootStackParamList */}
             <Button title="Go to Signup" onPress={() => navigation.navigate('Signup')}/>
