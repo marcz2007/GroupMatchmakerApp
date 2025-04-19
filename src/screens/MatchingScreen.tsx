@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Button, StyleSheet, Alert, FlatList, ActivityIndicator } from 'react-native';
 import { supabase } from '../supabase'; // Adjust path if needed
 import { useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../App'; // Adjust path if needed
+import { RootStackNavigationProp } from '../../App';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 // Define the type for the route parameters expected by this screen
 type MatchingScreenRouteProp = RouteProp<RootStackParamList, 'Matching'>;

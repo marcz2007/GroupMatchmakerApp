@@ -1,17 +1,20 @@
 {
   "expo": {
-    "name": "GroupMatchmakerApp",
-    "slug": "GroupMatchmakerApp",
+    "name": "Grapple",
+    "slug": "grapple",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.marcz2007.GroupMatchmakerApp",
@@ -33,6 +36,16 @@
       "eas": {
         "projectId": "876034cd-48d2-4305-8754-741f1efd638f"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/react-native-vector-icons/Fonts/Ionicons.ttf"
+          ]
+        }
+      ]
+    ]
   }
 }

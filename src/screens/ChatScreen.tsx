@@ -1,16 +1,18 @@
 // src/screens/ChatScreen.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { Alert, View, Text, ActivityIndicator } from "react-native"; // Import View/Text for loading/error states
+import { Alert, View, Text, ActivityIndicator } from "react-native";
 import { GiftedChat, IMessage, User } from "react-native-gifted-chat";
-import { supabase } from "../supabase"; // Adjust path if needed
+import { supabase } from "../supabase";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import { RootStackParamList, RootStackNavigationProp } from "../../App"; // Adjust path if needed
+import { RootStackNavigationProp } from "../../App";
+import { RootStackParamList } from "../navigation/AppNavigator";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { StyleSheet } from "react-native";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
 
 // Define the type for the route parameters expected by this screen
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
-type ChatScreenNavigationProp = RootStackNavigationProp<"Chat">; // For navigation.setOptions
+type ChatScreenNavigationProp = RootStackNavigationProp<"Chat">;
 
 // Define a shape for profile data (assuming you have a 'profiles' table)
 interface Profile {
@@ -26,6 +28,19 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Loading state
+
+  // Set keyboard handler
+  useKeyboardHandler({
+    onStart: () => {
+      // Optional: handle keyboard movement start
+    },
+    onMove: () => {
+      // Optional: handle keyboard movement
+    },
+    onEnd: () => {
+      // Optional: handle keyboard movement end
+    },
+  });
 
   // Set screen title and fetch current user ID on mount
   useEffect(() => {
