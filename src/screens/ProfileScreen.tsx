@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Button, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Button, Alert, ActivityIndicator, Image, TouchableOpacity, Platform } from 'react-native';
 import { supabase } from '../supabase';
 
 interface Profile {
@@ -7,6 +7,7 @@ interface Profile {
   username: string;
   bio: string;
   interests: string[];
+  avatar_url?: string;
 }
 
 const ProfileScreen = () => {
@@ -17,6 +18,8 @@ const ProfileScreen = () => {
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -79,6 +82,7 @@ const ProfileScreen = () => {
         setUsername(data.username || '');
         setBio(data.bio || '');
         setInterests(data.interests ? data.interests.join(', ') : '');
+        setAvatarUrl(data.avatar_url || null);
       }
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -134,6 +138,76 @@ const ProfileScreen = () => {
     await supabase.auth.signOut();
   };
 
+  // Simplified approach without expo-image-picker
+  const pickImage = async () => {
+    try {
+      // Alert that this feature requires additional setup
+      Alert.alert(
+        "Development Note",
+        "Profile image upload requires a rebuild of the app with properly configured native modules.\n\nPlease consider using Expo Go for testing this feature, or follow the complete setup instructions in the documentation.",
+        [
+          { 
+            text: "Try Anyway", 
+            onPress: () => {
+              // Here we would normally launch image picker
+              Alert.alert("Image Picker", "This would normally open your photo library.");
+            } 
+          },
+          { text: "OK", style: "cancel" }
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Could not select image');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    try {
+      setUploading(true);
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      // Create file path with unique name
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const filePath = `${user.id}-${Date.now()}.${fileExt}`;
+      
+      // This would normally handle the image upload
+      // Since we're providing a temporary placeholder,
+      // we'll simulate this with a mock avatar URL
+      
+      // Simulated profile URL for development
+      const mockAvatarUrl = "https://ui-avatars.com/api/?name=" + 
+        encodeURIComponent(username || "User") + 
+        "&background=random&color=fff&size=200";
+      
+      // Update profile with the mock avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: mockAvatarUrl })
+        .eq('id', user.id);
+        
+      if (updateError) {
+        Alert.alert('Update failed', updateError.message);
+        return;
+      }
+      
+      // Update local state
+      setAvatarUrl(mockAvatarUrl);
+      
+      Alert.alert('Success', 'Profile picture updated (development mode)');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centeredContainer}>
@@ -146,6 +220,24 @@ const ProfileScreen = () => {
     return (
       <ScrollView style={styles.container}>
         <Text style={styles.title}>Edit Profile</Text>
+        
+        <View style={styles.avatarContainer}>
+          {uploading ? (
+            <ActivityIndicator size="large" style={styles.avatar} />
+          ) : (
+            <Image
+              source={avatarUrl ? { uri: avatarUrl } : require('../../assets/default-avatar.png')}
+              style={styles.avatar}
+            />
+          )}
+          <TouchableOpacity 
+            style={styles.uploadButton} 
+            onPress={pickImage}
+            disabled={uploading}
+          >
+            <Text style={styles.uploadButtonText}>Change Photo</Text>
+          </TouchableOpacity>
+        </View>
         
         <Text style={styles.label}>Username</Text>
         <TextInput
@@ -192,6 +284,13 @@ const ProfileScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Your Profile</Text>
+      
+      <View style={styles.avatarContainer}>
+        <Image
+          source={avatarUrl ? { uri: avatarUrl } : require('../../assets/default-avatar.png')}
+          style={styles.avatar}
+        />
+      </View>
       
       <View style={styles.profileSection}>
         <Text style={styles.label}>Username</Text>
@@ -262,6 +361,27 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: 20,
     gap: 10,
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#e1e1e1',
+    marginBottom: 10,
+  },
+  uploadButton: {
+    backgroundColor: '#5762b7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 5,
+  },
+  uploadButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

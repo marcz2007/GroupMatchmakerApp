@@ -45,6 +45,12 @@
             "node_modules/react-native-vector-icons/Fonts/Ionicons.ttf"
           ]
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to let you set a profile picture."
+        }
       ]
     ]
   }
