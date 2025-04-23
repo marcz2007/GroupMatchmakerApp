@@ -39,6 +39,37 @@ const ProfileScreen = () => {
         .single();
 
       if (error) {
+        // If the error is because profile doesn't exist, create one
+        if (error.code === 'PGRST116') { // PostgreSQL error for "no rows returned"
+          // Create a default profile
+          const defaultProfile = {
+            id: user.id,
+            username: '',
+            bio: '',
+            interests: [],
+            created_at: new Date(),
+            updated_at: new Date(),
+          };
+
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert(defaultProfile);
+
+          if (insertError) {
+            Alert.alert('Error', 'Failed to create profile: ' + insertError.message);
+            return;
+          }
+          
+          // Set the new profile
+          setProfile(defaultProfile);
+          setUsername('');
+          setBio('');
+          setInterests('');
+          return;
+        }
+        
+        // For other errors
+        Alert.alert('Error', 'Failed to fetch profile: ' + error.message);
         console.error('Error fetching profile', error);
         return;
       }
@@ -51,6 +82,7 @@ const ProfileScreen = () => {
       }
     } catch (error) {
       console.error('Unexpected error:', error);
+      Alert.alert('Error', 'An unexpected error occurred while fetching your profile.');
     } finally {
       setLoading(false);
     }

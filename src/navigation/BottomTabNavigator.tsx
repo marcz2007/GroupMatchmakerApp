@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Import screens
@@ -17,20 +17,22 @@ const BottomTabNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
+          // Use Ionicons for regular tabs
           if (route.name === 'Groups') {
-            iconName = focused ? 'people' : 'people-outline';
+            return <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />;
           } else if (route.name === 'Messages') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'Matchmaking') {
-            iconName = focused ? 'flame' : 'flame-outline';
+            return <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />;
           } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
-          }
-
-          // Return the icon component
-          return <Ionicons name={iconName as string} size={size} color={color} />;
+            return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
+          } 
+          
+          // Use a hook-like icon for Grapple tab
+          // Options: link, construct, hammer, magnet, anchor, flash-outline
+          return <Ionicons 
+            name={focused ? 'magnet' : 'magnet-outline'} 
+            size={size * 1.2} 
+            color={color} 
+          />;
         },
         tabBarActiveTintColor: '#5762b7',
         tabBarInactiveTintColor: 'gray',
