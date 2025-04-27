@@ -261,7 +261,7 @@ const ProfileScreen = () => {
           style={styles.input}
           value={interests}
           onChangeText={setInterests}
-          placeholder="e.g. basketball, movies, hiking"
+          placeholder="e.g. art, movies, hiking"
         />
         
         <View style={styles.buttonContainer}>
