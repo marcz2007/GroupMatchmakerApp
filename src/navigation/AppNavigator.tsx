@@ -1,23 +1,32 @@
-import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import React from 'react';
 
 // Import screens
-import LoginScreen from '../screens/LoginScreen';
-import SignupScreen from '../screens/SignupScreen';
+import AddUserToGroupScreen from '../screens/AddUserToGroupScreen';
 import ChatScreen from '../screens/ChatScreen';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupsScreen from '../screens/GroupsScreen';
+import LoginScreen from '../screens/LoginScreen';
 import MatchingScreen from '../screens/MatchingScreen';
 import MatchResultsScreen from '../screens/MatchResultsScreen';
+import MessagesListScreen from '../screens/MessagesListScreen';
+import SignupScreen from '../screens/SignupScreen';
 
 // Import the bottom tab navigator
 import BottomTabNavigator from './BottomTabNavigator';
 
 // Define updated param list
 export type RootStackParamList = {
+  AuthLoading: undefined;
   Login: undefined;
   Signup: undefined;
   Main: undefined;
-  Chat: { groupId: string; groupName: string };
+  MessagesList: undefined;
+  CreateGroup: undefined;
+  Groups: undefined;
   Matching: { currentGroupId: string; currentGroupName: string };
+  Chat: { groupId: string; groupName: string };
+  AddUserToGroup: { groupId: string; groupName: string };
   MatchResults: { 
     type: 'activity' | 'event'; 
     query: string; 
@@ -57,6 +66,26 @@ const AppStack = () => (
       name="MatchResults" 
       component={MatchResultsScreen} 
       options={{ title: 'Match Results' }}
+    />
+    <Stack.Screen 
+      name="MessagesList" 
+      component={MessagesListScreen} 
+      options={{ title: 'Messages List' }}
+    />
+    <Stack.Screen 
+      name="CreateGroup" 
+      component={CreateGroupScreen}
+      options={{ title: 'Create Group' }}
+    />
+    <Stack.Screen 
+      name="Groups" 
+      component={GroupsScreen} 
+      options={{ title: 'Groups' }}
+    />
+    <Stack.Screen 
+      name="AddUserToGroup" 
+      component={AddUserToGroupScreen} 
+      options={({ route }) => ({ title: `Add User to ${route.params.groupName}` })}
     />
   </Stack.Navigator>
 );

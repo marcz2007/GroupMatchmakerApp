@@ -1,14 +1,13 @@
 // src/screens/ChatScreen.tsx
-import React, { useState, useEffect, useCallback } from "react";
-import { Alert, View, Text, ActivityIndicator } from "react-native";
-import { GiftedChat, IMessage, User } from "react-native-gifted-chat";
-import { supabase } from "../supabase";
-import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { GiftedChat, IMessage } from "react-native-gifted-chat";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { RootStackNavigationProp } from "../../App";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { RealtimeChannel } from "@supabase/supabase-js";
-import { StyleSheet } from "react-native";
-import { useKeyboardHandler } from "react-native-keyboard-controller";
+import { supabase } from "../supabase";
 
 // Define the type for the route parameters expected by this screen
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
@@ -44,7 +43,9 @@ const ChatScreen = () => {
 
   // Set screen title and fetch current user ID on mount
   useEffect(() => {
-    navigation.setOptions({ title: groupName || "Chat" });
+    navigation.setOptions({
+      title: groupName || "Chat",
+    });
 
     const fetchUser = async () => {
       const {

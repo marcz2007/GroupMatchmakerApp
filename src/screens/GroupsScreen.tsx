@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, Button, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { supabase } from '../supabase'; // Adjust path if needed
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack'; // Import StackNavigationProp
-import { RootStackParamList } from '../../App'; // Adjust path to your App.tsx
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Button, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RootStackParamList } from '../navigation/AppNavigator'; // Corrected import path
+import { supabase } from '../supabase'; // Adjust path if needed
 
 interface Group {
     id: string;
@@ -107,14 +107,20 @@ const GroupsScreen = () => {
         <View style={styles.groupItem}>
             <Text style={styles.groupName}>{item.name}</Text>
             <Text>{item.description}</Text>
-            <Button
-                title="Find Matches"
-                onPress={() => navigation.navigate('Matching', { currentGroupId: item.id, currentGroupName: item.name })}
-            />
-            <Button
-                title="Chat"
-                onPress={() => navigation.navigate('Chat', { groupId: item.id, groupName: item.name })} // Ensure Chat route exists
-            />
+            <View style={styles.buttonContainer}>
+                <Button
+                    title="Find Matches"
+                    onPress={() => navigation.navigate('Matching', { currentGroupId: item.id, currentGroupName: item.name })}
+                />
+                <Button
+                    title="Chat"
+                    onPress={() => navigation.navigate('Chat', { groupId: item.id, groupName: item.name })}
+                />
+                <Button
+                    title="Add User"
+                    onPress={() => navigation.navigate('AddUserToGroup', { groupId: item.id, groupName: item.name })}
+                />
+            </View>
         </View>
     );
 
@@ -148,7 +154,12 @@ const styles = StyleSheet.create({ /* ... styles ... */
     groupItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff', marginBottom: 5, borderRadius: 5, },
     groupName: { fontSize: 16, fontWeight: 'bold', marginBottom: 5, },
     input: { height: 45, borderColor: '#ccc', borderWidth: 1, marginBottom: 10, paddingHorizontal: 10, borderRadius: 5, backgroundColor: '#fff', },
-    emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: 'gray', }
+    emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: 'gray', },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 10,
+    }
 });
 
 
