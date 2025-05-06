@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { supabase } from '../supabase';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackNavigationProp } from '../../App';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { supabase } from '../supabase';
 
 interface ChatPreview {
   id: string;
@@ -54,20 +53,30 @@ const MessagesListScreen = () => {
       
       if (groupsData) {
         for (const item of groupsData) {
-          if (!item.groups) continue;
+          if (!item.groups || !Array.isArray(item.groups) || item.groups.length === 0) {
+            console.warn('Skipping group member item due to missing, non-array, or empty groups data:', item);
+            continue;
+          }
+          
+          const group = item.groups[0];
+
+          if (!group || typeof group.id === 'undefined' || typeof group.name === 'undefined') {
+            console.warn('Skipping group member item due to invalid group object in array:', item, group);
+            continue;
+          }
           
           const { data: latestMessage, error: messageError } = await supabase
             .from('messages')
             .select('content, created_at')
-            .eq('group_id', item.groups.id)
+            .eq('group_id', group.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
           
           if (!messageError && latestMessage) {
             groupPreviews.push({
-              id: item.groups.id,
-              name: item.groups.name,
+              id: group.id,
+              name: group.name,
               lastMessage: latestMessage.content,
               timestamp: new Date(latestMessage.created_at),
               isGroup: true
@@ -75,8 +84,8 @@ const MessagesListScreen = () => {
           } else {
             // If no messages, still show the group
             groupPreviews.push({
-              id: item.groups.id,
-              name: item.groups.name,
+              id: group.id,
+              name: group.name,
               lastMessage: 'No messages yet',
               timestamp: new Date(),
               isGroup: true
