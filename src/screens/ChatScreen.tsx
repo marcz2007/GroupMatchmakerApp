@@ -361,6 +361,7 @@ const ChatScreen = () => {
       messagesContainerStyle={{ paddingBottom: 10 }}
       placeholder="Type your message here..."
       alwaysShowSend
+      renderUsernameOnMessage={true}
     />
   );
 };
