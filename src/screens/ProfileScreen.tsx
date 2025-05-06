@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Button, Alert, ActivityIndicator, Image, TouchableOpacity, Platform } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Button, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../supabase';
 
 interface Profile {
@@ -20,6 +21,7 @@ const ProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -93,13 +95,25 @@ const ProfileScreen = () => {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
+
     try {
-      setIsSaving(true);
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
         Alert.alert('Error', 'Could not get user session.');
+        setIsSaving(false);
         return;
+      }
+
+      let newAvatarUrl: string | null | undefined = undefined;
+
+      if (selectedImage) {
+        newAvatarUrl = await uploadImage(selectedImage);
+        if (newAvatarUrl === null) {
+          Alert.alert('Save Error', 'Failed to upload new profile picture. Profile not saved.');
+          setIsSaving(false);
+          return;
+        }
       }
 
       const interestsArray = interests
@@ -107,7 +121,7 @@ const ProfileScreen = () => {
         .map(item => item.trim())
         .filter(item => item.length > 0);
 
-      const updates = {
+      const updates: Partial<Profile> & { updated_at: Date, id: string, avatar_url?: string | null } = {
         id: user.id,
         username,
         bio,
@@ -115,20 +129,32 @@ const ProfileScreen = () => {
         updated_at: new Date(),
       };
 
-      const { error } = await supabase
+      if (newAvatarUrl !== undefined) {
+        updates.avatar_url = newAvatarUrl;
+      }
+
+      const { error: updateError } = await supabase
         .from('profiles')
         .upsert(updates)
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
-      if (error) {
-        Alert.alert('Error updating profile', error.message);
+      if (updateError) {
+        console.error("Error updating profile:", updateError);
+        Alert.alert('Error updating profile', updateError.message);
       } else {
         Alert.alert('Success', 'Profile updated successfully');
+        if (newAvatarUrl !== undefined) {
+          setAvatarUrl(newAvatarUrl);
+        }
+        setProfile(prevProfile => ({ ...prevProfile!, ...updates }));
+        setSelectedImage(null);
         setEditing(false);
-        fetchProfile();
       }
     } catch (error: any) {
-      Alert.alert('Error', 'An unexpected error occurred.');
+      console.error("Unexpected error in handleSave:", error);
+      Alert.alert('Error', 'An unexpected error occurred during save.');
     } finally {
       setIsSaving(false);
     }
@@ -138,71 +164,73 @@ const ProfileScreen = () => {
     await supabase.auth.signOut();
   };
 
-  // Simplified approach without expo-image-picker
-  const pickImage = async () => {
-    try {
-      // Alert that this feature requires additional setup
-      Alert.alert(
-        "Development Note",
-        "Profile image upload requires a rebuild of the app with properly configured native modules.\n\nPlease consider using Expo Go for testing this feature, or follow the complete setup instructions in the documentation.",
-        [
-          { 
-            text: "Try Anyway", 
-            onPress: () => {
-              // Here we would normally launch image picker
-              Alert.alert("Image Picker", "This would normally open your photo library.");
-            } 
-          },
-          { text: "OK", style: "cancel" }
-        ]
-      );
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Could not select image');
+  const pickImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      console.log('Selected image asset:', result.assets[0]);
+      setSelectedImage(result.assets[0]);
     }
   };
 
-  const uploadImage = async (uri: string) => {
+  const uploadImage = async (asset: ImagePicker.ImagePickerAsset): Promise<string | null> => {
     try {
       setUploading(true);
-      
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        Alert.alert('Error', 'User not authenticated');
-        return;
+        Alert.alert('Error', 'User not authenticated for upload.');
+        return null;
       }
 
-      // Create file path with unique name
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const filePath = `${user.id}-${Date.now()}.${fileExt}`;
-      
-      // This would normally handle the image upload
-      // Since we're providing a temporary placeholder,
-      // we'll simulate this with a mock avatar URL
-      
-      // Simulated profile URL for development
-      const mockAvatarUrl = "https://ui-avatars.com/api/?name=" + 
-        encodeURIComponent(username || "User") + 
-        "&background=random&color=fff&size=200";
-      
-      // Update profile with the mock avatar URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: mockAvatarUrl })
-        .eq('id', user.id);
-        
-      if (updateError) {
-        Alert.alert('Update failed', updateError.message);
-        return;
+      const arraybuffer = await fetch(asset.uri).then((res) => res.arrayBuffer());
+      const fileExt = asset.uri?.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const path = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, arraybuffer, {
+          contentType: asset.mimeType ?? `image/${fileExt}`,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        Alert.alert('Upload Error', 'Failed to upload image: ' + uploadError.message);
+        return null;
       }
-      
-      // Update local state
-      setAvatarUrl(mockAvatarUrl);
-      
-      Alert.alert('Success', 'Profile picture updated (development mode)');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+
+      console.log('Upload successful:', data);
+
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(path);
+
+      console.log('Public URL data:', urlData);
+
+      if (!urlData?.publicUrl) {
+        console.warn('Could not get public URL. Check bucket permissions/RLS.');
+        return null;
+      }
+
+      return urlData.publicUrl;
+
+    } catch (error: any) {
+      console.error('Error in uploadImage function:', error);
+      Alert.alert('Upload Error', error?.message ?? 'An unexpected error occurred during upload.');
+      return null;
     } finally {
       setUploading(false);
     }
@@ -217,6 +245,8 @@ const ProfileScreen = () => {
   }
 
   if (editing) {
+    const displayUri = selectedImage?.uri || avatarUrl;
+
     return (
       <ScrollView style={styles.container}>
         <Text style={styles.title}>Edit Profile</Text>
@@ -226,16 +256,16 @@ const ProfileScreen = () => {
             <ActivityIndicator size="large" style={styles.avatar} />
           ) : (
             <Image
-              source={avatarUrl ? { uri: avatarUrl } : require('../../assets/default-avatar.png')}
+              source={displayUri ? { uri: displayUri } : require('../../assets/default-avatar.png')}
               style={styles.avatar}
             />
           )}
           <TouchableOpacity 
             style={styles.uploadButton} 
-            onPress={pickImage}
+            onPress={pickImages}
             disabled={uploading}
           >
-            <Text style={styles.uploadButtonText}>Change Photo</Text>
+            <Text style={styles.uploadButtonText}>{selectedImage ? "Change Selection" : "Choose Photo"}</Text>
           </TouchableOpacity>
         </View>
         
@@ -266,14 +296,17 @@ const ProfileScreen = () => {
         
         <View style={styles.buttonContainer}>
           <Button
-            title={isSaving ? "Saving..." : "Save Changes"}
+            title={isSaving || uploading ? "Saving..." : "Save Changes"}
             onPress={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || uploading}
           />
           <Button
             title="Cancel"
-            onPress={() => setEditing(false)}
-            disabled={isSaving}
+            onPress={() => {
+              setEditing(false);
+              setSelectedImage(null);
+            }}
+            disabled={isSaving || uploading}
             color="gray"
           />
         </View>
