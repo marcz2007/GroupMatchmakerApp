@@ -32,38 +32,46 @@ const GroupsScreen = () => {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
 
             if (userError || !user) {
-                // ... (handle user error)
                 setGroups([]);
+                setLoading(false); // Ensure loading is stopped
                 return;
             }
 
-            // --- Fetch data and use .returns<T[]>() ---
             const { data: membershipData, error: fetchError } = await supabase
                 .from('group_members')
                 .select(`groups ( id, name, description )`)
                 .eq('user_id', user.id)
-                .returns<MembershipData[]>(); // <--- Tell Supabase the expected return type
+                .returns<MembershipData[]>();
 
             if (fetchError) {
                 console.error('Error fetching groups:', fetchError);
                 Alert.alert('Error fetching groups', fetchError.message);
+                setGroups([]); // Clear groups on error
             } else {
-                // --- Use map and a type guard filter ---
-                const extractedGroups = membershipData
-                        ?.map(item => item.groups) // Result is (Group | null)[] | undefined
-                        .filter((group): group is Group => group !== null) // Filter out nulls AND assert type
-                    || []; // Provide default empty array if membershipData was null
-                setGroups(extractedGroups); // Now correctly typed as Group[]
+                const allFetchedGroups = membershipData
+                    ?.map(item => item.groups)
+                    .filter((group): group is Group => group !== null)
+                    || [];
+                
+                // Ensure unique groups before setting state
+                const uniqueGroups: Group[] = [];
+                const encounteredGroupIds = new Set<string>();
+                for (const group of allFetchedGroups) {
+                    if (!encounteredGroupIds.has(group.id)) {
+                        uniqueGroups.push(group);
+                        encounteredGroupIds.add(group.id);
+                    }
+                }
+                setGroups(uniqueGroups);
             }
         } catch (error: any) {
-            // ... (handle unexpected error)
+            console.error('Unexpected error in fetchGroups:', error);
+            Alert.alert('Error', 'An unexpected error occurred while fetching groups.');
+            setGroups([]); // Clear groups on unexpected error
         } finally {
             setLoading(false);
         }
     }, []);
-
-    // ... rest of the component remains the same (useEffect, handleCreateGroup, renderItem, return)
-    // Make sure handleCreateGroup also uses await supabase.auth.getUser() correctly
 
     useEffect(() => {
         fetchGroups();

@@ -2,7 +2,7 @@
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GiftedChat, IMessage } from "react-native-gifted-chat";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { RootStackNavigationProp } from "../../App";
@@ -22,51 +22,37 @@ interface Profile {
 const ChatScreen = () => {
   const route = useRoute<ChatScreenRouteProp>();
   const navigation = useNavigation<ChatScreenNavigationProp>();
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName: initialGroupName } = route.params;
 
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGroupMember, setIsGroupMember] = useState(false);
+  const [fetchedGroupName, setFetchedGroupName] = useState<string | undefined>(initialGroupName);
+  const [processingJoin, setProcessingJoin] = useState(false);
 
-  // Set keyboard handler
+  // Set keyboard handler with workletized functions
   useKeyboardHandler({
     onStart: () => {
+      'worklet'; // Add this directive
       // Optional: handle keyboard movement start
+      // console.log('Keyboard movement started');
     },
-    onMove: () => {
+    onMove: (e) => {
+      'worklet'; // Add this directive
       // Optional: handle keyboard movement
+      // console.log('Keyboard moving:', e.height);
     },
     onEnd: () => {
+      'worklet'; // Add this directive
       // Optional: handle keyboard movement end
+      // console.log('Keyboard movement ended');
     },
   });
 
-  // Set screen title and fetch current user ID on mount
-  useEffect(() => {
-    navigation.setOptions({
-      title: groupName || "Chat",
-    });
-
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id ?? null);
-      // Initial message fetch depends on having the user ID, so chain it or call here
-      if (user?.id) {
-        fetchMessages(user.id);
-      } else {
-        setIsLoading(false); // No user, stop loading
-        Alert.alert("Error", "Could not identify user session.");
-      }
-    };
-    fetchUser();
-  }, [navigation, groupName]);
-
-  // Fetch initial messages
   const fetchMessages = useCallback(
     async (userId: string) => {
-      if (!userId) return; // Don't fetch if no user ID
+      if (!userId || !isGroupMember || processingJoin) return;
       setIsLoading(true);
       try {
         const { data, error } = await supabase
@@ -79,10 +65,10 @@ const ChatScreen = () => {
                     user_id,
                     profiles ( username )
                 `
-          ) // Adjust 'profiles ( username )' if your profile table/column is different
+          )
           .eq("group_id", groupId)
-          .order("created_at", { ascending: false }) // GiftedChat expects descending
-          .limit(50); // Load initial batch
+          .order("created_at", { ascending: false })
+          .limit(50);
 
         if (error) throw error;
 
@@ -94,11 +80,9 @@ const ChatScreen = () => {
               createdAt: new Date(msg.created_at),
               user: {
                 _id: msg.user_id,
-                // Use profile username or a default/fallback
                 name:
                   msg.profiles?.username ||
                   `User ${msg.user_id.substring(0, 4)}`,
-                // avatar: msg.profiles?.avatar_url || undefined, // Add avatar later
               },
             })
           );
@@ -111,18 +95,166 @@ const ChatScreen = () => {
         setIsLoading(false);
       }
     },
-    [groupId]
+    [groupId, isGroupMember, processingJoin]
   );
 
-  // Set up Realtime subscription
   useEffect(() => {
-    if (!currentUserId) return; // Only subscribe if user is known
+    const checkMembershipAndPromptToJoin = async (userId: string, currentGroupId: string, nameDisplay: string) => {
+      setProcessingJoin(true);
+      try {
+        const { data: memberData, error: memberError } = await supabase
+          .from('group_members')
+          .select('id')
+          .eq('group_id', currentGroupId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (memberError) throw memberError;
+
+        if (memberData) {
+          setIsGroupMember(true);
+        } else {
+          setIsGroupMember(false);
+          Alert.alert(
+            `Join Group?`,
+            `Do you want to join the group "${nameDisplay}"?`,
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => navigation.goBack(),
+              },
+              {
+                text: 'Join Group',
+                onPress: async () => {
+                  try {
+                    const { error: joinError } = await supabase
+                      .from('group_members')
+                      .insert({ group_id: currentGroupId, user_id: userId });
+                    if (joinError) throw joinError;
+                    Alert.alert('Joined!', `You have successfully joined "${nameDisplay}".`);
+                    setIsGroupMember(true);
+                  } catch (e: any) {
+                    Alert.alert('Error', `Failed to join group: ${e.message}`);
+                  }
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        }
+      } catch (error: any) {
+        console.error('Error checking membership or joining group:', error);
+        Alert.alert('Error', 'Could not process group membership.');
+        navigation.goBack();
+      } finally {
+        setProcessingJoin(false);
+      }
+    };
+
+    const setupScreen = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          Alert.alert('Error', 'Could not identify user session.');
+          navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login');
+          setIsLoading(false);
+          return;
+        }
+        setCurrentUserId(user.id);
+
+        let currentGroupName = initialGroupName;
+        if (!currentGroupName && groupId) {
+          const { data: groupData, error: groupError } = await supabase
+            .from('groups')
+            .select('name')
+            .eq('id', groupId)
+            .single();
+          
+          if (groupError || !groupData) {
+            Alert.alert('Error', 'Could not find group details.');
+            navigation.goBack();
+            setIsLoading(false);
+            return;
+          }
+          currentGroupName = groupData.name;
+          setFetchedGroupName(groupData.name);
+        }
+        
+        if (!currentGroupName) {
+          Alert.alert('Error', 'Group name is missing.');
+          navigation.goBack();
+          setIsLoading(false);
+          return;
+        }
+        
+        navigation.setOptions({
+          title: currentGroupName || "Chat",
+          headerRight: () => (
+            <View style={styles.headerRightContainer}>
+              <TouchableOpacity onPress={handleShareInvite} style={styles.headerButton}>
+                <Text style={styles.headerButtonText}>Share Invite</Text>
+              </TouchableOpacity>
+            </View>
+          ),
+        });
+
+        await checkMembershipAndPromptToJoin(user.id, groupId, currentGroupName);
+      } catch (error) {
+        console.error("Error in setupScreen:", error);
+        Alert.alert("Setup Error", "An error occurred while setting up the chat.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    setupScreen();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState === 'active') {
+            // Re-evaluate or refresh if needed when app comes to foreground
+        }
+    });
+
+    return () => {
+        appStateSubscription.remove();
+    };
+  }, [navigation, groupId, initialGroupName]); 
+
+  // Effect to fetch messages when user is a member and not processing join or initial load
+  useEffect(() => {
+    if (currentUserId && isGroupMember && !processingJoin) {
+      fetchMessages(currentUserId);
+    }
+  }, [currentUserId, isGroupMember, processingJoin, fetchMessages]);
+
+  const handleShareInvite = async () => {
+    const nameForShare = fetchedGroupName || initialGroupName;
+    const inviteLink = `groupmatchmakerapp://group/invite/${groupId}`;
+    try {
+      await Share.share({
+        message: `Join my group "${nameForShare}" on GroupMatchmaker App! Link: ${inviteLink}`,
+        url: inviteLink, 
+        title: `Invite to ${nameForShare}` 
+      });
+    } catch (error: any) {
+      Alert.alert('Error', 'Could not share invite link.');
+    }
+  };
+  
+  // Realtime subscription effect
+  useEffect(() => {
+    // Subscribe only if a group member, not processing a join, and user ID is available.
+    if (!currentUserId || !isGroupMember || processingJoin) {
+      return; // Do nothing, or clean up if a channel exists
+    }
 
     let channel: RealtimeChannel | null = null;
-
     const setupSubscription = () => {
       channel = supabase
         .channel(`public:messages:group_id=eq.${groupId}`)
+        // ... (on and subscribe logic as before) ...
         .on<any>(
           "postgres_changes",
           {
@@ -132,39 +264,16 @@ const ChatScreen = () => {
             filter: `group_id=eq.${groupId}`,
           },
           async (payload) => {
-            console.log("New message received via Realtime!", payload.new);
-            const newMessage = payload.new;
-
-            // Avoid adding message if the sender is the current user (already handled by onSend)
-            // This prevents duplicate messages on sender's screen
-            if (newMessage.user_id === currentUserId) {
-              return;
-            }
-
-            // Fetch profile username for the new message sender
-            // Optimization: Could cache usernames or fetch in batches
+            // ... (payload handling as before) ...
+            const newMessagePayload = payload.new;
+            if (newMessagePayload.user_id === currentUserId) return;
             const { data: profileData } = await supabase
-              .from("profiles") // Assuming 'profiles' table linked to auth.users by 'id'
-              .select("username") // Adjust column name if needed
-              .eq("id", newMessage.user_id)
-              .single();
-
+              .from("profiles").select("username").eq("id", newMessagePayload.user_id).single();
             const formattedMessage: IMessage = {
-              _id: newMessage.id,
-              text: newMessage.content,
-              createdAt: new Date(newMessage.created_at),
-              user: {
-                _id: newMessage.user_id,
-                name:
-                  profileData?.username ||
-                  `User ${newMessage.user_id.substring(0, 4)}`,
-                // avatar: '...'
-              },
+              _id: newMessagePayload.id, text: newMessagePayload.content, createdAt: new Date(newMessagePayload.created_at),
+              user: { _id: newMessagePayload.user_id, name: profileData?.username || `User ${newMessagePayload.user_id.substring(0, 4)}` },
             };
-            // Prepend new messages (GiftedChat standard)
-            setMessages((previousMessages) =>
-              GiftedChat.append(previousMessages, [formattedMessage])
-            );
+            setMessages((prevMsgs) => GiftedChat.append(prevMsgs, [formattedMessage]));
           }
         )
         .subscribe((status, err) => {
@@ -179,77 +288,76 @@ const ChatScreen = () => {
 
     setupSubscription();
 
-    // Clean up subscription on unmount or if groupId/currentUserId changes
     return () => {
       if (channel) {
         supabase.removeChannel(channel).then(() => {
           console.log(`Realtime unsubscribed for group ${groupId}`);
         });
+        channel = null;
       }
     };
-  }, [groupId, currentUserId]); // Depend on groupId and currentUserId
+  // This effect depends on these to re-subscribe if any of them change AFTER initial setup.
+  // The conditions at the start of the effect prevent subscription during processing states.
+  }, [groupId, currentUserId, isGroupMember, processingJoin]);
 
-  // Send message handler
   const onSend = useCallback(
+    // ... (onSend implementation as before) ...
     async (newMessages: IMessage[] = []) => {
-      if (!currentUserId) {
-        Alert.alert("Error", "Cannot send message, user not identified.");
+      if (!currentUserId || !isGroupMember) {
+        Alert.alert("Error", "Cannot send message, user not identified or not a group member.");
         return;
       }
-
       const messageToSend = {
         group_id: groupId,
-        user_id: currentUserId, // Use the fetched current user ID
-        content: newMessages[0].text, // Get text from the first message in the array
+        user_id: currentUserId,
+        content: newMessages[0].text,
       };
-
-      // Optimistically update the UI *before* sending to Supabase
-      setMessages((previousMessages) =>
-        GiftedChat.append(previousMessages, newMessages)
-      );
-
+      setMessages((previousMessages) => GiftedChat.append(previousMessages, newMessages));
       const { error } = await supabase.from("messages").insert(messageToSend);
-
       if (error) {
         Alert.alert("Error", "Could not send message.");
         console.error("Send message error:", error);
-        // Optional: Revert optimistic update if needed (more complex)
-        // Find the message by its temporary ID and remove it
       } else {
         console.log("Message sent successfully");
       }
     },
-    [groupId, currentUserId]
-  ); // Depend on groupId and currentUserId
+    [groupId, currentUserId, isGroupMember]
+  );
 
-  // Render loading state
-  if (isLoading) {
+  if (isLoading || processingJoin) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
+        <Text>
+          {processingJoin 
+            ? 'Processing group join...' 
+            : (isLoading ? 'Loading chat setup...' : 'Please wait...')}
+        </Text>
       </View>
     );
   }
 
-  // Render message if no user identified
   if (!currentUserId) {
     return (
       <View style={styles.centered}>
-        <Text>Could not load user session.</Text>
+        <Text>Could not load user session. Please try logging in again.</Text>
       </View>
     );
   }
 
-  // Render the chat interface
+  if (!isGroupMember) {
+    return (
+      <View style={styles.centered}>
+        <Text>You are not a member of this group, or processing membership.</Text>
+      </View>
+    );
+  }
+
   return (
     <GiftedChat
       messages={messages}
-      onSend={(messages) => onSend(messages)}
-      user={{
-        _id: currentUserId, // Current user's ID
-        // name: 'My Username' // Optional: Set current user's name if available
-        // avatar: '...'      // Optional: Set current user's avatar if available
-      }}
+      onSend={(msgs) => onSend(msgs)}
+      user={{ _id: currentUserId, }}
       messagesContainerStyle={{ paddingBottom: 10 }}
       placeholder="Type your message here..."
       alwaysShowSend
@@ -263,6 +371,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerRightContainer: { // To accommodate multiple buttons if needed in future
+    flexDirection: 'row',
+    marginRight: 10,
+  },
+  headerButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginLeft: 8, // Space between buttons if multiple
+    // Add more styling as needed, e.g., backgroundColor, borderRadius
+  },
+  headerButtonText: {
+    fontSize: 16,
+    color: '#007AFF', // Example color, adjust as per your app's theme
   },
 });
 
