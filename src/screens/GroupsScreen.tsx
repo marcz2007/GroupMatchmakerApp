@@ -128,6 +128,10 @@ const GroupsScreen = () => {
                     title="Add User"
                     onPress={() => navigation.navigate('AddUserToGroup', { groupId: item.id, groupName: item.name })}
                 />
+                <Button
+                    title="Details"
+                    onPress={() => navigation.navigate('GroupDetails', { groupId: item.id, groupName: item.name })}
+                />
             </View>
         </View>
     );
@@ -166,6 +170,7 @@ const styles = StyleSheet.create({ /* ... styles ... */
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
+        flexWrap: 'wrap',
         marginTop: 10,
     }
 });

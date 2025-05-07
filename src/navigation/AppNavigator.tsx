@@ -5,6 +5,7 @@ import React from 'react';
 import AddUserToGroupScreen from '../screens/AddUserToGroupScreen';
 import ChatScreen from '../screens/ChatScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupDetailsScreen from '../screens/GroupDetailsScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MatchingScreen from '../screens/MatchingScreen';
@@ -27,6 +28,7 @@ export type RootStackParamList = {
   Matching: { currentGroupId: string; currentGroupName: string };
   Chat: { groupId: string; groupName: string };
   AddUserToGroup: { groupId: string; groupName: string };
+  GroupDetails: { groupId: string; groupName: string };
   MatchResults: { 
     type: 'activity' | 'event'; 
     query: string; 
@@ -86,6 +88,11 @@ const AppStack = () => (
       name="AddUserToGroup" 
       component={AddUserToGroupScreen} 
       options={({ route }) => ({ title: `Add User to ${route.params.groupName}` })}
+    />
+    <Stack.Screen 
+      name="GroupDetails" 
+      component={GroupDetailsScreen} 
+      options={({ route }) => ({ title: route.params.groupName || 'Group Details' })} 
     />
   </Stack.Navigator>
 );
