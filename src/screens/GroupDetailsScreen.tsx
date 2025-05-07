@@ -4,23 +4,18 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Button,
     FlatList,
     Image,
-    ScrollView // Added ScrollView for potentially long content
-    ,
-
-
-
-
-
-
+    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
-import { RootStackParamList } from '../navigation/AppNavigator'; // Adjust path if needed
-import { supabase } from '../supabase'; // Adjust path if needed
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { supabase } from '../supabase';
 
 // Define types for route and navigation
 type GroupDetailsScreenRouteProp = RouteProp<RootStackParamList, 'GroupDetails'>;
@@ -52,9 +47,14 @@ const GroupDetailsScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // State for bio editing
+    const [isEditingBio, setIsEditingBio] = useState(false);
+    const [editableBio, setEditableBio] = useState('');
+    const [isSavingBio, setIsSavingBio] = useState(false);
+
     useEffect(() => {
-        navigation.setOptions({ title: initialGroupName || 'Group Details' });
-    }, [navigation, initialGroupName]);
+        navigation.setOptions({ title: initialGroupName || groupDetails?.name || 'Group Details' });
+    }, [navigation, initialGroupName, groupDetails?.name]);
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -71,6 +71,7 @@ const GroupDetailsScreen = () => {
                 if (groupError) throw groupError;
                 if (!groupData) throw new Error('Group not found.');
                 setGroupDetails(groupData);
+                setEditableBio(groupData.description || '');
                 if (!initialGroupName) { // If initialGroupName wasn't passed, update title
                     navigation.setOptions({ title: groupData.name || 'Group Details'});
                 }
@@ -114,6 +115,46 @@ const GroupDetailsScreen = () => {
         }
     }, [groupId, navigation, initialGroupName]);
 
+    const handleEditBio = () => {
+        if (groupDetails) {
+            setEditableBio(groupDetails.description || '');
+        }
+        setIsEditingBio(true);
+    };
+
+    const handleCancelEditBio = () => {
+        setIsEditingBio(false);
+        if (groupDetails) { // Reset editableBio to original if cancelled
+            setEditableBio(groupDetails.description || '');
+        }
+    };
+
+    const handleSaveBio = async () => {
+        if (!groupDetails) return;
+        setIsSavingBio(true);
+        try {
+            const { data, error: updateError } = await supabase
+                .from('groups')
+                .update({ description: editableBio.trim() })
+                .eq('id', groupId)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+
+            if (data) {
+                setGroupDetails(prevDetails => prevDetails ? { ...prevDetails, description: data.description } : null);
+                Alert.alert('Success', 'Group description updated.');
+            }
+            setIsEditingBio(false);
+        } catch (err: any) {
+            console.error('Failed to save bio:', err);
+            Alert.alert('Error', 'Could not save description.');
+        } finally {
+            setIsSavingBio(false);
+        }
+    };
+
     if (isLoading) {
         return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
     }
@@ -150,14 +191,33 @@ const GroupDetailsScreen = () => {
                 </TouchableOpacity>
             </View>
 
-            {/* Group Bio/Description Area */}
+            {/* Group Bio/Description Area - Corrected onPress */}
             <View style={styles.bioSection}>
                 <Text style={styles.sectionTitle}>Description</Text>
-                <Text style={styles.bioText}>{groupDetails.description || 'No description provided.'}</Text>
-                {/* Button to edit bio - to be implemented */}
-                <TouchableOpacity style={styles.actionButton} onPress={() => Alert.alert('TODO', 'Edit bio functionality')}>
-                    <Text style={styles.actionButtonText}>Edit Description</Text>
-                </TouchableOpacity>
+                {isEditingBio ? (
+                    <>
+                        <TextInput
+                            style={[styles.input, styles.bioInput]}
+                            value={editableBio}
+                            onChangeText={setEditableBio}
+                            placeholder="Enter group description..."
+                            multiline
+                            numberOfLines={4}
+                            editable={!isSavingBio}
+                        />
+                        <View style={styles.bioActionsContainer}>
+                            <Button title="Cancel" onPress={handleCancelEditBio} disabled={isSavingBio} color="#FF3B30"/>
+                            <Button title={isSavingBio ? "Saving..." : "Save"} onPress={handleSaveBio} disabled={isSavingBio} />
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        <Text style={styles.bioText}>{groupDetails.description || 'No description provided.'}</Text>
+                        <TouchableOpacity style={styles.actionButton} onPress={handleEditBio}>
+                            <Text style={styles.actionButtonText}>Edit Description</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
             </View>
 
             {/* Group Members List Area */}
@@ -239,6 +299,25 @@ const styles = StyleSheet.create({
         color: '#555',
         marginBottom: 15,
     },
+    input: {
+        borderColor: '#ddd',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        fontSize: 16,
+        backgroundColor: '#fff',
+    },
+    bioInput: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+        marginBottom: 10,
+    },
+    bioActionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 10,
+    },
     membersSection: {
         padding: 20,
         backgroundColor: '#fff',
@@ -274,6 +353,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 5,
         marginTop: 10,
+        alignSelf: 'flex-start',
     },
     actionButtonText: {
         color: '#fff',
