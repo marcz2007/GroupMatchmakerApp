@@ -3,6 +3,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { getUserGroups } from '../services/groupService';
 import { supabase } from '../supabase';
 
 interface ChatPreview {
@@ -24,73 +25,44 @@ const MessagesListScreen = () => {
     setLoading(true);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-
       if (userError || !user) {
         setChats([]);
         Alert.alert('Error', 'Could not get user session.');
         return;
       }
 
-      // Fetch groups user is member of
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('group_members')
-        .select(`
-          groups (
-            id,
-            name
-          )
-        `)
-        .eq('user_id', user.id);
-
-      if (groupsError) {
-        console.error('Error fetching group chats:', groupsError);
-        Alert.alert('Error', 'Could not fetch group chats.');
-        return;
-      }
-
+      // Fetch groups using the service
+      const groups = await getUserGroups(user.id);
+      
       // Fetch latest message for each group
       const groupPreviews: ChatPreview[] = [];
       
-      if (groupsData) {
-        for (const item of groupsData) {
-          if (!item.groups || !Array.isArray(item.groups) || item.groups.length === 0) {
-            console.warn('Skipping group member item due to missing, non-array, or empty groups data:', item);
-            continue;
-          }
-          
-          const group = item.groups[0];
-
-          if (!group || typeof group.id === 'undefined' || typeof group.name === 'undefined') {
-            console.warn('Skipping group member item due to invalid group object in array:', item, group);
-            continue;
-          }
-          
-          const { data: latestMessage, error: messageError } = await supabase
-            .from('messages')
-            .select('content, created_at')
-            .eq('group_id', group.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          
-          if (!messageError && latestMessage) {
-            groupPreviews.push({
-              id: group.id,
-              name: group.name,
-              lastMessage: latestMessage.content,
-              timestamp: new Date(latestMessage.created_at),
-              isGroup: true
-            });
-          } else {
-            // If no messages, still show the group
-            groupPreviews.push({
-              id: group.id,
-              name: group.name,
-              lastMessage: 'No messages yet',
-              timestamp: new Date(),
-              isGroup: true
-            });
-          }
+      for (const group of groups) {
+        const { data: latestMessage, error: messageError } = await supabase
+          .from('messages')
+          .select('content, created_at')
+          .eq('group_id', group.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (!messageError && latestMessage) {
+          groupPreviews.push({
+            id: group.id,
+            name: group.name,
+            lastMessage: latestMessage.content,
+            timestamp: new Date(latestMessage.created_at),
+            isGroup: true
+          });
+        } else {
+          // If no messages, still show the group
+          groupPreviews.push({
+            id: group.id,
+            name: group.name,
+            lastMessage: 'No messages yet',
+            timestamp: new Date(),
+            isGroup: true
+          });
         }
       }
 

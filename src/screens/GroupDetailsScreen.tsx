@@ -1,6 +1,7 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker'; // Import expo-image-picker
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -21,13 +22,20 @@ import { supabase } from '../supabase';
 type GroupDetailsScreenRouteProp = RouteProp<RootStackParamList, 'GroupDetails'>;
 type GroupDetailsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'GroupDetails'>;
 
-// Interface for fetched group details (can be expanded)
+// Interface for fetched group details (picture_url removed from here)
 interface GroupDetailsData {
     id: string;
     name: string;
     description?: string | null;
-    picture_url?: string | null; // Assuming a column for picture URL in 'groups' table
     owner_id?: string;
+}
+
+// Interface for group images from group_images table
+interface GroupImageRecord {
+    id: string; // id from group_images table
+    image_url: string;
+    is_primary: boolean;
+    image_storage_path: string; // To potentially delete old image from storage
 }
 
 // Interface for group members
@@ -43,8 +51,11 @@ const GroupDetailsScreen = () => {
     const { groupId, groupName: initialGroupName } = route.params;
 
     const [groupDetails, setGroupDetails] = useState<GroupDetailsData | null>(null);
+    const [primaryImage, setPrimaryImage] = useState<GroupImageRecord | null>(null);
+    // Later: const [otherImages, setOtherImages] = useState<GroupImageRecord[]>([]);
     const [members, setMembers] = useState<GroupMember[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isUploadingPicture, setIsUploadingPicture] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // State for bio editing
@@ -56,64 +67,230 @@ const GroupDetailsScreen = () => {
         navigation.setOptions({ title: initialGroupName || groupDetails?.name || 'Group Details' });
     }, [navigation, initialGroupName, groupDetails?.name]);
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Fetch group-specific details (name, description, picture_url)
-                const { data: groupData, error: groupError } = await supabase
-                    .from('groups')
-                    .select('id, name, description, picture_url, owner_id') // Add/remove fields as needed
-                    .eq('id', groupId)
-                    .single();
+    const fetchGroupData = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            // Fetch group-specific details (name, description)
+            const { data: groupData, error: groupError } = await supabase
+                .from('groups')
+                .select('id, name, description, owner_id') // Removed picture_url from here
+                .eq('id', groupId)
+                .single();
 
-                if (groupError) throw groupError;
-                if (!groupData) throw new Error('Group not found.');
-                setGroupDetails(groupData);
-                setEditableBio(groupData.description || '');
-                if (!initialGroupName) { // If initialGroupName wasn't passed, update title
-                    navigation.setOptions({ title: groupData.name || 'Group Details'});
-                }
-
-                // Fetch group members
-                const { data: memberData, error: memberError } = await supabase
-                    .from('group_members')
-                    .select(`
-                        user_id,
-                        profiles ( id, username, avatar_url )
-                    `)
-                    .eq('group_id', groupId);
-
-                if (memberError) throw memberError;
-                
-                const mappedMembers = memberData?.map(m => {
-                    const profileData = m.profiles as any; // Cast to any to access properties
-                    if (profileData && typeof profileData === 'object' && profileData.id) {
-                        return {
-                            id: profileData.id,
-                            username: profileData.username,
-                            avatar_url: profileData.avatar_url
-                        } as GroupMember;
-                    }
-                    return null;
-                }).filter((profile): profile is GroupMember => profile !== null) || [];
-                
-                setMembers(mappedMembers);
-
-            } catch (err: any) {
-                console.error('Failed to fetch group details or members:', err);
-                setError(err.message || 'Could not load group information.');
-                Alert.alert('Error', err.message || 'Could not load group information.');
-            } finally {
-                setIsLoading(false);
+            if (groupError) throw groupError;
+            if (!groupData) throw new Error('Group not found.');
+            setGroupDetails(groupData);
+            setEditableBio(groupData.description || '');
+            if (!initialGroupName && groupData.name) {
+                navigation.setOptions({ title: groupData.name });
             }
-        };
 
-        if (groupId) {
-            fetchDetails();
+            // Fetch primary group image
+            const { data: primaryImageData, error: primaryImageError } = await supabase
+                .from('group_images')
+                .select('id, image_url, is_primary, image_storage_path')
+                .eq('group_id', groupId)
+                .eq('is_primary', true)
+                .maybeSingle(); // Use maybeSingle as there might be no primary image
+            
+            if (primaryImageError) throw primaryImageError;
+            setPrimaryImage(primaryImageData as GroupImageRecord | null);
+            // Later: Fetch otherImages here as well
+
+            // Fetch group members
+            const { data: memberData, error: memberError } = await supabase
+                .from('group_members')
+                .select(`user_id, profiles ( id, username, avatar_url )`)
+                .eq('group_id', groupId);
+
+            if (memberError) throw memberError;
+            const mappedMembers = memberData?.map(m => {
+                const profileData = m.profiles as any;
+                if (profileData && typeof profileData === 'object' && profileData.id) {
+                    return { id: profileData.id, username: profileData.username, avatar_url: profileData.avatar_url } as GroupMember;
+                }
+                return null;
+            }).filter((profile): profile is GroupMember => profile !== null) || [];
+            setMembers(mappedMembers);
+
+        } catch (err: any) {
+            console.error('Failed to fetch group details:', err);
+            setError(err.message || 'Could not load group information.');
+        } finally {
+            setIsLoading(false);
         }
     }, [groupId, navigation, initialGroupName]);
+
+    useEffect(() => {
+        if (groupId) {
+            fetchGroupData();
+        }
+    }, [groupId, fetchGroupData]);
+
+    const handleChoosePrimaryPicture = async () => {
+        console.log('[handleChoosePrimaryPicture] Initiated.');
+        setIsUploadingPicture(true);
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert("Permission required", "Please grant permission to access the photo library.");
+                setIsUploadingPicture(false);
+                return;
+            }
+            console.log('[handleChoosePrimaryPicture] Permissions granted.');
+
+            const pickerResult = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.6,
+            });
+
+            if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
+                console.log('[handleChoosePrimaryPicture] Image picker cancelled or no assets.');
+                setIsUploadingPicture(false);
+                return;
+            }
+
+            const asset = pickerResult.assets[0];
+            const imageUri = asset.uri;
+            console.log(`[handleChoosePrimaryPicture] Image selected. URI: ${imageUri}, Asset:`, JSON.stringify(asset));
+
+            const fileName = `${groupId}_primary_${Date.now()}.${imageUri.split('.').pop()}`;
+            const filePath = `${fileName}`;
+
+            // Convert URI to Blob using XMLHttpRequest
+            console.log('[handleChoosePrimaryPicture] Attempting Blob conversion via XHR...');
+            const blob: Blob = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.onload = function () {
+                    console.log(`[handleChoosePrimaryPicture] XHR onload success. Status: ${xhr.status}, Response size: ${xhr.response?.size}`);
+                    resolve(xhr.response);
+                };
+                xhr.onerror = function (e) {
+                    console.error('[handleChoosePrimaryPicture] XHR onerror: ', e);
+                    reject(new TypeError('XHR request failed during blob conversion.'));
+                };
+                xhr.responseType = 'blob';
+                xhr.open('GET', imageUri, true);
+                xhr.send(null);
+            });
+            console.log(`[handleChoosePrimaryPicture] Blob conversion successful. Size: ${blob.size}, Type: ${blob.type}`);
+
+            // If there was an old primary image, delete it from storage first
+            if (primaryImage && primaryImage.image_storage_path) {
+                console.log(`[handleChoosePrimaryPicture] Attempting to delete old image: ${primaryImage.image_storage_path}`);
+                const { error: deleteError } = await supabase.storage
+                    .from('group-images') // Use hyphen for bucket name
+                    .remove([primaryImage.image_storage_path]);
+                if (deleteError) {
+                    console.warn('[handleChoosePrimaryPicture] Failed to delete old image from storage:', deleteError);
+                } else {
+                    console.log('[handleChoosePrimaryPicture] Old image deleted successfully from storage.');
+                }
+            }
+
+            // Upload new image to Supabase Storage
+            console.log(`[handleChoosePrimaryPicture] Attempting to upload to Supabase Storage. Bucket: group-images, Path: ${filePath}, ContentType: ${asset.mimeType || blob.type || 'image/jpeg'}`);
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('group-images') // Use hyphen for bucket name
+                .upload(filePath, blob, {
+                    cacheControl: '3600',
+                    upsert: true,
+                    contentType: asset.mimeType || blob.type || 'image/jpeg',
+                });
+
+            if (uploadError) {
+                console.error('[handleChoosePrimaryPicture] Supabase upload error:', uploadError);
+                throw uploadError; // Re-throw Supabase specific error
+            }
+            if (!uploadData) throw new Error('Supabase upload failed, no data returned.');
+            console.log('[handleChoosePrimaryPicture] Supabase upload successful:', uploadData);
+
+            // Get public URL
+            console.log('[handleChoosePrimaryPicture] Getting public URL...');
+            const { data: urlData } = supabase.storage
+                .from('group-images') // Use hyphen for bucket name
+                .getPublicUrl(filePath);
+            
+            if (!urlData.publicUrl) throw new Error('Failed to get public URL.');
+            const newImageUrl = urlData.publicUrl;
+            console.log(`[handleChoosePrimaryPicture] Public URL obtained: ${newImageUrl}`);
+
+            // Update database (group_images table)
+            console.log('[handleChoosePrimaryPicture] Updating database records...');
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            const uploaderUserId = currentUser?.id;
+
+            const { error: demoteError } = await supabase
+                .from('group_images') // Underscore for table
+                .update({ is_primary: false })
+                .eq('group_id', groupId)
+                .eq('is_primary', true);
+
+            if (demoteError) {
+                console.error('[handleChoosePrimaryPicture] Error demoting old primary image in DB:', demoteError);
+            }
+            
+            let newPrimaryImageRecord: GroupImageRecord | null = null;
+            if (primaryImage) { 
+                console.log(`[handleChoosePrimaryPicture] Updating existing DB record ID: ${primaryImage.id}`);
+                const {data: updatedRecord, error: updateDbError} = await supabase
+                    .from('group_images') // Underscore for table
+                    .update({ 
+                        image_url: newImageUrl, 
+                        image_storage_path: filePath, 
+                        is_primary: true, 
+                        uploaded_at: new Date().toISOString(),
+                        uploader_user_id: uploaderUserId
+                    })
+                    .eq('id', primaryImage.id)
+                    .select('id, image_url, is_primary, image_storage_path')
+                    .single();
+                if(updateDbError) {
+                    console.error('[handleChoosePrimaryPicture] Error updating DB record:', updateDbError);
+                    throw updateDbError;
+                }
+                newPrimaryImageRecord = updatedRecord;
+                console.log('[handleChoosePrimaryPicture] DB record updated.');
+            } else { 
+                 console.log('[handleChoosePrimaryPicture] Inserting new DB record...');
+                 const {data: insertedRecord, error: insertDbError} = await supabase
+                    .from('group_images') // Underscore for table
+                    .insert({
+                        group_id: groupId,
+                        image_url: newImageUrl,
+                        image_storage_path: filePath,
+                        is_primary: true,
+                        uploader_user_id: uploaderUserId
+                    })
+                    .select('id, image_url, is_primary, image_storage_path')
+                    .single();
+                if(insertDbError) {
+                    console.error('[handleChoosePrimaryPicture] Error inserting DB record:', insertDbError);
+                    throw insertDbError;
+                }
+                newPrimaryImageRecord = insertedRecord;
+                console.log('[handleChoosePrimaryPicture] New DB record inserted.');
+            }
+
+            setPrimaryImage(newPrimaryImageRecord);
+            Alert.alert('Success', 'Group picture updated!');
+            console.log('[handleChoosePrimaryPicture] Process completed successfully.');
+
+        } catch (err: any) {
+            console.error('[handleChoosePrimaryPicture] Caught Error:', err);
+            // Distinguish between XHR error and other errors
+            const errorMessage = (err.message === 'XHR request failed during blob conversion.') 
+                ? 'Could not read selected image file.' 
+                : (err.message || 'Could not change group picture.');
+            Alert.alert('Error', errorMessage);
+        } finally {
+            console.log('[handleChoosePrimaryPicture] Finished.');
+            setIsUploadingPicture(false);
+        }
+    };
 
     const handleEditBio = () => {
         if (groupDetails) {
@@ -124,7 +301,7 @@ const GroupDetailsScreen = () => {
 
     const handleCancelEditBio = () => {
         setIsEditingBio(false);
-        if (groupDetails) { // Reset editableBio to original if cancelled
+        if (groupDetails) {
             setEditableBio(groupDetails.description || '');
         }
     };
@@ -176,22 +353,25 @@ const GroupDetailsScreen = () => {
 
     return (
         <ScrollView style={styles.container}>
-            {/* Group Picture Area */}
             <View style={styles.pictureSection}>
-                {groupDetails.picture_url ? (
-                    <Image source={{ uri: groupDetails.picture_url }} style={styles.groupImage} resizeMode="cover" />
+                {isUploadingPicture ? (
+                    <View style={styles.groupImagePlaceholder}><ActivityIndicator size="large" /></View>
+                ) : primaryImage?.image_url ? (
+                    <Image source={{ uri: primaryImage.image_url }} style={styles.groupImage} resizeMode="cover" />
                 ) : (
                     <View style={styles.groupImagePlaceholder}>
                         <Text style={styles.placeholderText}>No Group Picture</Text>
                     </View>
                 )}
-                {/* Button to change picture - to be implemented */}
-                <TouchableOpacity style={styles.actionButton} onPress={() => Alert.alert('TODO', 'Upload picture functionality')}>
-                    <Text style={styles.actionButtonText}>Change Picture</Text>
+                <TouchableOpacity 
+                    style={[styles.actionButton, isUploadingPicture && styles.disabledButton]}
+                    onPress={handleChoosePrimaryPicture} 
+                    disabled={isUploadingPicture}
+                >
+                    <Text style={styles.actionButtonText}>{isUploadingPicture ? 'Uploading...' : 'Change Picture'}</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Group Bio/Description Area - Corrected onPress */}
             <View style={styles.bioSection}>
                 <Text style={styles.sectionTitle}>Description</Text>
                 {isEditingBio ? (
@@ -212,15 +392,14 @@ const GroupDetailsScreen = () => {
                     </>
                 ) : (
                     <>
-                        <Text style={styles.bioText}>{groupDetails.description || 'No description provided.'}</Text>
-                        <TouchableOpacity style={styles.actionButton} onPress={handleEditBio}>
+                        <Text style={styles.bioText}>{groupDetails?.description || 'No description provided.'}</Text>
+                        <TouchableOpacity style={styles.actionButton} onPress={handleEditBio}> 
                             <Text style={styles.actionButtonText}>Edit Description</Text>
                         </TouchableOpacity>
                     </>
                 )}
             </View>
 
-            {/* Group Members List Area */}
             <View style={styles.membersSection}>
                 <Text style={styles.sectionTitle}>Members ({members.length})</Text>
                 {members.length > 0 ? (
@@ -228,7 +407,7 @@ const GroupDetailsScreen = () => {
                         data={members}
                         renderItem={renderMemberItem}
                         keyExtractor={(item) => item.id}
-                        scrollEnabled={false} // ScrollView handles main scroll
+                        scrollEnabled={false} 
                     />
                 ) : (
                     <Text>No members found.</Text>
@@ -299,7 +478,7 @@ const styles = StyleSheet.create({
         color: '#555',
         marginBottom: 15,
     },
-    input: {
+    input: { 
         borderColor: '#ddd',
         borderWidth: 1,
         borderRadius: 8,
@@ -359,6 +538,9 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    disabledButton: {
+        backgroundColor: '#cccccc',
     }
 });
 
