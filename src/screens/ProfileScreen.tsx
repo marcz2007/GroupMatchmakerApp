@@ -23,6 +23,7 @@ interface Profile {
   avatar_url?: string;
   firstName?: string;
   lastName?: string;
+  photos?: { url: string; order: number }[];
 }
 
 const ProfileScreen = () => {
@@ -39,6 +40,8 @@ const ProfileScreen = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -117,6 +120,10 @@ const ProfileScreen = () => {
         setAvatarUrl(data.avatar_url || null);
         setFirstName(data.firstName || "");
         setLastName(data.lastName || "");
+        // Sort photos by order if they exist
+        if (data.photos) {
+          data.photos.sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+        }
       }
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -144,6 +151,7 @@ const ProfileScreen = () => {
       }
 
       let newAvatarUrl: string | null | undefined = undefined;
+      let newPhotos: { url: string; order: number }[] | undefined = undefined;
 
       if (selectedImage) {
         newAvatarUrl = await uploadImage(selectedImage);
@@ -157,6 +165,19 @@ const ProfileScreen = () => {
         }
       }
 
+      if (selectedPhotos.length > 0) {
+        const uploadedPhotos = await uploadPhotos(selectedPhotos);
+        if (uploadedPhotos.length === 0) {
+          Alert.alert(
+            "Save Error",
+            "Failed to upload photos. Profile not saved."
+          );
+          setIsSaving(false);
+          return;
+        }
+        newPhotos = uploadedPhotos;
+      }
+
       const interestsArray = interests
         .split(",")
         .map((item) => item.trim())
@@ -166,6 +187,7 @@ const ProfileScreen = () => {
         updated_at: Date;
         id: string;
         avatar_url?: string | null;
+        photos?: { url: string; order: number }[];
       } = {
         id: user.id,
         username,
@@ -178,6 +200,10 @@ const ProfileScreen = () => {
 
       if (newAvatarUrl !== undefined) {
         updates.avatar_url = newAvatarUrl;
+      }
+
+      if (newPhotos !== undefined) {
+        updates.photos = newPhotos;
       }
 
       const { error: updateError } = await supabase
@@ -195,8 +221,12 @@ const ProfileScreen = () => {
         if (newAvatarUrl !== undefined) {
           setAvatarUrl(newAvatarUrl);
         }
+        if (newPhotos !== undefined) {
+          setProfile((prevProfile) => ({ ...prevProfile!, photos: newPhotos }));
+        }
         setProfile((prevProfile) => ({ ...prevProfile!, ...updates }));
         setSelectedImage(null);
+        setSelectedPhotos([]);
         setEditing(false);
       }
     } catch (error: any) {
@@ -232,6 +262,28 @@ const ProfileScreen = () => {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       console.log("Selected image asset:", result.assets[0]);
       setSelectedImage(result.assets[0]);
+    }
+  };
+
+  const pickMultipleImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "Sorry, we need camera roll permissions to make this work!"
+      );
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 6,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setSelectedPhotos(result.assets);
     }
   };
 
@@ -295,6 +347,59 @@ const ProfileScreen = () => {
       return null;
     } finally {
       setUploading(false);
+    }
+  };
+
+  const uploadPhotos = async (assets: ImagePicker.ImagePickerAsset[]): Promise<{ url: string; order: number }[]> => {
+    try {
+      setUploadingPhotos(true);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        Alert.alert("Error", "User not authenticated for upload.");
+        return [];
+      }
+
+      const uploadedPhotos = [];
+      for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        const arraybuffer = await fetch(asset.uri).then((res) => res.arrayBuffer());
+        const fileExt = asset.uri?.split(".").pop()?.toLowerCase() ?? "jpg";
+        const path = `${user.id}/photos/${Date.now()}_${i}.${fileExt}`;
+
+        const { data, error: uploadError } = await supabase.storage
+          .from("photos")
+          .upload(path, arraybuffer, {
+            contentType: asset.mimeType ?? `image/${fileExt}`,
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error("Error uploading photo:", uploadError);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from("photos")
+          .getPublicUrl(path);
+
+        if (urlData?.publicUrl) {
+          uploadedPhotos.push({ url: urlData.publicUrl, order: i });
+        }
+      }
+
+      return uploadedPhotos;
+    } catch (error: any) {
+      console.error("Error in uploadPhotos function:", error);
+      Alert.alert(
+        "Upload Error",
+        error?.message ?? "An unexpected error occurred during upload."
+      );
+      return [];
+    } finally {
+      setUploadingPhotos(false);
     }
   };
 
@@ -378,6 +483,58 @@ const ProfileScreen = () => {
           placeholder="e.g. art, movies, hiking"
         />
 
+        <View style={styles.photoGallerySection}>
+          <Text style={styles.label}>Profile Photos (up to 6)</Text>
+          <View style={styles.photoGrid}>
+            {profile?.photos?.map((photo, index) => (
+              <View key={index} style={styles.photoContainer}>
+                <Image source={{ uri: photo.url }} style={styles.photo} />
+                <TouchableOpacity
+                  style={styles.removePhotoButton}
+                  onPress={() => {
+                    const newPhotos = [...(profile.photos || [])];
+                    newPhotos.splice(index, 1);
+                    setProfile(prev => prev ? { ...prev, photos: newPhotos } : null);
+                  }}
+                >
+                  <Text style={styles.removePhotoButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {(!profile?.photos || profile.photos.length < 6) && (
+              <TouchableOpacity
+                style={styles.addPhotoButton}
+                onPress={pickMultipleImages}
+                disabled={uploadingPhotos}
+              >
+                <Text style={styles.addPhotoButtonText}>+</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {selectedPhotos.length > 0 && (
+            <View style={styles.selectedPhotosPreview}>
+              <Text style={styles.label}>Selected Photos ({selectedPhotos.length})</Text>
+              <ScrollView horizontal style={styles.selectedPhotosScroll}>
+                {selectedPhotos.map((photo, index) => (
+                  <View key={index} style={styles.selectedPhotoContainer}>
+                    <Image source={{ uri: photo.uri }} style={styles.selectedPhoto} />
+                    <TouchableOpacity
+                      style={styles.removeSelectedPhotoButton}
+                      onPress={() => {
+                        const newSelectedPhotos = [...selectedPhotos];
+                        newSelectedPhotos.splice(index, 1);
+                        setSelectedPhotos(newSelectedPhotos);
+                      }}
+                    >
+                      <Text style={styles.removePhotoButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
         <View style={styles.profileSection}>
           <Text style={styles.label}>Email</Text>
           <Text style={styles.profileValue}>{profile?.email}</Text>
@@ -443,6 +600,19 @@ const ProfileScreen = () => {
             ? profile.interests.join(", ")
             : "Not set"}
         </Text>
+      </View>
+
+      <View style={styles.photoGallerySection}>
+        <Text style={styles.label}>Photos</Text>
+        {profile?.photos && profile.photos.length > 0 ? (
+          <ScrollView horizontal style={styles.photoGallery}>
+            {profile.photos.map((photo, index) => (
+              <Image key={index} source={{ uri: photo.url }} style={styles.galleryPhoto} />
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={styles.noPhotosText}>No photos added yet</Text>
+        )}
       </View>
 
       <View style={styles.protectedSection}>
@@ -564,6 +734,98 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#212529",
     fontWeight: "400",
+  },
+  photoGallerySection: {
+    marginBottom: 20,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+  },
+  photoContainer: {
+    width: '30%',
+    aspectRatio: 1,
+    position: 'relative',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: 'red',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removePhotoButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  addPhotoButton: {
+    width: '30%',
+    aspectRatio: 1,
+    backgroundColor: '#e1e1e1',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderStyle: 'dashed',
+  },
+  addPhotoButtonText: {
+    fontSize: 32,
+    color: '#666',
+  },
+  selectedPhotosPreview: {
+    marginTop: 20,
+  },
+  selectedPhotosScroll: {
+    marginTop: 10,
+  },
+  selectedPhotoContainer: {
+    width: 100,
+    height: 100,
+    marginRight: 10,
+    position: 'relative',
+  },
+  selectedPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  removeSelectedPhotoButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: 'red',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoGallery: {
+    marginTop: 10,
+  },
+  galleryPhoto: {
+    width: 200,
+    height: 200,
+    marginRight: 10,
+    borderRadius: 8,
+  },
+  noPhotosText: {
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 10,
   },
 });
 
