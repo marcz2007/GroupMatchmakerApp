@@ -7,12 +7,14 @@ import {
   Image,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { supabase } from "../supabase";
+import { shouldAnalyzeBio, updateAnalysisScores } from '../utils/aiAnalysis';
 
 interface Profile {
   id: string;
@@ -24,6 +26,13 @@ interface Profile {
   firstName?: string;
   lastName?: string;
   photos?: { url: string; order: number }[];
+  enable_ai_analysis?: boolean;
+  ai_analysis_scores?: {
+    communicationStyle?: number;
+    activityPreference?: number;
+    socialDynamics?: number;
+    lastUpdated?: string;
+  };
 }
 
 const ProfileScreen = () => {
@@ -42,6 +51,7 @@ const ProfileScreen = () => {
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [selectedPhotos, setSelectedPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -138,6 +148,7 @@ const ProfileScreen = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
+    console.log('[handleSave] Starting save process...');
 
     try {
       const {
@@ -145,17 +156,21 @@ const ProfileScreen = () => {
         error: userError,
       } = await supabase.auth.getUser();
       if (userError || !user) {
+        console.error('[handleSave] User authentication error:', userError);
         Alert.alert("Error", "Could not get user session.");
         setIsSaving(false);
         return;
       }
+      console.log('[handleSave] User authenticated successfully:', user.id);
 
       let newAvatarUrl: string | null | undefined = undefined;
       let newPhotos: { url: string; order: number }[] | undefined = undefined;
 
       if (selectedImage) {
+        console.log('[handleSave] Processing new avatar image...');
         newAvatarUrl = await uploadImage(selectedImage);
         if (newAvatarUrl === null) {
+          console.error('[handleSave] Failed to upload new avatar');
           Alert.alert(
             "Save Error",
             "Failed to upload new profile picture. Profile not saved."
@@ -163,11 +178,14 @@ const ProfileScreen = () => {
           setIsSaving(false);
           return;
         }
+        console.log('[handleSave] New avatar uploaded successfully:', newAvatarUrl);
       }
 
       if (selectedPhotos.length > 0) {
+        console.log('[handleSave] Processing new photos...');
         const uploadedPhotos = await uploadPhotos(selectedPhotos);
         if (uploadedPhotos.length === 0) {
+          console.error('[handleSave] Failed to upload photos');
           Alert.alert(
             "Save Error",
             "Failed to upload photos. Profile not saved."
@@ -176,6 +194,7 @@ const ProfileScreen = () => {
           return;
         }
         newPhotos = uploadedPhotos;
+        console.log('[handleSave] New photos uploaded successfully:', uploadedPhotos.length);
       }
 
       const interestsArray = interests
@@ -183,11 +202,24 @@ const ProfileScreen = () => {
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
 
+      // Check if we should analyze the bio
+      const shouldAnalyze = shouldAnalyzeBio(
+        bio,
+        profile?.ai_analysis_scores?.lastUpdated
+      );
+      console.log('[handleSave] Bio analysis check:', {
+        shouldAnalyze,
+        enableAIAnalysis,
+        bioLength: bio.length,
+        lastUpdated: profile?.ai_analysis_scores?.lastUpdated
+      });
+
       const updates: Partial<Profile> & {
         updated_at: Date;
         id: string;
         avatar_url?: string | null;
         photos?: { url: string; order: number }[];
+        enable_ai_analysis?: boolean;
       } = {
         id: user.id,
         username,
@@ -196,6 +228,7 @@ const ProfileScreen = () => {
         updated_at: new Date(),
         firstName,
         lastName,
+        enable_ai_analysis: enableAIAnalysis,
       };
 
       if (newAvatarUrl !== undefined) {
@@ -206,6 +239,14 @@ const ProfileScreen = () => {
         updates.photos = newPhotos;
       }
 
+      console.log('[handleSave] Updating profile with data:', {
+        id: updates.id,
+        username: updates.username,
+        bioLength: updates.bio?.length,
+        interestsCount: updates.interests?.length,
+        enableAIAnalysis: updates.enable_ai_analysis
+      });
+
       const { error: updateError } = await supabase
         .from("profiles")
         .upsert(updates)
@@ -214,9 +255,33 @@ const ProfileScreen = () => {
         .single();
 
       if (updateError) {
-        console.error("Error updating profile:", updateError);
+        console.error('[handleSave] Error updating profile:', updateError);
         Alert.alert("Error updating profile", updateError.message);
       } else {
+        // If bio should be analyzed and AI analysis is enabled, trigger analysis
+        if (shouldAnalyze && enableAIAnalysis) {
+          console.log('[handleSave] Triggering AI analysis for bio...');
+          try {
+            console.log('[handleSave] Sending request to analyze-text function with payload:', {
+              text: bio,
+              type: 'bio'
+            });
+            
+            const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-text', {
+              body: { text: bio, type: 'bio' }
+            });
+
+            if (analysisError) {
+              console.error('[handleSave] Error analyzing bio:', analysisError);
+            } else if (analysisData) {
+              console.log('[handleSave] Analysis successful, updating scores:', analysisData);
+              await updateAnalysisScores(user.id, analysisData);
+            }
+          } catch (error) {
+            console.error('[handleSave] Error in AI analysis:', error);
+          }
+        }
+
         Alert.alert("Success", "Profile updated successfully");
         if (newAvatarUrl !== undefined) {
           setAvatarUrl(newAvatarUrl);
@@ -230,10 +295,11 @@ const ProfileScreen = () => {
         setEditing(false);
       }
     } catch (error: any) {
-      console.error("Unexpected error in handleSave:", error);
+      console.error("[handleSave] Unexpected error:", error);
       Alert.alert("Error", "An unexpected error occurred during save.");
     } finally {
       setIsSaving(false);
+      console.log('[handleSave] Save process completed');
     }
   };
 
@@ -482,6 +548,23 @@ const ProfileScreen = () => {
           onChangeText={setInterests}
           placeholder="e.g. art, movies, hiking"
         />
+
+        <View style={styles.aiAnalysisSection}>
+          <Text style={styles.label}>AI Analysis</Text>
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Enable AI Analysis</Text>
+            <Switch
+              value={enableAIAnalysis}
+              onValueChange={setEnableAIAnalysis}
+              trackColor={{ false: "#767577", true: "#5762b7" }}
+              thumbColor={enableAIAnalysis ? "#f4f3f4" : "#f4f3f4"}
+            />
+          </View>
+          <Text style={styles.aiDescription}>
+            When enabled, your chat messages and bio will be analyzed to help find better group matches.
+            This helps us understand your communication style and preferences.
+          </Text>
+        </View>
 
         <View style={styles.photoGallerySection}>
           <Text style={styles.label}>Profile Photos (up to 6)</Text>
@@ -826,6 +909,23 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     marginTop: 10,
+  },
+  aiAnalysisSection: {
+    marginBottom: 20,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  aiDescription: {
+    fontSize: 14,
+    color: '#6c757d',
   },
 });
 

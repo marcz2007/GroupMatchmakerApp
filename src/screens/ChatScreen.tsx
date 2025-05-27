@@ -8,6 +8,7 @@ import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { RootStackNavigationProp } from "../../App";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
+import { analyzeUserChatMessages } from '../utils/aiAnalysis';
 
 // Define the type for the route parameters expected by this screen
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
@@ -301,24 +302,42 @@ const ChatScreen = () => {
   }, [groupId, currentUserId, isGroupMember, processingJoin]);
 
   const onSend = useCallback(
-    // ... (onSend implementation as before) ...
     async (newMessages: IMessage[] = []) => {
       if (!currentUserId || !isGroupMember) {
         Alert.alert("Error", "Cannot send message, user not identified or not a group member.");
         return;
       }
+
       const messageToSend = {
         group_id: groupId,
         user_id: currentUserId,
         content: newMessages[0].text,
+        created_at: new Date().toISOString(),
       };
+
       setMessages((previousMessages) => GiftedChat.append(previousMessages, newMessages));
-      const { error } = await supabase.from("messages").insert(messageToSend);
-      if (error) {
-        Alert.alert("Error", "Could not send message.");
-        console.error("Send message error:", error);
-      } else {
+      
+      try {
+        // Send message
+        const { error } = await supabase.from("messages").insert(messageToSend);
+        if (error) throw error;
+
+        // Get user's profile to check if AI analysis is enabled
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('enableAIAnalysis')
+          .eq('id', currentUserId)
+          .single();
+
+        // If AI analysis is enabled, analyze the new message
+        if (profile?.enableAIAnalysis) {
+          await analyzeUserChatMessages(currentUserId, [messageToSend]);
+        }
+
         console.log("Message sent successfully");
+      } catch (error) {
+        console.error("Send message error:", error);
+        Alert.alert("Error", "Could not send message.");
       }
     },
     [groupId, currentUserId, isGroupMember]

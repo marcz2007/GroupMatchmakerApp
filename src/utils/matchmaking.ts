@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase } from "../supabase";
 
 // Define interfaces for the database entities
 export interface Group {
@@ -10,6 +10,12 @@ export interface Group {
   interests?: string[];
   photo_url?: string;
   music_genres?: string[];
+  aiAnalysisScores?: {
+    communicationStyle: number;
+    activityPreference: number;
+    socialDynamics: number;
+    lastUpdated?: string;
+  };
 }
 
 export interface GroupMember {
@@ -43,10 +49,11 @@ export interface GroupEvent {
 
 // Matchmaking score weights
 const WEIGHTS = {
-  interestOverlap: 0.3,
-  styleSimilarity: 0.2,
-  musicCompatibility: 0.2,
-  textualRelevance: 0.3
+  interestOverlap: 0.25,
+  styleSimilarity: 0.15,
+  musicCompatibility: 0.15,
+  textualRelevance: 0.15,
+  aiCompatibility: 0.3,
 };
 
 /**
@@ -55,18 +62,21 @@ const WEIGHTS = {
  * @param interests2 Second array of interests
  * @returns Score between 0-1
  */
-export function calculateInterestOverlap(interests1: string[] = [], interests2: string[] = []): number {
+export function calculateInterestOverlap(
+  interests1: string[] = [],
+  interests2: string[] = []
+): number {
   if (interests1.length === 0 || interests2.length === 0) return 0;
-  
+
   // Normalize interests by converting to lowercase
-  const normalizedInterests1 = interests1.map(i => i.toLowerCase().trim());
-  const normalizedInterests2 = interests2.map(i => i.toLowerCase().trim());
-  
+  const normalizedInterests1 = interests1.map((i) => i.toLowerCase().trim());
+  const normalizedInterests2 = interests2.map((i) => i.toLowerCase().trim());
+
   // Find common interests
-  const commonInterests = normalizedInterests1.filter(interest => 
+  const commonInterests = normalizedInterests1.filter((interest) =>
     normalizedInterests2.includes(interest)
   );
-  
+
   // Calculate Jaccard similarity (intersection over union)
   const union = new Set([...normalizedInterests1, ...normalizedInterests2]);
   return commonInterests.length / union.size;
@@ -79,10 +89,13 @@ export function calculateInterestOverlap(interests1: string[] = [], interests2: 
  * @param styleVector2 Style vector for second group/user
  * @returns Score between 0-1
  */
-export function calculateStyleSimilarity(styleVector1?: number[], styleVector2?: number[]): number {
+export function calculateStyleSimilarity(
+  styleVector1?: number[],
+  styleVector2?: number[]
+): number {
   if (!styleVector1 || !styleVector2) return 0.5; // Default if no style data
-  
-  // Placeholder: In a real implementation, this would use cosine similarity 
+
+  // Placeholder: In a real implementation, this would use cosine similarity
   // or another vector distance measure
   return 0.5; // Default medium similarity
 }
@@ -93,7 +106,10 @@ export function calculateStyleSimilarity(styleVector1?: number[], styleVector2?:
  * @param genres2 Second array of music genres
  * @returns Score between 0-1
  */
-export function calculateMusicCompatibility(genres1: string[] = [], genres2: string[] = []): number {
+export function calculateMusicCompatibility(
+  genres1: string[] = [],
+  genres2: string[] = []
+): number {
   // Reuse interest overlap logic for genres
   return calculateInterestOverlap(genres1, genres2);
 }
@@ -107,54 +123,99 @@ export function calculateMusicCompatibility(genres1: string[] = [], genres2: str
  */
 export function calculateTextualRelevance(query: string, group: Group): number {
   if (!query) return 0;
-  
+
   // Normalize query
   const normalizedQuery = query.toLowerCase().trim();
-  
+
   // Search in group name and description
   const groupText = `${group.name} ${group.description}`.toLowerCase();
-  
+
   // Simple text matching for now
   // In a real implementation, this would use more sophisticated NLP/LLM
   const queryWords = normalizedQuery.split(/\s+/);
   let matchCount = 0;
-  
-  queryWords.forEach(word => {
+
+  queryWords.forEach((word) => {
     if (groupText.includes(word)) matchCount++;
   });
-  
+
   return matchCount / queryWords.length;
+}
+
+/**
+ * Calculate compatibility score between two AI analysis scores
+ * @param scores1 First set of AI analysis scores
+ * @param scores2 Second set of AI analysis scores
+ * @returns Score between 0-1
+ */
+export function calculateCompatibilityScore(
+  scores1: {
+    communicationStyle: number;
+    activityPreference: number;
+    socialDynamics: number;
+  },
+  scores2: {
+    communicationStyle: number;
+    activityPreference: number;
+    socialDynamics: number;
+  }
+): number {
+  // Placeholder: In a real implementation, this would use a more sophisticated algorithm
+  // to calculate compatibility between two AI analysis scores
+  return 0.5; // Default neutral score
 }
 
 /**
  * Calculate overall match score between user/group and potential match group
  * @param query Search query (activity or event)
+ * @param matchGroup Potential match group
  * @param userInterests User or user's group interests
  * @param userGenres User or user's group music genres
  * @param userStyle User or user's group style vector
- * @param matchGroup Potential match group
+ * @param userAIScores User's AI analysis scores
  * @returns Score between 0-1
  */
 export function calculateMatchScore(
   query: string,
+  matchGroup: Group,
   userInterests: string[] = [],
   userGenres: string[] = [],
   userStyle?: number[],
-  matchGroup: Group
+  userAIScores?: {
+    communicationStyle: number;
+    activityPreference: number;
+    socialDynamics: number;
+  }
 ): number {
   // Calculate individual scores
-  const interestScore = calculateInterestOverlap(userInterests, matchGroup.interests);
+  const interestScore = calculateInterestOverlap(
+    userInterests,
+    matchGroup.interests
+  );
   const styleScore = calculateStyleSimilarity(userStyle, undefined); // placeholder for group style
-  const musicScore = calculateMusicCompatibility(userGenres, matchGroup.music_genres);
+  const musicScore = calculateMusicCompatibility(
+    userGenres,
+    matchGroup.music_genres
+  );
   const textScore = calculateTextualRelevance(query, matchGroup);
-  
+
+  // Calculate AI compatibility score if both users have AI analysis enabled
+  let aiScore = 0.5; // Default neutral score
+  if (userAIScores && matchGroup.aiAnalysisScores) {
+    aiScore = calculateCompatibilityScore(
+      userAIScores,
+      matchGroup.aiAnalysisScores
+    );
+  }
+
   // Calculate weighted score
-  const weightedScore = 
-    (interestScore * WEIGHTS.interestOverlap) +
-    (styleScore * WEIGHTS.styleSimilarity) +
-    (musicScore * WEIGHTS.musicCompatibility) +
-    (textScore * WEIGHTS.textualRelevance);
-  
+  const weightedScore =
+    interestScore * WEIGHTS.interestOverlap +
+    styleScore * WEIGHTS.styleSimilarity +
+    musicScore * WEIGHTS.musicCompatibility +
+    textScore * WEIGHTS.textualRelevance +
+    aiScore * WEIGHTS.aiCompatibility;
+
   return weightedScore;
 }
 
@@ -171,30 +232,36 @@ export async function findGroupsByActivity(
   try {
     // Get all groups except current
     const { data: groups, error } = await supabase
-      .from('groups')
-      .select('*')
-      .neq('id', currentGroupId || '')
+      .from("groups")
+      .select("*")
+      .neq("id", currentGroupId || "")
       .limit(50);
-    
+
     if (error) throw error;
     if (!groups || groups.length === 0) return [];
-    
+
     // Get current user or group interests
     // Placeholder - in a real implementation you would fetch the user's group interests
     const userInterests: string[] = [];
     const userGenres: string[] = [];
-    
+
     // Calculate scores and sort
-    const scoredGroups = groups.map(group => ({
+    const scoredGroups = groups.map((group) => ({
       group,
-      score: calculateMatchScore(query, userInterests, userGenres, undefined, group)
+      score: calculateMatchScore(
+        query,
+        group,
+        userInterests,
+        userGenres,
+        undefined,
+        undefined
+      ),
     }));
-    
+
     // Sort by score (highest first)
     return scoredGroups.sort((a, b) => b.score - a.score);
-    
   } catch (error) {
-    console.error('Error finding groups by activity:', error);
+    console.error("Error finding groups by activity:", error);
     return [];
   }
 }
@@ -213,12 +280,11 @@ export async function findGroupsByEvent(
     // Get groups with matching events
     // This is a simplification - in a real implementation, you would
     // search through events table and find groups attending those events
-    
+
     // For now, reuse the activity search as placeholder
     return findGroupsByActivity(query, currentGroupId);
-    
   } catch (error) {
-    console.error('Error finding groups by event:', error);
+    console.error("Error finding groups by event:", error);
     return [];
   }
-} 
+}
