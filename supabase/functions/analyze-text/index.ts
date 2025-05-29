@@ -6,6 +6,158 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Common English stopwords to filter out
+const stopwords = new Set([
+  "the",
+  "be",
+  "to",
+  "of",
+  "and",
+  "a",
+  "in",
+  "that",
+  "have",
+  "i",
+  "it",
+  "for",
+  "not",
+  "on",
+  "with",
+  "he",
+  "as",
+  "you",
+  "do",
+  "at",
+  "this",
+  "but",
+  "his",
+  "by",
+  "from",
+  "they",
+  "we",
+  "say",
+  "her",
+  "she",
+  "or",
+  "an",
+  "will",
+  "my",
+  "one",
+  "all",
+  "would",
+  "there",
+  "their",
+  "what",
+  "so",
+  "up",
+  "out",
+  "if",
+  "about",
+  "who",
+  "get",
+  "which",
+  "go",
+  "me",
+  "when",
+  "make",
+  "can",
+  "like",
+  "time",
+  "no",
+  "just",
+  "him",
+  "know",
+  "take",
+  "people",
+  "into",
+  "year",
+  "your",
+  "good",
+  "some",
+  "could",
+  "them",
+  "see",
+  "other",
+  "than",
+  "then",
+  "now",
+  "look",
+  "only",
+  "come",
+  "its",
+  "over",
+  "think",
+  "also",
+  "back",
+  "after",
+  "use",
+  "two",
+  "how",
+  "our",
+  "work",
+  "first",
+  "well",
+  "way",
+  "even",
+  "new",
+  "want",
+  "because",
+  "any",
+  "these",
+  "give",
+  "day",
+  "most",
+  "us",
+]);
+
+// Function to generate n-grams from text
+function generateNGrams(text: string, n: number): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !stopwords.has(word));
+
+  const ngrams: string[] = [];
+  for (let i = 0; i <= words.length - n; i++) {
+    ngrams.push(words.slice(i, i + n).join(" "));
+  }
+  return ngrams;
+}
+
+// Function to calculate TF-IDF scores
+function calculateTFIDF(text: string, allTexts: string[]): Map<string, number> {
+  const words = text
+    .toLowerCase()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !stopwords.has(word));
+
+  const wordFreq = new Map<string, number>();
+  words.forEach((word) => {
+    wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
+  });
+
+  const tfidf = new Map<string, number>();
+  const totalDocs = allTexts.length;
+
+  wordFreq.forEach((freq, word) => {
+    // Calculate TF (Term Frequency)
+    const tf = freq / words.length;
+
+    // Calculate IDF (Inverse Document Frequency)
+    const docsWithWord = allTexts.filter((doc) =>
+      doc.toLowerCase().includes(word)
+    ).length;
+    const idf = Math.log(totalDocs / (docsWithWord + 1));
+
+    // Calculate TF-IDF
+    tfidf.set(word, tf * idf);
+  });
+
+  return tfidf;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -22,13 +174,44 @@ serve(async (req) => {
     const body = await req.json();
     console.log("Request body:", body);
 
-    const { text, type } = body;
-    console.log("Parsed request:", { text, type });
+    const { text, type, allTexts = [] } = body;
+    console.log("Parsed request:", { text, type, allTexts });
 
     if (!text) {
       console.error("No text provided in request");
       throw new Error("No text provided for analysis");
     }
+
+    // Generate n-grams (unigrams, bigrams, trigrams)
+    const unigrams = generateNGrams(text, 1);
+    const bigrams = generateNGrams(text, 2);
+    const trigrams = generateNGrams(text, 3);
+
+    console.log("Generated n-grams:", {
+      unigramsCount: unigrams.length,
+      bigramsCount: bigrams.length,
+      trigramsCount: trigrams.length,
+      sampleUnigrams: unigrams.slice(0, 5),
+      sampleBigrams: bigrams.slice(0, 5),
+      sampleTrigrams: trigrams.slice(0, 5),
+    });
+
+    // Calculate TF-IDF scores
+    const tfidfScores = calculateTFIDF(text, allTexts);
+
+    // Get top words by TF-IDF score
+    const topWords = Array.from(tfidfScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 50)
+      .map(([word, score]) => ({ word, score }));
+
+    console.log("Generated top words:", {
+      count: topWords.length,
+      sample: topWords.slice(0, 5).map((w) => ({
+        word: w.word,
+        score: w.score.toFixed(3),
+      })),
+    });
 
     // Check if OpenRouter API key is set
     const openRouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
@@ -153,10 +336,30 @@ Provide the scores in JSON format with these exact keys: communicationStyle, act
 
         console.log("Returning validated scores:", validatedScores);
 
-        return new Response(JSON.stringify(validatedScores), {
+        // Combine both analyses
+        const analysis = {
+          ...validatedScores,
+          wordPatterns: {
+            unigrams,
+            bigrams,
+            trigrams,
+            topWords,
+          },
+          lastUpdated: new Date().toISOString(),
+        };
+
+        console.log(
+          "Final analysis object:",
+          JSON.stringify(analysis, null, 2)
+        );
+
+        const response = new Response(JSON.stringify(analysis), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
+
+        console.log("Response being sent:", await response.clone().text());
+        return response;
       } catch (parseError) {
         console.error("Error parsing scores:", parseError);
         console.error("Failed response content:", responseContent);

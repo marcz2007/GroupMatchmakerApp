@@ -33,6 +33,12 @@ interface Profile {
     socialDynamics?: number;
     lastUpdated?: string;
   };
+  word_patterns?: {
+    unigrams: string[];
+    bigrams: string[];
+    trigrams: string[];
+    topWords: Array<{ word: string; score: number }>;
+  };
 }
 
 const ProfileScreen = () => {
@@ -211,7 +217,8 @@ const ProfileScreen = () => {
         shouldAnalyze,
         enableAIAnalysis,
         bioLength: bio.length,
-        lastUpdated: profile?.ai_analysis_scores?.lastUpdated
+        lastUpdated: profile?.ai_analysis_scores?.lastUpdated,
+        bio: bio // Log the actual bio content
       });
 
       const updates: Partial<Profile> & {
@@ -273,12 +280,20 @@ const ProfileScreen = () => {
 
             if (analysisError) {
               console.error('[handleSave] Error analyzing bio:', analysisError);
+              Alert.alert(
+                "Analysis Error",
+                "There was an error analyzing your bio. Your profile was saved, but the analysis will be retried later."
+              );
             } else if (analysisData) {
               console.log('[handleSave] Analysis successful, updating scores:', analysisData);
               await updateAnalysisScores(user.id, analysisData);
             }
           } catch (error) {
             console.error('[handleSave] Error in AI analysis:', error);
+            Alert.alert(
+              "Analysis Error",
+              "There was an error analyzing your bio. Your profile was saved, but the analysis will be retried later."
+            );
           }
         }
 
@@ -467,6 +482,32 @@ const ProfileScreen = () => {
     } finally {
       setUploadingPhotos(false);
     }
+  };
+
+  const getTopUncommonWord = (wordPatterns?: Profile['word_patterns']): string | null => {
+    if (!wordPatterns?.topWords?.length) return null;
+    return wordPatterns.topWords[0]?.word || null;
+  };
+
+  const getCommunicationStyleDescription = (score?: number): string => {
+    if (score === undefined) return "Not analyzed yet";
+    if (score < 0.3) return "Formal and detailed";
+    if (score < 0.6) return "Balanced and clear";
+    return "Casual and concise";
+  };
+
+  const getActivityPreferenceDescription = (score?: number): string => {
+    if (score === undefined) return "Not analyzed yet";
+    if (score < 0.3) return "Prefers indoor activities";
+    if (score < 0.6) return "Enjoys both indoor and outdoor";
+    return "Prefers outdoor activities";
+  };
+
+  const getSocialDynamicsDescription = (score?: number): string => {
+    if (score === undefined) return "Not analyzed yet";
+    if (score < 0.3) return "Prefers smaller groups";
+    if (score < 0.6) return "Comfortable in various group sizes";
+    return "Enjoys larger social gatherings";
   };
 
   if (loading) {
@@ -698,6 +739,54 @@ const ProfileScreen = () => {
         )}
       </View>
 
+      <View style={styles.aiInsightsSection}>
+        <Text style={styles.sectionTitle}>AI Insights</Text>
+        
+        {profile?.enable_ai_analysis ? (
+          <>
+            {profile.word_patterns?.topWords && profile.word_patterns.topWords.length > 0 && (
+              <View style={styles.insightItem}>
+                <Text style={styles.insightLabel}>Your most frequently used uncommon word is:</Text>
+                <Text style={styles.insightValue}>
+                  "{getTopUncommonWord(profile.word_patterns)}"
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Communication Style:</Text>
+              <Text style={styles.insightValue}>
+                {getCommunicationStyleDescription(profile?.ai_analysis_scores?.communicationStyle)}
+              </Text>
+            </View>
+
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Activity Preference:</Text>
+              <Text style={styles.insightValue}>
+                {getActivityPreferenceDescription(profile?.ai_analysis_scores?.activityPreference)}
+              </Text>
+            </View>
+
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Social Dynamics:</Text>
+              <Text style={styles.insightValue}>
+                {getSocialDynamicsDescription(profile?.ai_analysis_scores?.socialDynamics)}
+              </Text>
+            </View>
+
+            {profile?.ai_analysis_scores?.lastUpdated && (
+              <Text style={styles.insightTimestamp}>
+                Last updated: {new Date(profile.ai_analysis_scores.lastUpdated).toLocaleDateString()}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text style={styles.insightDisabled}>
+            Enable AI Analysis in Edit Profile to see insights about your communication style and preferences.
+          </Text>
+        )}
+      </View>
+
       <View style={styles.protectedSection}>
         <Text style={styles.protectedTitle}>Things only you can see</Text>
         <View style={styles.protectedContent}>
@@ -926,6 +1015,48 @@ const styles = StyleSheet.create({
   aiDescription: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  aiInsightsSection: {
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#495057',
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dee2e6',
+    paddingBottom: 10,
+  },
+  insightItem: {
+    marginBottom: 12,
+  },
+  insightLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 4,
+  },
+  insightValue: {
+    fontSize: 16,
+    color: '#212529',
+    fontWeight: '500',
+  },
+  insightTimestamp: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic',
+    marginTop: 10,
+  },
+  insightDisabled: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontStyle: 'italic',
   },
 });
 

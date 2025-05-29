@@ -23,20 +23,51 @@ export const shouldAnalyzeBio = (
   bio: string,
   lastAnalysis?: string
 ): boolean => {
+  console.log("[shouldAnalyzeBio] Checking bio:", {
+    bioLength: bio?.length,
+    minLength: BIO_MIN_LENGTH,
+    lastAnalysis,
+    hasBio: !!bio,
+  });
+
   if (!bio || bio.length < BIO_MIN_LENGTH) {
+    console.log("[shouldAnalyzeBio] Bio too short or missing");
     return false;
   }
 
   // If no previous analysis, analyze
   if (!lastAnalysis) {
+    console.log("[shouldAnalyzeBio] No previous analysis, will analyze");
     return true;
   }
 
-  // TODO: Implement similarity check with previous bio
-  // For now, we'll analyze if it's been more than 24 hours
-  const lastAnalysisDate = new Date(lastAnalysis);
-  const now = new Date();
-  return now.getTime() - lastAnalysisDate.getTime() > MESSAGE_ANALYSIS_INTERVAL;
+  try {
+    const lastAnalysisDate = new Date(lastAnalysis);
+    const now = new Date();
+
+    // Validate the date is reasonable (not in the future and not too old)
+    if (isNaN(lastAnalysisDate.getTime()) || lastAnalysisDate > now) {
+      console.log(
+        "[shouldAnalyzeBio] Invalid last analysis date, will analyze"
+      );
+      return true;
+    }
+
+    const shouldAnalyze =
+      now.getTime() - lastAnalysisDate.getTime() > MESSAGE_ANALYSIS_INTERVAL;
+    console.log("[shouldAnalyzeBio] Time-based check:", {
+      lastAnalysisDate: lastAnalysisDate.toISOString(),
+      now: now.toISOString(),
+      timeDiff: now.getTime() - lastAnalysisDate.getTime(),
+      interval: MESSAGE_ANALYSIS_INTERVAL,
+      shouldAnalyze,
+    });
+    return shouldAnalyze;
+  } catch (error) {
+    console.error("[shouldAnalyzeBio] Error parsing date:", error);
+    // If there's any error parsing the date, we should analyze
+    return true;
+  }
 };
 
 export const shouldAnalyzeMessages = async (
@@ -111,21 +142,57 @@ export const getMessagesForAnalysis = async (
 
 export const updateAnalysisScores = async (
   userId: string,
-  scores: {
-    communicationStyle: number;
-    activityPreference: number;
-    socialDynamics: number;
-  }
+  analysisData: any
 ): Promise<void> => {
-  await supabase
-    .from("profiles")
-    .update({
-      ai_analysis_scores: {
-        ...scores,
-        lastUpdated: new Date().toISOString(),
+  try {
+    console.log("[updateAnalysisScores] Updating scores with data:", {
+      scores: {
+        communicationStyle: analysisData.communicationStyle,
+        activityPreference: analysisData.activityPreference,
+        socialDynamics: analysisData.socialDynamics,
       },
-    })
-    .eq("id", userId);
+      wordPatterns: analysisData.wordPatterns
+        ? {
+            unigramsCount: analysisData.wordPatterns.unigrams?.length,
+            bigramsCount: analysisData.wordPatterns.bigrams?.length,
+            trigramsCount: analysisData.wordPatterns.trigrams?.length,
+            topWordsCount: analysisData.wordPatterns.topWords?.length,
+            topWords: analysisData.wordPatterns.topWords
+              ?.slice(0, 5)
+              .map((w: any) => ({
+                word: w.word,
+                score: w.score.toFixed(3),
+              })),
+          }
+        : "missing",
+    });
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        ai_analysis_scores: {
+          communicationStyle: analysisData.communicationStyle,
+          activityPreference: analysisData.activityPreference,
+          socialDynamics: analysisData.socialDynamics,
+          lastUpdated: new Date().toISOString(),
+        },
+        word_patterns: analysisData.wordPatterns || {
+          unigrams: [],
+          bigrams: [],
+          trigrams: [],
+          topWords: [],
+        },
+      })
+      .eq("id", userId);
+
+    if (error) {
+      console.error("Error updating analysis scores:", error);
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error in updateAnalysisScores:", error);
+    throw error;
+  }
 };
 
 interface AIAnalysisScores {
@@ -133,29 +200,45 @@ interface AIAnalysisScores {
   activityPreference: number;
   socialDynamics: number;
   lastUpdated: string;
+  wordPatterns?: {
+    unigrams: string[];
+    bigrams: string[];
+    trigrams: string[];
+    topWords: Array<{ word: string; score: number }>;
+  };
 }
 
 /**
  * Analyzes text content using AI to generate compatibility scores
  * @param text The text content to analyze
+ * @param allTexts Optional array of all texts for TF-IDF calculation
  * @returns Promise with analysis scores
  */
-export async function analyzeText(text: string): Promise<AIAnalysisScores> {
+export async function analyzeText(
+  text: string,
+  allTexts: string[] = []
+): Promise<AIAnalysisScores> {
   try {
     // Call Supabase Edge Function for AI analysis
     const { data, error } = await supabase.functions.invoke("analyze-text", {
-      body: { text },
+      body: { text, allTexts },
     });
+
+    console.log("Raw response from analyze-text:", data);
 
     if (error) throw error;
     if (!data) throw new Error("No analysis data received");
 
-    return {
+    const result = {
       communicationStyle: data.communicationStyle || 0.5,
       activityPreference: data.activityPreference || 0.5,
       socialDynamics: data.socialDynamics || 0.5,
       lastUpdated: new Date().toISOString(),
+      wordPatterns: data.wordPatterns,
     };
+
+    console.log("Processed analysis result:", result);
+    return result;
   } catch (error) {
     console.error("Error in text analysis:", error);
     // Return neutral scores in case of error
@@ -164,36 +247,48 @@ export async function analyzeText(text: string): Promise<AIAnalysisScores> {
       activityPreference: 0.5,
       socialDynamics: 0.5,
       lastUpdated: new Date().toISOString(),
+      wordPatterns: {
+        unigrams: [],
+        bigrams: [],
+        trigrams: [],
+        topWords: [],
+      },
     };
   }
 }
 
 /**
- * Updates a user's AI analysis scores
+ * Finds users with similar word patterns
  * @param userId The user's ID
- * @param scores The new analysis scores
+ * @param similarityThreshold Minimum similarity score (0-1)
+ * @param maxResults Maximum number of results to return
+ * @returns Promise with array of similar users
  */
-export async function updateUserAnalysisScores(
+export async function findSimilarUsersByPatterns(
   userId: string,
-  scores: AIAnalysisScores
-): Promise<void> {
+  similarityThreshold: number = 0.1,
+  maxResults: number = 10
+) {
   try {
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        aiAnalysisScores: scores,
-      })
-      .eq("id", userId);
+    const { data, error } = await supabase.rpc(
+      "find_similar_users_by_patterns",
+      {
+        current_user_id: userId,
+        similarity_threshold: similarityThreshold,
+        max_results: maxResults,
+      }
+    );
 
     if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("Error updating AI analysis scores:", error);
+    console.error("Error finding similar users:", error);
     throw error;
   }
 }
 
 /**
- * Calculates compatibility score between two users based on their AI analysis scores
+ * Calculates compatibility score between two users based on their AI analysis scores and word patterns
  * @param user1Scores First user's analysis scores
  * @param user2Scores Second user's analysis scores
  * @returns Compatibility score between 0 and 1
@@ -218,17 +313,37 @@ export function calculateCompatibilityScore(
   const activitySimilarity = 1 - activityDiff;
   const socialSimilarity = 1 - socialDiff;
 
+  // Calculate word pattern similarity if available
+  let wordPatternSimilarity = 0.5; // Default neutral score
+  if (user1Scores.wordPatterns && user2Scores.wordPatterns) {
+    // Calculate overlap in top words
+    const user1Words = new Set(
+      user1Scores.wordPatterns.topWords.map((w) => w.word)
+    );
+    const user2Words = new Set(
+      user2Scores.wordPatterns.topWords.map((w) => w.word)
+    );
+    const commonWords = new Set(
+      [...user1Words].filter((x) => user2Words.has(x))
+    );
+
+    wordPatternSimilarity =
+      commonWords.size / Math.max(user1Words.size, user2Words.size);
+  }
+
   // Weighted average of similarity scores
   const weights = {
-    communication: 0.4,
-    activity: 0.3,
-    social: 0.3,
+    communication: 0.3,
+    activity: 0.2,
+    social: 0.2,
+    wordPatterns: 0.3,
   };
 
   return (
     communicationSimilarity * weights.communication +
     activitySimilarity * weights.activity +
-    socialSimilarity * weights.social
+    socialSimilarity * weights.social +
+    wordPatternSimilarity * weights.wordPatterns
   );
 }
 
@@ -242,6 +357,15 @@ export async function analyzeUserChatMessages(
   messages: { content: string; created_at: string }[]
 ): Promise<void> {
   try {
+    // Get all messages for TF-IDF calculation
+    const { data: allMessages } = await supabase
+      .from("messages")
+      .select("content")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    const allTexts = allMessages?.map((m) => m.content) || [];
+
     // Combine recent messages into a single text for analysis
     const recentMessages = messages
       .sort(
@@ -266,10 +390,16 @@ export async function analyzeUserChatMessages(
       activityPreference: 0.5,
       socialDynamics: 0.5,
       lastUpdated: new Date().toISOString(),
+      wordPatterns: {
+        unigrams: [],
+        bigrams: [],
+        trigrams: [],
+        topWords: [],
+      },
     };
 
     // Analyze new messages
-    const newScores = await analyzeText(recentMessages);
+    const newScores = await analyzeText(recentMessages, allTexts);
 
     // Blend new scores with existing scores (70% weight to existing scores)
     const blendedScores = {
@@ -282,10 +412,36 @@ export async function analyzeUserChatMessages(
       socialDynamics:
         currentScores.socialDynamics * 0.7 + newScores.socialDynamics * 0.3,
       lastUpdated: new Date().toISOString(),
+      wordPatterns: {
+        unigrams: [
+          ...new Set([
+            ...currentScores.wordPatterns.unigrams,
+            ...(newScores.wordPatterns?.unigrams || []),
+          ]),
+        ],
+        bigrams: [
+          ...new Set([
+            ...currentScores.wordPatterns.bigrams,
+            ...(newScores.wordPatterns?.bigrams || []),
+          ]),
+        ],
+        trigrams: [
+          ...new Set([
+            ...currentScores.wordPatterns.trigrams,
+            ...(newScores.wordPatterns?.trigrams || []),
+          ]),
+        ],
+        topWords: [
+          ...currentScores.wordPatterns.topWords,
+          ...(newScores.wordPatterns?.topWords || []),
+        ]
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 50),
+      },
     };
 
     // Update scores in database
-    await updateUserAnalysisScores(userId, blendedScores);
+    await updateAnalysisScores(userId, blendedScores);
   } catch (error) {
     console.error("Error analyzing chat messages:", error);
   }
