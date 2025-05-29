@@ -17,6 +17,28 @@ ADD COLUMN IF NOT EXISTS ai_analysis_scores JSONB DEFAULT '{
   "lastUpdated": null
 }'::jsonb;
 
+-- Add enable_ai_analysis column to groups table
+ALTER TABLE groups ADD COLUMN enable_ai_analysis BOOLEAN DEFAULT false;
+
+-- Add RLS policy to allow group members to update enable_ai_analysis
+CREATE POLICY "Group members can update AI analysis settings"
+ON groups
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM group_members
+    WHERE group_members.group_id = groups.id
+    AND group_members.user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM group_members
+    WHERE group_members.group_id = groups.id
+    AND group_members.user_id = auth.uid()
+  )
+);
+
 -- Create function to update AI analysis scores
 CREATE OR REPLACE FUNCTION update_ai_analysis_scores()
 RETURNS TRIGGER AS $$

@@ -322,15 +322,23 @@ const ChatScreen = () => {
         const { error } = await supabase.from("messages").insert(messageToSend);
         if (error) throw error;
 
-        // Get user's profile to check if AI analysis is enabled
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('enableAIAnalysis')
-          .eq('id', currentUserId)
-          .single();
+        // Check both user and group AI analysis settings
+        const [{ data: userProfile }, { data: groupSettings }] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('enable_ai_analysis')
+            .eq('id', currentUserId)
+            .single(),
+          supabase
+            .from('groups')
+            .select('enable_ai_analysis')
+            .eq('id', groupId)
+            .single()
+        ]);
 
-        // If AI analysis is enabled, analyze the new message
-        if (profile?.enableAIAnalysis) {
+        // Only analyze if both user and group have AI analysis enabled
+        if (userProfile?.enable_ai_analysis && groupSettings?.enable_ai_analysis) {
+          console.log('Analyzing message for AI insights...');
           await analyzeUserChatMessages(currentUserId, [messageToSend]);
         }
 

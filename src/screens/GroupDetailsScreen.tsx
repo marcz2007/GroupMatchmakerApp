@@ -10,6 +10,7 @@ import {
     Image,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -63,6 +64,8 @@ const GroupDetailsScreen = () => {
     const [editableBio, setEditableBio] = useState('');
     const [isSavingBio, setIsSavingBio] = useState(false);
 
+    const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
+
     useEffect(() => {
         navigation.setOptions({ title: initialGroupName || groupDetails?.name || 'Group Details' });
     }, [navigation, initialGroupName, groupDetails?.name]);
@@ -113,6 +116,15 @@ const GroupDetailsScreen = () => {
                 return null;
             }).filter((profile): profile is GroupMember => profile !== null) || [];
             setMembers(mappedMembers);
+
+            // Add this after fetching group details
+            const { data: groupSettings } = await supabase
+                .from('groups')
+                .select('enable_ai_analysis')
+                .eq('id', groupId)
+                .single();
+
+            setEnableAIAnalysis(groupSettings?.enable_ai_analysis || false);
 
         } catch (err: any) {
             console.error('Failed to fetch group details:', err);
@@ -413,6 +425,36 @@ const GroupDetailsScreen = () => {
                     <Text>No members found.</Text>
                 )}
             </View>
+
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>AI Analysis</Text>
+                <View style={styles.toggleContainer}>
+                    <Text style={styles.toggleLabel}>Enable AI Analysis</Text>
+                    <Switch
+                        value={enableAIAnalysis}
+                        onValueChange={async (value) => {
+                            try {
+                                const { error } = await supabase
+                                    .from('groups')
+                                    .update({ enable_ai_analysis: value })
+                                    .eq('id', groupId);
+                                
+                                if (error) throw error;
+                                setEnableAIAnalysis(value);
+                            } catch (error) {
+                                console.error('Error updating AI analysis setting:', error);
+                                Alert.alert('Error', 'Failed to update AI analysis setting');
+                            }
+                        }}
+                        trackColor={{ false: "#767577", true: "#5762b7" }}
+                        thumbColor={enableAIAnalysis ? "#f4f3f4" : "#f4f3f4"}
+                    />
+                </View>
+                <Text style={styles.settingDescription}>
+                    When enabled, messages in this group will be analyzed to help find better matches.
+                    This helps us understand communication styles and preferences of group members.
+                </Text>
+            </View>
         </ScrollView>
     );
 };
@@ -541,7 +583,29 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         backgroundColor: '#cccccc',
-    }
+    },
+    section: {
+        padding: 20,
+        backgroundColor: '#fff',
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee'
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    toggleLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginRight: 10,
+        color: '#333',
+    },
+    settingDescription: {
+        fontSize: 14,
+        color: '#555',
+    },
 });
 
 export default GroupDetailsScreen; 

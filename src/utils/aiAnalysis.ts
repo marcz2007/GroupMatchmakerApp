@@ -2,8 +2,9 @@ import { supabase } from "../supabase";
 
 const BIO_MIN_LENGTH = 100;
 const MESSAGE_BATCH_SIZE = 5;
-const MESSAGE_ANALYSIS_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const GROUP_ACTIVITY_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const MESSAGE_ANALYSIS_INTERVAL = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+const GROUP_ACTIVITY_THRESHOLD = 90 * 24 * 60 * 60 * 1000; // 90 days in milliseconds
+const MAX_WORD_PATTERNS = 1000; // Maximum number of word patterns to store
 
 interface AnalysisThresholds {
   bioMinLength: number;
@@ -145,43 +146,87 @@ export const updateAnalysisScores = async (
   analysisData: any
 ): Promise<void> => {
   try {
+    // First get existing scores to preserve historical data
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("ai_analysis_scores, word_patterns")
+      .eq("id", userId)
+      .single();
+
+    const existingScores = existingProfile?.ai_analysis_scores || {
+      communicationStyle: 0.5,
+      activityPreference: 0.5,
+      socialDynamics: 0.5,
+      lastUpdated: null,
+    };
+
+    const existingWordPatterns = existingProfile?.word_patterns || {
+      unigrams: [],
+      bigrams: [],
+      trigrams: [],
+      topWords: [],
+    };
+
+    // Blend new scores with existing scores (70% weight to existing scores)
+    const blendedScores = {
+      communicationStyle:
+        existingScores.communicationStyle * 0.7 +
+        analysisData.communicationStyle * 0.3,
+      activityPreference:
+        existingScores.activityPreference * 0.7 +
+        analysisData.activityPreference * 0.3,
+      socialDynamics:
+        existingScores.socialDynamics * 0.7 + analysisData.socialDynamics * 0.3,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    // Merge word patterns, keeping the most recent and unique ones
+    const mergedWordPatterns = {
+      unigrams: [
+        ...new Set([
+          ...existingWordPatterns.unigrams,
+          ...(analysisData.wordPatterns?.unigrams || []),
+        ]),
+      ].slice(0, MAX_WORD_PATTERNS),
+      bigrams: [
+        ...new Set([
+          ...existingWordPatterns.bigrams,
+          ...(analysisData.wordPatterns?.bigrams || []),
+        ]),
+      ].slice(0, MAX_WORD_PATTERNS),
+      trigrams: [
+        ...new Set([
+          ...existingWordPatterns.trigrams,
+          ...(analysisData.wordPatterns?.trigrams || []),
+        ]),
+      ].slice(0, MAX_WORD_PATTERNS),
+      topWords: [
+        ...existingWordPatterns.topWords,
+        ...(analysisData.wordPatterns?.topWords || []),
+      ]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, MAX_WORD_PATTERNS),
+    };
+
     console.log("[updateAnalysisScores] Updating scores with data:", {
-      scores: {
-        communicationStyle: analysisData.communicationStyle,
-        activityPreference: analysisData.activityPreference,
-        socialDynamics: analysisData.socialDynamics,
+      scores: blendedScores,
+      wordPatterns: {
+        unigramsCount: mergedWordPatterns.unigrams.length,
+        bigramsCount: mergedWordPatterns.bigrams.length,
+        trigramsCount: mergedWordPatterns.trigrams.length,
+        topWordsCount: mergedWordPatterns.topWords.length,
+        topWords: mergedWordPatterns.topWords.slice(0, 5).map((w: any) => ({
+          word: w.word,
+          score: w.score?.toFixed(3) || "0.000",
+        })),
       },
-      wordPatterns: analysisData.wordPatterns
-        ? {
-            unigramsCount: analysisData.wordPatterns.unigrams?.length,
-            bigramsCount: analysisData.wordPatterns.bigrams?.length,
-            trigramsCount: analysisData.wordPatterns.trigrams?.length,
-            topWordsCount: analysisData.wordPatterns.topWords?.length,
-            topWords: analysisData.wordPatterns.topWords
-              ?.slice(0, 5)
-              .map((w: any) => ({
-                word: w.word,
-                score: w.score.toFixed(3),
-              })),
-          }
-        : "missing",
     });
 
     const { error } = await supabase
       .from("profiles")
       .update({
-        ai_analysis_scores: {
-          communicationStyle: analysisData.communicationStyle,
-          activityPreference: analysisData.activityPreference,
-          socialDynamics: analysisData.socialDynamics,
-          lastUpdated: new Date().toISOString(),
-        },
-        word_patterns: analysisData.wordPatterns || {
-          unigrams: [],
-          bigrams: [],
-          trigrams: [],
-          topWords: [],
-        },
+        ai_analysis_scores: blendedScores,
+        word_patterns: mergedWordPatterns,
       })
       .eq("id", userId);
 
@@ -352,100 +397,58 @@ export function calculateCompatibilityScore(
  * @param userId The user's ID
  * @param messages Array of chat messages
  */
-export async function analyzeUserChatMessages(
+export const analyzeUserChatMessages = async (
   userId: string,
   messages: { content: string; created_at: string }[]
-): Promise<void> {
+): Promise<void> => {
   try {
-    // Get all messages for TF-IDF calculation
-    const { data: allMessages } = await supabase
-      .from("messages")
-      .select("content")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    console.log(
+      "[analyzeUserChatMessages] Starting analysis for user:",
+      userId
+    );
+    console.log(
+      "[analyzeUserChatMessages] Messages to analyze:",
+      messages.length
+    );
 
-    const allTexts = allMessages?.map((m) => m.content) || [];
-
-    // Combine recent messages into a single text for analysis
-    const recentMessages = messages
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      .slice(0, 50) // Analyze last 50 messages
-      .map((msg) => msg.content)
-      .join(" ");
-
-    if (recentMessages.length === 0) return;
-
-    // Get current scores
-    const { data: profile } = await supabase
+    // Get user's profile to check if AI analysis is enabled
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("aiAnalysisScores")
+      .select("enable_ai_analysis")
       .eq("id", userId)
       .single();
 
-    const currentScores = profile?.aiAnalysisScores || {
-      communicationStyle: 0.5,
-      activityPreference: 0.5,
-      socialDynamics: 0.5,
-      lastUpdated: new Date().toISOString(),
-      wordPatterns: {
-        unigrams: [],
-        bigrams: [],
-        trigrams: [],
-        topWords: [],
-      },
-    };
+    if (profileError) throw profileError;
 
-    // Analyze new messages
-    const newScores = await analyzeText(recentMessages, allTexts);
+    if (!profile?.enable_ai_analysis) {
+      console.log("[analyzeUserChatMessages] AI analysis disabled for user");
+      return;
+    }
 
-    // Blend new scores with existing scores (70% weight to existing scores)
-    const blendedScores = {
-      communicationStyle:
-        currentScores.communicationStyle * 0.7 +
-        newScores.communicationStyle * 0.3,
-      activityPreference:
-        currentScores.activityPreference * 0.7 +
-        newScores.activityPreference * 0.3,
-      socialDynamics:
-        currentScores.socialDynamics * 0.7 + newScores.socialDynamics * 0.3,
-      lastUpdated: new Date().toISOString(),
-      wordPatterns: {
-        unigrams: [
-          ...new Set([
-            ...currentScores.wordPatterns.unigrams,
-            ...(newScores.wordPatterns?.unigrams || []),
-          ]),
-        ],
-        bigrams: [
-          ...new Set([
-            ...currentScores.wordPatterns.bigrams,
-            ...(newScores.wordPatterns?.bigrams || []),
-          ]),
-        ],
-        trigrams: [
-          ...new Set([
-            ...currentScores.wordPatterns.trigrams,
-            ...(newScores.wordPatterns?.trigrams || []),
-          ]),
-        ],
-        topWords: [
-          ...currentScores.wordPatterns.topWords,
-          ...(newScores.wordPatterns?.topWords || []),
-        ]
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 50),
-      },
-    };
+    // Combine messages into a single text
+    const combinedText = messages.map((m) => m.content).join(" ");
+    console.log("[analyzeUserChatMessages] Sending to analyze-text function:", {
+      textLength: combinedText.length,
+      messageCount: messages.length,
+    });
 
-    // Update scores in database
-    await updateAnalysisScores(userId, blendedScores);
+    const { data: analysisData, error: analysisError } =
+      await supabase.functions.invoke("analyze-text", {
+        body: { text: combinedText, type: "messages" },
+      });
+
+    if (analysisError) throw analysisError;
+    if (!analysisData) throw new Error("No analysis data received");
+
+    console.log(
+      "[analyzeUserChatMessages] Analysis successful, updating scores"
+    );
+    await updateAnalysisScores(userId, analysisData);
   } catch (error) {
-    console.error("Error analyzing chat messages:", error);
+    console.error("[analyzeUserChatMessages] Error:", error);
+    throw error;
   }
-}
+};
 
 /**
  * Triggers analysis for all users who have AI analysis enabled
