@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Button,
   Image,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Button } from '../components/Button';
 import { supabase } from "../supabase";
 import { shouldAnalyzeBio, updateAnalysisScores } from '../utils/aiAnalysis';
 
@@ -666,19 +666,25 @@ const ProfileScreen = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={isSaving || uploading ? "Saving..." : "Save Changes"}
+            variant="primary"
             onPress={handleSave}
             disabled={isSaving || uploading}
-          />
+            loading={isSaving || uploading}
+            fullWidth
+          >
+            {isSaving || uploading ? "Saving..." : "Save Changes"}
+          </Button>
           <Button
-            title="Cancel"
+            variant="ghost"
             onPress={() => {
               setEditing(false);
               setSelectedImage(null);
             }}
             disabled={isSaving || uploading}
-            color="gray"
-          />
+            fullWidth
+          >
+            Cancel
+          </Button>
         </View>
       </ScrollView>
     );
@@ -798,8 +804,20 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.buttonContainer}>
-        <Button title="Edit Profile" onPress={() => setEditing(true)} />
-        <Button title="Logout" onPress={handleLogout} color="red" />
+        <Button
+          variant="primary"
+          onPress={() => setEditing(true)}
+          fullWidth
+        >
+          Edit Profile
+        </Button>
+        <Button
+          variant="danger"
+          onPress={handleLogout}
+          fullWidth
+        >
+          Logout
+        </Button>
       </View>
     </ScrollView>
   );

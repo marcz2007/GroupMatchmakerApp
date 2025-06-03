@@ -192,6 +192,16 @@ const ChatScreen = () => {
         
         navigation.setOptions({
           title: currentGroupName || "Chat",
+          headerTitle: () => (
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('GroupDetails', { 
+                groupId: groupId, 
+                groupName: currentGroupName 
+              })}
+            >
+              <Text style={styles.headerTitle}>{currentGroupName || "Chat"}</Text>
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <View style={styles.headerRightContainer}>
               <TouchableOpacity onPress={handleShareInvite} style={styles.headerButton}>
@@ -413,6 +423,11 @@ const styles = StyleSheet.create({
   headerButtonText: {
     fontSize: 16,
     color: '#007AFF', // Example color, adjust as per your app's theme
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#007AFF', // iOS blue color, adjust as needed
   },
 });
 

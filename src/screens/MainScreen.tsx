@@ -1,10 +1,11 @@
 // screens/MainScreen.tsx
-import React from 'react';
-import { View, Button, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import GroupsScreen from './GroupsScreen'; // Import GroupsScreen
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { RootStackNavigationProp } from "../../App";
+import { Button } from '../components/Button';
 import { supabase } from '../supabase';
-import {RootStackNavigationProp} from "../../App";
+import GroupsScreen from './GroupsScreen'; // Import GroupsScreen
 
 const MainScreen = () => {
     const navigation = useNavigation<RootStackNavigationProp<'Main'>>();
@@ -17,7 +18,12 @@ const MainScreen = () => {
     return (
         <View style={styles.container}>
             <GroupsScreen />
-            <Button title="Logout" onPress={handleLogout} />
+            <Button
+              variant="danger"
+              onPress={handleLogout}
+            >
+              Logout
+            </Button>
         </View>
     );
 };

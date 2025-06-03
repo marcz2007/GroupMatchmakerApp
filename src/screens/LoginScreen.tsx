@@ -1,9 +1,10 @@
 // screens/LoginScreen.tsx
-import React, {useState} from 'react';
-import {View, Text, TextInput, Button, StyleSheet, Alert} from 'react-native';
-import {supabase} from '../supabase'; // Adjust path if needed
-import {useNavigation} from '@react-navigation/native';
-import {RootStackNavigationProp} from "../../App";
+import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RootStackNavigationProp } from "../../App";
+import { Button } from '../components/Button';
+import { supabase } from '../supabase'; // Adjust path if needed
 // --- Import the ParamList and NavigationProp type ---
 
 const LoginScreen = () => {
@@ -59,11 +60,27 @@ const LoginScreen = () => {
                     secureTextEntry={!showPassword} // Toggle visibility based on state
                     autoComplete="password"
                 />
-                <Button title={showPassword ? "Hide password" : "Show password"} onPress={() => setShowPassword(!showPassword)} />
+                <Button
+                    variant="ghost"
+                    onPress={() => setShowPassword(!showPassword)}
+                    size="sm"
+                >
+                    {showPassword ? "Hide password" : "Show password"}
+                </Button>
             </View>
-            <Button title="Login" onPress={handleLogin}/>
-            {/* Make sure Signup is also in RootStackParamList */}
-            <Button title="Go to Signup" onPress={() => navigation.navigate('Signup')}/>
+            <Button
+                variant="primary"
+                onPress={handleLogin}
+                fullWidth
+            >
+                Login
+            </Button>
+            <Button
+                variant="link"
+                onPress={() => navigation.navigate('Signup')}
+            >
+                Go to Signup
+            </Button>
         </View>
     );
 };

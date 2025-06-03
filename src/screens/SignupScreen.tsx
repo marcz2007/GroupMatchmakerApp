@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { supabase } from '../supabase';
 import { useNavigation } from '@react-navigation/native';
-import {RootStackNavigationProp} from "../../App";
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RootStackNavigationProp } from "../../App";
+import { Button } from '../components/Button';
+import { supabase } from '../supabase';
 
 const SignupScreen = () => {
     const [email, setEmail] = useState('');
@@ -44,8 +45,19 @@ const SignupScreen = () => {
                 onChangeText={setPassword}
                 secureTextEntry
             />
-            <Button title="Signup" onPress={handleSignup} />
-            <Button title="Go to Login" onPress={() => navigation.navigate('Login')} />
+            <Button
+                variant="primary"
+                onPress={handleSignup}
+                fullWidth
+            >
+                Signup
+            </Button>
+            <Button
+                variant="link"
+                onPress={() => navigation.navigate('Login')}
+            >
+                Go to Login
+            </Button>
         </View>
     );
 };

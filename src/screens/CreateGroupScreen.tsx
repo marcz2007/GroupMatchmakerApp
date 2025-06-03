@@ -1,7 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Button } from '../components/Button';
 import { RootStackParamList } from '../navigation/AppNavigator'; // Adjust path if needed
 import { supabase } from '../supabase'; // Adjust path if needed
 
@@ -87,7 +88,13 @@ const CreateGroupScreen = () => {
       {isLoading ? (
         <ActivityIndicator size="large" color="#007AFF" />
       ) : (
-        <Button title="Create Group" onPress={handleCreateGroup} />
+        <Button
+          variant="primary"
+          onPress={handleCreateGroup}
+          fullWidth
+        >
+          Create Group
+        </Button>
       )}
     </View>
   );

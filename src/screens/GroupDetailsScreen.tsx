@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Button,
     FlatList,
     Image,
     ScrollView,
@@ -16,6 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { Button as CustomButton } from '../components/Button';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { supabase } from '../supabase';
 
@@ -398,8 +398,21 @@ const GroupDetailsScreen = () => {
                             editable={!isSavingBio}
                         />
                         <View style={styles.bioActionsContainer}>
-                            <Button title="Cancel" onPress={handleCancelEditBio} disabled={isSavingBio} color="#FF3B30"/>
-                            <Button title={isSavingBio ? "Saving..." : "Save"} onPress={handleSaveBio} disabled={isSavingBio} />
+                            <CustomButton
+                                variant="ghost"
+                                onPress={handleCancelEditBio}
+                                disabled={isSavingBio}
+                            >
+                                Cancel
+                            </CustomButton>
+                            <CustomButton
+                                variant="primary"
+                                onPress={handleSaveBio}
+                                disabled={isSavingBio}
+                                loading={isSavingBio}
+                            >
+                                {isSavingBio ? "Saving..." : "Save"}
+                            </CustomButton>
                         </View>
                     </>
                 ) : (
