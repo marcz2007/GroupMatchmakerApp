@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import {
   ActivityIndicator,
-  Alert 
+  Alert,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../../App';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { findGroupsByActivity, findGroupsByEvent, Group } from '../utils/matchmaking';

@@ -3,7 +3,7 @@ import { LinkingOptions, NavigationContainer } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Session } from '@supabase/supabase-js';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import AppNavigator, { RootStackParamList } from './src/navigation/AppNavigator';
 import { supabase } from "./src/supabase";
@@ -85,8 +85,17 @@ export default function App() {
     return (
         <KeyboardProvider>
             <NavigationContainer linking={linking} fallback={<ActivityIndicator color="blue" size="large" />}>
-                <AppNavigator isAuthenticated={!!session} />
+                <View style={styles.container}>
+                    <AppNavigator isAuthenticated={!!session} />
+                </View>
             </NavigationContainer>
         </KeyboardProvider>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc', // Modern light gray/white
+    },
+});

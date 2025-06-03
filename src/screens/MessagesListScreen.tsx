@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getUserGroups } from "../services/groupService";
-import { getProfileById, User } from "../services/userService";
+import { getProfileById } from "../services/userService";
 import { supabase } from "../supabase";
 
 interface ChatPreview {

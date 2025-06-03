@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { RootStackNavigationProp } from '../../App';
-import { RootStackParamList } from '../navigation/AppNavigator';
 
 type MatchmakingHomeNavigationProp = RootStackNavigationProp<'Main'>;
 

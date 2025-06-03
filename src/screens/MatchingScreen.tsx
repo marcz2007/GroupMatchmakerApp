@@ -1,10 +1,9 @@
 // src/screens/MatchingScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Button, StyleSheet, Alert, FlatList, ActivityIndicator } from 'react-native';
-import { supabase } from '../supabase'; // Adjust path if needed
-import { useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackNavigationProp } from '../../App';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { supabase } from '../supabase'; // Adjust path if needed
 
 // Define the type for the route parameters expected by this screen
 type MatchingScreenRouteProp = RouteProp<RootStackParamList, 'Matching'>;
