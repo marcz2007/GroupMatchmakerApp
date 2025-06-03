@@ -23,18 +23,18 @@ export const spacing = {
 export const typography = {
   title: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "700" as const,
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "700" as const,
   },
   body: {
     fontSize: 16,
   },
   caption: {
     fontSize: 12,
-    fontStyle: "italic",
+    fontStyle: "italic" as const,
   },
 };
 

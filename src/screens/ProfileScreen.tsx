@@ -12,8 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Button } from '../components/Button';
 import { supabase } from "../supabase";
+import { commonStyles } from "../theme/commonStyles";
+import { borderRadius, colors, spacing, typography } from "../theme/theme";
 import { shouldAnalyzeBio, updateAnalysisScores } from '../utils/aiAnalysis';
 
 interface Profile {
@@ -512,7 +513,7 @@ const ProfileScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.centeredContainer}>
+      <View style={commonStyles.centeredContainer}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -522,417 +523,350 @@ const ProfileScreen = () => {
     const displayUri = selectedImage?.uri || avatarUrl;
 
     return (
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>Edit Profile</Text>
+      <ScrollView style={commonStyles.container}>
+        <Text style={commonStyles.title}>Edit Profile</Text>
 
-        <View style={styles.avatarContainer}>
-          {uploading ? (
-            <ActivityIndicator size="large" style={styles.avatar} />
-          ) : (
-            <Image
-              source={
-                displayUri
-                  ? { uri: displayUri }
-                  : require("../../assets/default-avatar.png")
-              }
-              style={styles.avatar}
-            />
-          )}
-          <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={pickImages}
-            disabled={uploading}
-          >
-            <Text style={styles.uploadButtonText}>
-              {selectedImage ? "Change Selection" : "Choose Photo"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>First Name</Text>
-        <TextInput
-          style={styles.input}
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="Enter your first name"
-        />
-
-        <Text style={styles.label}>Last Name</Text>
-        <TextInput
-          style={styles.input}
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Enter your last name"
-        />
-
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          placeholder="Enter username"
-        />
-
-        <Text style={styles.label}>Bio</Text>
-        <TextInput
-          style={[styles.input, styles.bioInput]}
-          value={bio}
-          onChangeText={setBio}
-          placeholder="Tell others about yourself"
-          multiline
-        />
-
-        <Text style={styles.label}>Interests (comma-separated)</Text>
-        <TextInput
-          style={styles.input}
-          value={interests}
-          onChangeText={setInterests}
-          placeholder="e.g. art, movies, hiking"
-        />
-
-        <View style={styles.aiAnalysisSection}>
-          <Text style={styles.label}>AI Analysis</Text>
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}>Enable AI Analysis</Text>
-            <Switch
-              value={enableAIAnalysis}
-              onValueChange={setEnableAIAnalysis}
-              trackColor={{ false: "#767577", true: "#5762b7" }}
-              thumbColor={enableAIAnalysis ? "#f4f3f4" : "#f4f3f4"}
-            />
-          </View>
-          <Text style={styles.aiDescription}>
-            When enabled, your chat messages and bio will be analyzed to help find better group matches.
-            This helps us understand your communication style and preferences.
-          </Text>
-        </View>
-
-        <View style={styles.photoGallerySection}>
-          <Text style={styles.label}>Profile Photos (up to 6)</Text>
-          <View style={styles.photoGrid}>
-            {profile?.photos?.map((photo, index) => (
-              <View key={index} style={styles.photoContainer}>
-                <Image source={{ uri: photo.url }} style={styles.photo} />
-                <TouchableOpacity
-                  style={styles.removePhotoButton}
-                  onPress={() => {
-                    const newPhotos = [...(profile.photos || [])];
-                    newPhotos.splice(index, 1);
-                    setProfile(prev => prev ? { ...prev, photos: newPhotos } : null);
-                  }}
-                >
-                  <Text style={styles.removePhotoButtonText}>×</Text>
-                </TouchableOpacity>
+        <View style={[commonStyles.section, { alignItems: 'center' }]}>
+          <TouchableOpacity onPress={pickImages} style={styles.avatarContainer}>
+            {displayUri ? (
+              <Image
+                source={{ uri: displayUri }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={[typography.body, { color: colors.text.secondary }]}>
+                  Add Photo
+                </Text>
               </View>
-            ))}
-            {(!profile?.photos || profile.photos.length < 6) && (
-              <TouchableOpacity
-                style={styles.addPhotoButton}
-                onPress={pickMultipleImages}
-                disabled={uploadingPhotos}
-              >
-                <Text style={styles.addPhotoButtonText}>+</Text>
-              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.uploadButton} onPress={pickImages}>
+              <Text style={styles.uploadButtonText}>Change Photo</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+
+          <TextInput
+            style={commonStyles.searchInput}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Username"
+          />
+
+          <TextInput
+            style={commonStyles.searchInput}
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="First Name"
+          />
+
+          <TextInput
+            style={commonStyles.searchInput}
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Last Name"
+          />
+
+          <TextInput
+            style={commonStyles.multilineInput}
+            value={bio}
+            onChangeText={setBio}
+            placeholder="Bio"
+            multiline
+            numberOfLines={4}
+          />
+
+          <TextInput
+            style={commonStyles.searchInput}
+            value={interests}
+            onChangeText={setInterests}
+            placeholder="e.g. art, movies, hiking"
+          />
+
+          <View style={commonStyles.protectedSection}>
+            <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
+            <View style={commonStyles.protectedContent}>
+              <View style={commonStyles.protectedItem}>
+                <Text style={commonStyles.protectedLabel}>Enable AI Analysis</Text>
+                <Switch
+                  value={enableAIAnalysis}
+                  onValueChange={setEnableAIAnalysis}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.white}
+                />
+              </View>
+              <Text style={[typography.body, { color: colors.text.secondary }]}>
+                When enabled, your chat messages and bio will be analyzed to help find better group matches.
+                This helps us understand your communication style and preferences.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.photoGallerySection}>
+            <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>Profile Photos (up to 6)</Text>
+            <View style={styles.photoGrid}>
+              {profile?.photos?.map((photo, index) => (
+                <View key={index} style={styles.photoContainer}>
+                  <Image source={{ uri: photo.url }} style={styles.photo} />
+                  <TouchableOpacity
+                    style={styles.removePhotoButton}
+                    onPress={() => {
+                      const newPhotos = [...(profile.photos || [])];
+                      newPhotos.splice(index, 1);
+                      setProfile(prev => prev ? { ...prev, photos: newPhotos } : null);
+                    }}
+                  >
+                    <Text style={styles.removePhotoButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {(!profile?.photos || profile.photos.length < 6) && (
+                <TouchableOpacity
+                  style={styles.addPhotoButton}
+                  onPress={pickMultipleImages}
+                  disabled={uploadingPhotos}
+                >
+                  <Text style={styles.addPhotoButtonText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {selectedPhotos.length > 0 && (
+              <View style={styles.selectedPhotosPreview}>
+                <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>
+                  Selected Photos ({selectedPhotos.length})
+                </Text>
+                <ScrollView horizontal style={styles.selectedPhotosScroll}>
+                  {selectedPhotos.map((photo, index) => (
+                    <View key={index} style={styles.selectedPhotoContainer}>
+                      <Image source={{ uri: photo.uri }} style={styles.selectedPhoto} />
+                      <TouchableOpacity
+                        style={styles.removeSelectedPhotoButton}
+                        onPress={() => {
+                          const newSelectedPhotos = [...selectedPhotos];
+                          newSelectedPhotos.splice(index, 1);
+                          setSelectedPhotos(newSelectedPhotos);
+                        }}
+                      >
+                        <Text style={styles.removePhotoButtonText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
             )}
           </View>
-          {selectedPhotos.length > 0 && (
-            <View style={styles.selectedPhotosPreview}>
-              <Text style={styles.label}>Selected Photos ({selectedPhotos.length})</Text>
-              <ScrollView horizontal style={styles.selectedPhotosScroll}>
-                {selectedPhotos.map((photo, index) => (
-                  <View key={index} style={styles.selectedPhotoContainer}>
-                    <Image source={{ uri: photo.uri }} style={styles.selectedPhoto} />
-                    <TouchableOpacity
-                      style={styles.removeSelectedPhotoButton}
-                      onPress={() => {
-                        const newSelectedPhotos = [...selectedPhotos];
-                        newSelectedPhotos.splice(index, 1);
-                        setSelectedPhotos(newSelectedPhotos);
-                      }}
-                    >
-                      <Text style={styles.removePhotoButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
 
-        <View style={styles.profileSection}>
-          <Text style={styles.label}>Email</Text>
-          <Text style={styles.profileValue}>{profile?.email}</Text>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          <Button
-            variant="primary"
-            onPress={handleSave}
-            disabled={isSaving || uploading}
-            loading={isSaving || uploading}
-            fullWidth
-          >
-            {isSaving || uploading ? "Saving..." : "Save Changes"}
-          </Button>
-          <Button
-            variant="ghost"
-            onPress={() => {
-              setEditing(false);
-              setSelectedImage(null);
-            }}
-            disabled={isSaving || uploading}
-            fullWidth
-          >
-            Cancel
-          </Button>
+          <View style={commonStyles.buttonContainer}>
+            <TouchableOpacity
+              style={[commonStyles.button, isSaving || uploading ? commonStyles.disabledButton : null]}
+              onPress={handleSave}
+              disabled={isSaving || uploading}
+            >
+              <Text style={commonStyles.buttonText}>
+                {isSaving || uploading ? "Saving..." : "Save Changes"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[commonStyles.button, { backgroundColor: colors.border }]}
+              onPress={() => {
+                setEditing(false);
+                setSelectedImage(null);
+              }}
+              disabled={isSaving || uploading}
+            >
+              <Text style={[commonStyles.buttonText, { color: colors.text.primary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Your Profile</Text>
+    <ScrollView style={commonStyles.container}>
+      <Text style={commonStyles.title}>Your Profile</Text>
 
-      <View style={styles.avatarContainer}>
-        <Image
-          source={
-            avatarUrl
-              ? { uri: avatarUrl }
-              : require("../../assets/default-avatar.png")
-          }
-          style={styles.avatar}
-        />
-      </View>
-
-      <View style={styles.profileSection}>
-        <Text style={styles.label}>Name</Text>
-        <Text style={styles.profileValue}>
-          {profile?.firstName || "Not set"}
-        </Text>
-      </View>
-      <View style={styles.profileSection}>
-        <Text style={styles.label}>Username</Text>
-        <Text style={styles.profileValue}>
-          {profile?.username || "Not set"}
-        </Text>
-      </View>
-
-      <View style={styles.profileSection}>
-        <Text style={styles.label}>Bio</Text>
-        <Text style={styles.profileValue}>{profile?.bio || "Not set"}</Text>
-      </View>
-
-      <View style={styles.profileSection}>
-        <Text style={styles.label}>Interests</Text>
-        <Text style={styles.profileValue}>
-          {profile?.interests && profile.interests.length > 0
-            ? profile.interests.join(", ")
-            : "Not set"}
-        </Text>
-      </View>
-
-      <View style={styles.photoGallerySection}>
-        <Text style={styles.label}>Photos</Text>
-        {profile?.photos && profile.photos.length > 0 ? (
-          <ScrollView horizontal style={styles.photoGallery}>
-            {profile.photos.map((photo, index) => (
-              <Image key={index} source={{ uri: photo.url }} style={styles.galleryPhoto} />
-            ))}
-          </ScrollView>
-        ) : (
-          <Text style={styles.noPhotosText}>No photos added yet</Text>
-        )}
-      </View>
-
-      <View style={styles.aiInsightsSection}>
-        <Text style={styles.sectionTitle}>AI Insights</Text>
-        
-        {profile?.enable_ai_analysis ? (
-          <>
-            {profile.word_patterns?.topWords && profile.word_patterns.topWords.length > 0 && (
-              <View style={styles.insightItem}>
-                <Text style={styles.insightLabel}>Your most frequently used uncommon word is:</Text>
-                <Text style={styles.insightValue}>
-                  "{getTopUncommonWord(profile.word_patterns)}"
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.insightItem}>
-              <Text style={styles.insightLabel}>Communication Style:</Text>
-              <Text style={styles.insightValue}>
-                {getCommunicationStyleDescription(profile?.ai_analysis_scores?.communicationStyle)}
+      <View style={[commonStyles.section, { alignItems: 'center' }]}>
+        <TouchableOpacity onPress={() => setEditing(true)} style={styles.avatarContainer}>
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={[typography.body, { color: colors.text.secondary }]}>
+                Add Photo
               </Text>
             </View>
+          )}
+        </TouchableOpacity>
 
-            <View style={styles.insightItem}>
-              <Text style={styles.insightLabel}>Activity Preference:</Text>
-              <Text style={styles.insightValue}>
-                {getActivityPreferenceDescription(profile?.ai_analysis_scores?.activityPreference)}
-              </Text>
+        <View style={commonStyles.protectedSection}>
+          <Text style={commonStyles.protectedTitle}>Profile Information</Text>
+          <View style={commonStyles.protectedContent}>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>Username</Text>
+              <Text style={commonStyles.protectedValue}>{username || 'Not set'}</Text>
             </View>
-
-            <View style={styles.insightItem}>
-              <Text style={styles.insightLabel}>Social Dynamics:</Text>
-              <Text style={styles.insightValue}>
-                {getSocialDynamicsDescription(profile?.ai_analysis_scores?.socialDynamics)}
-              </Text>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>First Name</Text>
+              <Text style={commonStyles.protectedValue}>{firstName || 'Not set'}</Text>
             </View>
-
-            {profile?.ai_analysis_scores?.lastUpdated && (
-              <Text style={styles.insightTimestamp}>
-                Last updated: {new Date(profile.ai_analysis_scores.lastUpdated).toLocaleDateString()}
-              </Text>
-            )}
-          </>
-        ) : (
-          <Text style={styles.insightDisabled}>
-            Enable AI Analysis in Edit Profile to see insights about your communication style and preferences.
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.protectedSection}>
-        <Text style={styles.protectedTitle}>Things only you can see</Text>
-        <View style={styles.protectedContent}>
-          <View style={styles.protectedItem}>
-            <Text style={styles.protectedLabel}>Email</Text>
-            <Text style={styles.protectedValue}>{profile?.email || "Not set"}</Text>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>Last Name</Text>
+              <Text style={commonStyles.protectedValue}>{lastName || 'Not set'}</Text>
+            </View>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>Bio</Text>
+              <Text style={commonStyles.protectedValue}>{bio || 'Not set'}</Text>
+            </View>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>Interests</Text>
+              <Text style={commonStyles.protectedValue}>{interests || 'Not set'}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.buttonContainer}>
-        <Button
-          variant="primary"
-          onPress={() => setEditing(true)}
-          fullWidth
-        >
-          Edit Profile
-        </Button>
-        <Button
-          variant="danger"
-          onPress={handleLogout}
-          fullWidth
-        >
-          Logout
-        </Button>
+        <View style={commonStyles.protectedSection}>
+          <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
+          <View style={commonStyles.protectedContent}>
+            <View style={commonStyles.protectedItem}>
+              <Text style={commonStyles.protectedLabel}>Enable AI Analysis</Text>
+              <Switch
+                value={enableAIAnalysis}
+                onValueChange={setEnableAIAnalysis}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+            <Text style={[typography.body, { color: colors.text.secondary }]}>
+              When enabled, your chat messages and bio will be analyzed to help find better group matches.
+              This helps us understand your communication style and preferences.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.photoGallerySection}>
+          <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>Photos</Text>
+          {profile?.photos && profile.photos.length > 0 ? (
+            <ScrollView horizontal style={styles.photoGallery}>
+              {profile.photos.map((photo, index) => (
+                <Image key={index} source={{ uri: photo.url }} style={styles.galleryPhoto} />
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={styles.noPhotosText}>No photos added yet</Text>
+          )}
+        </View>
+
+        <View style={styles.aiInsightsSection}>
+          <Text style={commonStyles.protectedTitle}>AI Insights</Text>
+          
+          {profile?.enable_ai_analysis ? (
+            <>
+              {profile.word_patterns?.topWords && profile.word_patterns.topWords.length > 0 && (
+                <View style={commonStyles.protectedItem}>
+                  <Text style={commonStyles.protectedLabel}>Your most frequently used uncommon word is:</Text>
+                  <Text style={commonStyles.protectedValue}>
+                    "{getTopUncommonWord(profile.word_patterns)}"
+                  </Text>
+                </View>
+              )}
+
+              <View style={commonStyles.protectedItem}>
+                <Text style={commonStyles.protectedLabel}>Communication Style:</Text>
+                <Text style={commonStyles.protectedValue}>
+                  {getCommunicationStyleDescription(profile?.ai_analysis_scores?.communicationStyle)}
+                </Text>
+              </View>
+
+              <View style={commonStyles.protectedItem}>
+                <Text style={commonStyles.protectedLabel}>Activity Preference:</Text>
+                <Text style={commonStyles.protectedValue}>
+                  {getActivityPreferenceDescription(profile?.ai_analysis_scores?.activityPreference)}
+                </Text>
+              </View>
+
+              <View style={commonStyles.protectedItem}>
+                <Text style={commonStyles.protectedLabel}>Social Dynamics:</Text>
+                <Text style={commonStyles.protectedValue}>
+                  {getSocialDynamicsDescription(profile?.ai_analysis_scores?.socialDynamics)}
+                </Text>
+              </View>
+
+              {profile?.ai_analysis_scores?.lastUpdated && (
+                <Text style={[typography.caption, { color: colors.text.secondary, marginTop: spacing.sm }]}>
+                  Last updated: {new Date(profile.ai_analysis_scores.lastUpdated).toLocaleDateString()}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={[typography.body, { color: colors.text.secondary, fontStyle: 'italic' }]}>
+              Enable AI Analysis in Edit Profile to see insights about your communication style and preferences.
+            </Text>
+          )}
+        </View>
+
+        <View style={commonStyles.buttonContainer}>
+          <TouchableOpacity
+            style={commonStyles.button}
+            onPress={() => setEditing(true)}
+          >
+            <Text style={commonStyles.buttonText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[commonStyles.button, { backgroundColor: '#dc3545' }]}
+            onPress={handleLogout}
+          >
+            <Text style={commonStyles.buttonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  profileSection: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  profileValue: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    backgroundColor: "#fff",
-  },
-  bioInput: {
-    height: 100,
-    textAlignVertical: "top",
-  },
-  buttonContainer: {
-    marginTop: 20,
-    marginBottom: 40,
-    gap: 10,
-  },
   avatarContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#e1e1e1",
-    marginBottom: 10,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    marginBottom: spacing.sm,
+  },
+  avatarPlaceholder: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   uploadButton: {
-    backgroundColor: "#5762b7",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 5,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
   },
   uploadButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  protectedSection: {
-    marginTop: 30,
-    marginBottom: 20,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 10,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  protectedTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#495057",
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#dee2e6",
-    paddingBottom: 10,
-  },
-  protectedContent: {
-    gap: 15,
-  },
-  protectedItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 5,
-  },
-  protectedLabel: {
-    fontSize: 15,
-    color: "#6c757d",
-    fontWeight: "500",
-  },
-  protectedValue: {
-    fontSize: 15,
-    color: "#212529",
-    fontWeight: "400",
+    color: colors.white,
+    fontWeight: 'bold',
   },
   photoGallerySection: {
-    marginBottom: 20,
+    width: '100%',
+    marginBottom: spacing.xl,
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   photoContainer: {
     width: '30%',
@@ -942,13 +876,13 @@ const styles = StyleSheet.create({
   photo: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
   },
   removePhotoButton: {
     position: 'absolute',
     top: -10,
     right: -10,
-    backgroundColor: 'red',
+    backgroundColor: '#dc3545',
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -956,47 +890,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   removePhotoButtonText: {
-    color: 'white',
+    color: colors.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
   addPhotoButton: {
     width: '30%',
     aspectRatio: 1,
-    backgroundColor: '#e1e1e1',
-    borderRadius: 8,
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
   addPhotoButtonText: {
     fontSize: 32,
-    color: '#666',
+    color: colors.text.secondary,
   },
   selectedPhotosPreview: {
-    marginTop: 20,
+    marginTop: spacing.lg,
   },
   selectedPhotosScroll: {
-    marginTop: 10,
+    marginTop: spacing.sm,
   },
   selectedPhotoContainer: {
     width: 100,
     height: 100,
-    marginRight: 10,
+    marginRight: spacing.sm,
     position: 'relative',
   },
   selectedPhoto: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
   },
   removeSelectedPhotoButton: {
     position: 'absolute',
     top: -10,
     right: -10,
-    backgroundColor: 'red',
+    backgroundColor: '#dc3545',
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -1004,77 +938,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   photoGallery: {
-    marginTop: 10,
+    marginTop: spacing.sm,
   },
   galleryPhoto: {
     width: 200,
     height: 200,
-    marginRight: 10,
-    borderRadius: 8,
+    marginRight: spacing.sm,
+    borderRadius: borderRadius.md,
   },
   noPhotosText: {
-    color: '#666',
+    color: colors.text.secondary,
     fontStyle: 'italic',
-    marginTop: 10,
-  },
-  aiAnalysisSection: {
-    marginBottom: 20,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 10,
-  },
-  aiDescription: {
-    fontSize: 14,
-    color: '#6c757d',
+    marginTop: spacing.sm,
   },
   aiInsightsSection: {
-    marginTop: 20,
-    marginBottom: 20,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 10,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#495057',
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#dee2e6',
-    paddingBottom: 10,
-  },
-  insightItem: {
-    marginBottom: 12,
-  },
-  insightLabel: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 4,
-  },
-  insightValue: {
-    fontSize: 16,
-    color: '#212529',
-    fontWeight: '500',
-  },
-  insightTimestamp: {
-    fontSize: 12,
-    color: '#6c757d',
-    fontStyle: 'italic',
-    marginTop: 10,
-  },
-  insightDisabled: {
-    fontSize: 14,
-    color: '#6c757d',
-    fontStyle: 'italic',
+    width: '100%',
+    marginBottom: spacing.xl,
   },
 });
 

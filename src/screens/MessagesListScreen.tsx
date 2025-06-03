@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -14,6 +13,8 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import { getUserGroups } from "../services/groupService";
 import { getProfileById } from "../services/userService";
 import { supabase } from "../supabase";
+import { commonStyles } from "../theme/commonStyles";
+import { colors, spacing, typography } from "../theme/theme";
 
 interface ChatPreview {
   id: string;
@@ -123,16 +124,16 @@ const MessagesListScreen = () => {
 
   const renderChatItem = ({ item }: { item: ChatPreview }) => (
     <TouchableOpacity
-      style={styles.chatItem}
+      style={[commonStyles.button, { marginBottom: spacing.sm }]}
       onPress={() => navigateToChat(item)}
     >
-      <View style={styles.chatContent}>
-        <Text style={styles.chatName}>{item.name}</Text>
-        <Text style={styles.lastMessage} numberOfLines={1}>
+      <View style={{ flex: 1 }}>
+        <Text style={[typography.sectionTitle, { marginBottom: spacing.xs }]}>{item.name}</Text>
+        <Text style={[typography.body, { color: colors.text.secondary }]} numberOfLines={1}>
           {item.lastMessageSender}: {item.lastMessage}
         </Text>
       </View>
-      <Text style={styles.timestamp}>
+      <Text style={[typography.caption, { marginLeft: spacing.sm }]}>
         {item.timestamp.toLocaleDateString(undefined, {
           month: "short",
           day: "numeric",
@@ -143,21 +144,23 @@ const MessagesListScreen = () => {
 
   if (loading && chats.length === 0) {
     return (
-      <View style={styles.centered}>
+      <View style={commonStyles.container}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Messages</Text>
+    <View style={commonStyles.container}>
+      <Text style={commonStyles.title}>Messages</Text>
       <FlatList
         data={chats}
         renderItem={renderChatItem}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No messages yet</Text>
+          <Text style={[typography.body, { color: colors.text.secondary, textAlign: 'center', marginTop: spacing.xl }]}>
+            No messages yet
+          </Text>
         }
         refreshing={loading}
         onRefresh={fetchChats}
@@ -165,56 +168,5 @@ const MessagesListScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
-  chatItem: {
-    flexDirection: "row",
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    marginBottom: 8,
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: "#666",
-  },
-  timestamp: {
-    fontSize: 12,
-    color: "#999",
-    marginLeft: 8,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 50,
-    color: "#666",
-    fontSize: 16,
-  },
-});
 
 export default MessagesListScreen;

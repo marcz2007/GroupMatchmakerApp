@@ -1,73 +1,37 @@
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack'; // Import StackNavigationProp
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Button, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, FlatList, Text, TextInput, View } from 'react-native';
 import { RootStackParamList } from '../navigation/AppNavigator'; // Corrected import path
+import { createGroup, getUserGroups, Group } from '../services/groupService';
 import { supabase } from '../supabase'; // Adjust path if needed
+import { commonStyles } from '../theme/commonStyles';
+import { colors, spacing, typography } from '../theme/theme';
 
-interface Group {
-    id: string;
-    name: string;
-    description: string;
-}
-
-// Define the expected structure from the Supabase query result item
-interface MembershipData {
-    groups: Group | null; // The nested group object, potentially null
-}
-
-type GroupsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
+type GroupsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Groups'>;
 
 const GroupsScreen = () => {
+    const navigation = useNavigation<GroupsScreenNavigationProp>();
     const [groups, setGroups] = useState<Group[]>([]);
+    const [loading, setLoading] = useState(true);
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupDescription, setNewGroupDescription] = useState('');
-    const [loading, setLoading] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
-    const navigation = useNavigation<GroupsScreenNavigationProp>();
 
     const fetchGroups = useCallback(async () => {
         setLoading(true);
         try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-            if (userError || !user) {
-                setGroups([]);
-                setLoading(false); // Ensure loading is stopped
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                Alert.alert('Error', 'Could not get user session.');
                 return;
             }
 
-            const { data: membershipData, error: fetchError } = await supabase
-                .from('group_members')
-                .select(`groups ( id, name, description )`)
-                .eq('user_id', user.id)
-                .returns<MembershipData[]>();
-
-            if (fetchError) {
-                console.error('Error fetching groups:', fetchError);
-                Alert.alert('Error fetching groups', fetchError.message);
-                setGroups([]); // Clear groups on error
-            } else {
-                const allFetchedGroups = membershipData
-                    ?.map(item => item.groups)
-                    .filter((group): group is Group => group !== null)
-                    || [];
-                
-                // Ensure unique groups before setting state
-                const uniqueGroups: Group[] = [];
-                const encounteredGroupIds = new Set<string>();
-                for (const group of allFetchedGroups) {
-                    if (!encounteredGroupIds.has(group.id)) {
-                        uniqueGroups.push(group);
-                        encounteredGroupIds.add(group.id);
-                    }
-                }
-                setGroups(uniqueGroups);
-            }
-        } catch (error: any) {
-            console.error('Unexpected error in fetchGroups:', error);
-            Alert.alert('Error', 'An unexpected error occurred while fetching groups.');
-            setGroups([]); // Clear groups on unexpected error
+            const userGroups = await getUserGroups(user.id);
+            setGroups(userGroups);
+        } catch (error) {
+            console.error('Error fetching groups:', error);
+            Alert.alert('Error', 'Could not fetch groups.');
         } finally {
             setLoading(false);
         }
@@ -75,47 +39,45 @@ const GroupsScreen = () => {
 
     useEffect(() => {
         fetchGroups();
-        const unsubscribe = navigation.addListener('focus', fetchGroups);
-        return unsubscribe;
-    }, [fetchGroups, navigation]);
+    }, [fetchGroups]);
 
     const handleCreateGroup = async () => {
-        if (!newGroupName.trim() || !newGroupDescription.trim()) {
-            Alert.alert('Error', 'Group name and description are required.');
+        if (!newGroupName.trim()) {
+            Alert.alert('Error', 'Please enter a group name.');
             return;
         }
+
         setIsCreating(true);
         try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError || !user) {
-                Alert.alert('Error', 'Could not get user session to create group.'); return;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                Alert.alert('Error', 'Could not get user session.');
+                return;
             }
-            const { data: newGroup, error: groupError } = await supabase
-                .from('groups')
-                .insert({ name: newGroupName.trim(), description: newGroupDescription.trim(), owner_id: user.id })
-                .select()
-                .single();
-            if (groupError) { Alert.alert('Error creating group', groupError.message); return; }
-            if (newGroup) {
-                const { error: memberError } = await supabase
-                    .from('group_members')
-                    .insert({ group_id: newGroup.id, user_id: user.id });
-                if (memberError) { Alert.alert('Error adding user to group', memberError.message); }
-                else {
-                    Alert.alert('Success', `Group "${newGroupName.trim()}" created!`);
-                    setNewGroupName(''); setNewGroupDescription('');
-                    fetchGroups(); // Refresh list
-                }
-            }
-        } catch (error: any) { Alert.alert('Error', 'An unexpected error occurred.'); }
-        finally { setIsCreating(false); }
+
+            await createGroup({
+                name: newGroupName.trim(),
+                description: newGroupDescription.trim(),
+                created_by: user.id,
+            });
+
+            setNewGroupName('');
+            setNewGroupDescription('');
+            fetchGroups();
+        } catch (error: any) {
+            Alert.alert('Error', 'An unexpected error occurred.');
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     const renderItem = ({ item }: { item: Group }) => (
-        <View style={styles.groupItem}>
-            <Text style={styles.groupName}>{item.name}</Text>
-            <Text>{item.description}</Text>
-            <View style={styles.buttonContainer}>
+        <View style={[commonStyles.section, { backgroundColor: colors.white, borderRadius: 8 }]}>
+            <Text style={[typography.sectionTitle, { marginBottom: spacing.xs }]}>{item.name}</Text>
+            <Text style={[typography.body, { color: colors.text.secondary, marginBottom: spacing.md }]}>
+                {item.description}
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', flexWrap: 'wrap', gap: spacing.sm }}>
                 <Button
                     title="Find Matches"
                     onPress={() => navigation.navigate('Matching', { currentGroupId: item.id, currentGroupName: item.name })}
@@ -137,43 +99,48 @@ const GroupsScreen = () => {
     );
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Your Groups</Text>
+        <View style={commonStyles.container}>
+            <Text style={commonStyles.title}>Your Groups</Text>
             {loading && groups.length === 0 ? (
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color={colors.primary} />
             ) : (
                 <FlatList
                     data={groups}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id}
-                    ListEmptyComponent={<Text style={styles.emptyText}>You haven't joined any groups yet.</Text>}
+                    ListEmptyComponent={
+                        <Text style={[typography.body, { color: colors.text.secondary, textAlign: 'center', marginTop: spacing.xl }]}>
+                            You haven't joined any groups yet.
+                        </Text>
+                    }
                     refreshing={loading}
                     onRefresh={fetchGroups}
                 />
             )}
-            <Text style={styles.subtitle}>Create New Group</Text>
-            <TextInput style={styles.input} placeholder="Group Name" value={newGroupName} onChangeText={setNewGroupName} editable={!isCreating} />
-            <TextInput style={styles.input} placeholder="Group Description" value={newGroupDescription} onChangeText={setNewGroupDescription} editable={!isCreating} />
-            <Button title={isCreating ? "Creating..." : "Create Group"} onPress={handleCreateGroup} disabled={isCreating} />
+            <View style={commonStyles.section}>
+                <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>Create New Group</Text>
+                <TextInput
+                    style={commonStyles.searchInput}
+                    placeholder="Group Name"
+                    value={newGroupName}
+                    onChangeText={setNewGroupName}
+                    editable={!isCreating}
+                />
+                <TextInput
+                    style={commonStyles.searchInput}
+                    placeholder="Group Description"
+                    value={newGroupDescription}
+                    onChangeText={setNewGroupDescription}
+                    editable={!isCreating}
+                />
+                <Button
+                    title={isCreating ? "Creating..." : "Create Group"}
+                    onPress={handleCreateGroup}
+                    disabled={isCreating}
+                />
+            </View>
         </View>
     );
 };
-// --- Styles remain the same ---
-const styles = StyleSheet.create({ /* ... styles ... */
-    container: { flex: 1, padding: 20, },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, },
-    subtitle: { fontSize: 18, fontWeight: 'bold', marginTop: 30, marginBottom: 10, },
-    groupItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff', marginBottom: 5, borderRadius: 5, },
-    groupName: { fontSize: 16, fontWeight: 'bold', marginBottom: 5, },
-    input: { height: 45, borderColor: '#ccc', borderWidth: 1, marginBottom: 10, paddingHorizontal: 10, borderRadius: 5, backgroundColor: '#fff', },
-    emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: 'gray', },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        flexWrap: 'wrap',
-        marginTop: 10,
-    }
-});
-
 
 export default GroupsScreen;
