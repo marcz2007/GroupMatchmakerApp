@@ -768,7 +768,7 @@ const ProfileScreen = () => {
             <>
               {profile.word_patterns?.topWords && profile.word_patterns.topWords.length > 0 && (
                 <View style={commonStyles.protectedItem}>
-                  <Text style={commonStyles.protectedLabel}>Your most frequently used uncommon word is:</Text>
+                  <Text style={commonStyles.protectedLabel}>Your signature word:</Text>
                   <Text style={commonStyles.protectedValue}>
                     "{getTopUncommonWord(profile.word_patterns)}"
                   </Text>
