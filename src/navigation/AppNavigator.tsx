@@ -11,6 +11,7 @@ import LoginScreen from '../screens/LoginScreen';
 import MatchingScreen from '../screens/MatchingScreen';
 import MatchResultsScreen from '../screens/MatchResultsScreen';
 import MessagesListScreen from '../screens/MessagesListScreen';
+import PublicProfileScreen from '../screens/PublicProfileScreen';
 import SignupScreen from '../screens/SignupScreen';
 
 // Import the bottom tab navigator
@@ -34,6 +35,7 @@ export type RootStackParamList = {
     query: string; 
     currentGroupId?: string;
   };
+  PublicProfile: { userId: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -93,6 +95,11 @@ const AppStack = () => (
       name="GroupDetails" 
       component={GroupDetailsScreen} 
       options={({ route }) => ({ title: route.params.groupName || 'Group Details' })} 
+    />
+    <Stack.Screen 
+      name="PublicProfile" 
+      component={PublicProfileScreen} 
+      options={{ title: 'Profile' }}
     />
   </Stack.Navigator>
 );

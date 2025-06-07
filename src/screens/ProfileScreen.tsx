@@ -1,3 +1,5 @@
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
@@ -42,7 +44,14 @@ interface Profile {
   };
 }
 
+type RootStackParamList = {
+  PublicProfile: { userId: string };
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 const ProfileScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -511,6 +520,12 @@ const ProfileScreen = () => {
     return "Enjoys larger social gatherings";
   };
 
+  const handleViewPublicProfile = () => {
+    if (profile?.id) {
+      navigation.navigate('PublicProfile', { userId: profile.id });
+    }
+  };
+
   if (loading) {
     return (
       <View style={commonStyles.centeredContainer}>
@@ -815,6 +830,12 @@ const ProfileScreen = () => {
             onPress={() => setEditing(true)}
           >
             <Text style={commonStyles.buttonText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[commonStyles.button, { backgroundColor: colors.primary }]}
+            onPress={handleViewPublicProfile}
+          >
+            <Text style={commonStyles.buttonText}>View Public Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[commonStyles.button, { backgroundColor: '#dc3545' }]}
