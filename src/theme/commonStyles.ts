@@ -103,6 +103,12 @@ export const commonStyles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.xs,
   },
+  protectedItemMultiLine: {
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
+    paddingVertical: spacing.xs,
+  },
   protectedLabel: {
     fontSize: 15,
     color: "#6c757d",

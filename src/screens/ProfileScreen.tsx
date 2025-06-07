@@ -718,13 +718,13 @@ const ProfileScreen = () => {
               <Text style={commonStyles.protectedLabel}>Last Name</Text>
               <Text style={commonStyles.protectedValue}>{lastName || 'Not set'}</Text>
             </View>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>Bio</Text>
-              <Text style={commonStyles.protectedValue}>{bio || 'Not set'}</Text>
+            <View style={[commonStyles.protectedItemMultiLine, { width: '100%' }]}>
+              <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>Bio</Text>
+              <Text style={[typography.body]}>{bio || 'Not set'}</Text>
             </View>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>Interests</Text>
-              <Text style={commonStyles.protectedValue}>{interests || 'Not set'}</Text>
+            <View style={[commonStyles.protectedItemMultiLine, { width: '100%' }]}>
+              <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>Interests</Text>
+              <Text style={[commonStyles.protectedValue]}>{interests || 'Not set'}</Text>
             </View>
           </View>
         </View>
