@@ -2,10 +2,7 @@
   "compilerOptions": {
     "target": "es2017",
     "module": "commonjs",
-    "lib": [
-      "es2017",
-      "dom"
-    ],
+    "lib": ["es2017", "dom"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,14 +11,10 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-native"
+    "jsx": "react-native",
+    "typeRoots": ["./src/types"]
   },
-  "include": [
-    "src/**/*",
-    "scripts/**/*"
-  ],
-  "exclude": [
-    "node_modules"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "src/types/*.d.ts"],
+  "exclude": ["node_modules"],
   "extends": "expo/tsconfig.base"
 }

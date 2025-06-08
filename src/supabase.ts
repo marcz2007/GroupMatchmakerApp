@@ -2,14 +2,13 @@
 import 'react-native-url-polyfill/auto'; // Required for Supabase on React Native
 import { createClient } from '@supabase/supabase-js';
 import { MMKV } from 'react-native-mmkv';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
 
 // Initialize MMKV storage
 const storage = new MMKV({
     id: 'supabase-auth-storage', // Unique ID for storage instance
 });
 
-const supabaseUrl = 'https://nqtycfrgzjiehatokmfn.supabase.co'; // Replace with your actual Supabase URL
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHljZnJnemppZWhhdG9rbWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMyNDU5MDcsImV4cCI6MjA1ODgyMTkwN30.QVuNoevXuJ9rTBAOe_yObjVLdqT-FqwsRw__3HeYDDQ'; // Replace with your actual Anon Key
 
 // Custom storage adapter using MMKV
 const mmkvStorageAdapter = {
@@ -25,7 +24,7 @@ const mmkvStorageAdapter = {
     },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         storage: mmkvStorageAdapter,
         autoRefreshToken: true,
