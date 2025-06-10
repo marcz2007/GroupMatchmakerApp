@@ -2,6 +2,8 @@
 ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS spotify_connected BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS spotify_top_genres TEXT[],
+ADD COLUMN IF NOT EXISTS spotify_top_artists JSONB[], -- Store artist objects with name, image, and spotify_url
+ADD COLUMN IF NOT EXISTS spotify_selected_playlist JSONB, -- Store playlist object with name, image, spotify_url, and description
 ADD COLUMN IF NOT EXISTS spotify_refresh_token TEXT,
 ADD COLUMN IF NOT EXISTS spotify_access_token TEXT,
 ADD COLUMN IF NOT EXISTS spotify_token_expires_at TIMESTAMP WITH TIME ZONE;

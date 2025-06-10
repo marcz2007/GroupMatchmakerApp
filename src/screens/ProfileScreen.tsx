@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -50,6 +51,20 @@ interface Profile {
   spotify_refresh_token?: string;
   spotify_access_token?: string;
   spotify_token_expires_at?: string;
+  spotify_top_artists?: Array<{
+    name: string;
+    image: string;
+    spotify_url: string;
+  }>;
+  spotify_selected_playlist?: {
+    id: string;
+    name: string;
+    description: string;
+    image: string;
+    spotify_url: string;
+    owner: string;
+    tracks_count: number;
+  };
 }
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Profile">;
@@ -77,6 +92,10 @@ const ProfileScreen = () => {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -674,6 +693,66 @@ const ProfileScreen = () => {
     }
   };
 
+  const handleSelectPlaylist = async () => {
+    try {
+      setLoadingPlaylists(true);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert("Error", "Could not get user session.");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("spotify-playlists", {
+        method: "POST",
+        body: { userId: user.id, action: "get_playlists" },
+      });
+
+      if (error) throw error;
+
+      setPlaylists(data.playlists);
+      setShowPlaylistModal(true);
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+      Alert.alert("Error", "Failed to fetch playlists. Please try again.");
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
+  const handlePlaylistSelect = async (playlistId: string) => {
+    try {
+      setLoadingPlaylists(true);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert("Error", "Could not get user session.");
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke("spotify-playlists", {
+        method: "POST",
+        body: { userId: user.id, action: "select_playlist", playlistId },
+      });
+
+      if (error) throw error;
+
+      setShowPlaylistModal(false);
+      fetchProfile(); // Refresh profile to show updated playlist
+    } catch (error) {
+      console.error("Error selecting playlist:", error);
+      Alert.alert("Error", "Failed to select playlist. Please try again.");
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={commonStyles.centeredContainer}>
@@ -1201,6 +1280,72 @@ const ProfileScreen = () => {
                     taste.
                   </Text>
                 )}
+
+                {/* Top Artists Section */}
+                {profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
+                  <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
+                    <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
+                      Top Artists
+                    </Text>
+                    <ScrollView horizontal style={styles.artistsContainer}>
+                      {profile.spotify_top_artists.map((artist, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.artistCard}
+                          onPress={() => Linking.openURL(artist.spotify_url)}
+                        >
+                          <Image source={{ uri: artist.image }} style={styles.artistImage} />
+                          <Text style={styles.artistName} numberOfLines={1}>
+                            {artist.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Selected Playlist Section */}
+                <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
+                  <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
+                    Featured Playlist
+                  </Text>
+                  {profile.spotify_selected_playlist ? (
+                    <TouchableOpacity
+                      style={styles.playlistCard}
+                      onPress={() => profile.spotify_selected_playlist && Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
+                    >
+                      <Image
+                        source={{ uri: profile.spotify_selected_playlist.image }}
+                        style={styles.playlistImage}
+                      />
+                      <View style={styles.playlistInfo}>
+                        <Text style={styles.playlistName}>
+                          {profile.spotify_selected_playlist.name}
+                        </Text>
+                        <Text style={styles.playlistDescription} numberOfLines={2}>
+                          {profile.spotify_selected_playlist.description}
+                        </Text>
+                        <Text style={styles.playlistStats}>
+                          {profile.spotify_selected_playlist.tracks_count} tracks • By{" "}
+                          {profile.spotify_selected_playlist.owner}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={[typography.body, { color: colors.text.secondary }]}>
+                      No playlist selected
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    style={[commonStyles.button, { marginTop: spacing.sm }]}
+                    onPress={handleSelectPlaylist}
+                    disabled={loadingPlaylists}
+                  >
+                    <Text style={commonStyles.buttonText}>
+                      {loadingPlaylists ? "Loading..." : "Select Playlist"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </>
             ) : (
               <>
@@ -1248,6 +1393,45 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Add Modal for Playlist Selection */}
+      <Modal
+        visible={showPlaylistModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPlaylistModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={[typography.sectionTitle, { marginBottom: spacing.md }]}>
+              Select a Playlist
+            </Text>
+            <ScrollView style={styles.playlistList}>
+              {playlists.map((playlist) => (
+                <TouchableOpacity
+                  key={playlist.id}
+                  style={styles.playlistItem}
+                  onPress={() => handlePlaylistSelect(playlist.id)}
+                >
+                  <Image source={{ uri: playlist.image }} style={styles.playlistItemImage} />
+                  <View style={styles.playlistItemInfo}>
+                    <Text style={styles.playlistItemName}>{playlist.name}</Text>
+                    <Text style={styles.playlistItemStats}>
+                      {playlist.tracks_count} tracks • By {playlist.owner}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[commonStyles.button, { marginTop: spacing.md }]}
+              onPress={() => setShowPlaylistModal(false)}
+            >
+              <Text style={commonStyles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -1394,6 +1578,94 @@ const styles = StyleSheet.create({
   genreText: {
     color: colors.white,
     fontSize: typography.body.fontSize,
+  },
+  artistsContainer: {
+    marginTop: spacing.xs,
+  },
+  artistCard: {
+    width: 120,
+    marginRight: spacing.sm,
+    alignItems: "center",
+  },
+  artistImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: spacing.xs,
+  },
+  artistName: {
+    ...typography.body,
+    textAlign: "center",
+  },
+  playlistCard: {
+    flexDirection: "row",
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.md,
+    overflow: "hidden",
+    marginTop: spacing.xs,
+  },
+  playlistImage: {
+    width: 120,
+    height: 120,
+  },
+  playlistInfo: {
+    flex: 1,
+    padding: spacing.sm,
+    justifyContent: "center",
+  },
+  playlistName: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
+  },
+  playlistDescription: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  playlistStats: {
+    ...typography.caption,
+    color: colors.text.secondary,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    width: "90%",
+    maxHeight: "80%",
+  },
+  playlistList: {
+    maxHeight: "70%",
+  },
+  playlistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  playlistItemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.sm,
+  },
+  playlistItemInfo: {
+    flex: 1,
+  },
+  playlistItemName: {
+    ...typography.body,
+    fontWeight: "bold",
+    marginBottom: spacing.xs,
+  },
+  playlistItemStats: {
+    ...typography.caption,
+    color: colors.text.secondary,
   },
 });
 

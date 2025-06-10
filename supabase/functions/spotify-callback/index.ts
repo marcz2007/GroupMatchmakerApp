@@ -66,6 +66,33 @@ async function getTopGenres(accessToken: string): Promise<string[]> {
   }
 }
 
+async function getTopArtists(accessToken: string): Promise<any[]> {
+  try {
+    const response = await fetch(
+      "https://api.spotify.com/v1/me/top/artists?limit=5&time_range=medium_term",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch top artists: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.items.map((artist: any) => ({
+      name: artist.name,
+      image: artist.images[0]?.url,
+      spotify_url: artist.external_urls.spotify,
+    }));
+  } catch (error) {
+    console.error("Error fetching top artists:", error);
+    return [];
+  }
+}
+
 function createHtmlResponse(message: string, redirectUrl: string) {
   return new Response(
     `<!DOCTYPE html>
@@ -235,10 +262,14 @@ serve(async (req: Request) => {
     const tokenData = await tokenResponse.json();
     console.log("Token exchange successful");
 
-    // Get user's top genres
-    console.log("Fetching top genres...");
-    const topGenres = await getTopGenres(tokenData.access_token);
+    // Get user's top genres and artists
+    console.log("Fetching top genres and artists...");
+    const [topGenres, topArtists] = await Promise.all([
+      getTopGenres(tokenData.access_token),
+      getTopArtists(tokenData.access_token),
+    ]);
     console.log("Retrieved top genres:", topGenres);
+    console.log("Retrieved top artists:", topArtists);
 
     // After getting the access token, fetch the user's profile
     console.log("Fetching Spotify user profile...");
@@ -266,6 +297,7 @@ serve(async (req: Request) => {
       .update({
         spotify_connected: true,
         spotify_top_genres: topGenres,
+        spotify_top_artists: topArtists,
         spotify_refresh_token: tokenData.refresh_token,
         spotify_access_token: tokenData.access_token,
         spotify_token_expires_at: new Date(
