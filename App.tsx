@@ -11,26 +11,32 @@ import { supabase } from "./src/supabase";
 // Export the navigation prop type for reuse in components
 export type RootStackNavigationProp<T extends keyof RootStackParamList> = StackNavigationProp<RootStackParamList, T>;
 
+type RootStackParamList = {
+  Chat: { groupId: string };
+  Profile: { code?: string; state?: string; error?: string };
+};
+
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ['groupmatchmakerapp://'],
+  prefixes: ['groupmatchmakerapp://', 'https://nqtycfrgzjiehatokmfn.supabase.co'],
   config: {
     screens: {
       // When a link like groupmatchmakerapp://group/invite/123 is opened,
       // navigate to the Chat screen with groupId: '123'.
-      // We will handle the actual "joining" logic within the ChatScreen or a subsequent screen.
       Chat: {
         path: 'group/invite/:groupId',
         parse: {
           groupId: (groupId: string) => groupId,
         },
-        // If you need to serialize params back into a path (less common for invites):
-        // serialize: {
-        //   groupId: (groupId: string) => groupId,
-        // },
       },
-      // You can add other screens here for deep linking if needed
-      // Example: navigating to a specific user profile or another part of your app
-      // Profile: 'user/:userId',
+      // Add Spotify callback handler
+      Profile: {
+        path: 'functions/v1/spotify-callback',
+        parse: {
+          code: (code: string) => code,
+          state: (state: string) => state,
+          error: (error: string) => error,
+        },
+      },
     },
   },
   // Optional: A function to get the initial URL if it's not handled automatically
@@ -43,7 +49,10 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
   // Optional: Subscribe to incoming links
   subscribe(listener) {
-    const onReceiveURL = ({ url }: { url: string }) => listener(url);
+    const onReceiveURL = ({ url }: { url: string }) => {
+      console.log('Received URL:', url);
+      listener(url);
+    };
     const subscription = Linking.addEventListener('url', onReceiveURL);
     return () => {
       subscription.remove();

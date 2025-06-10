@@ -23,19 +23,20 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
-  MessagesList: undefined;
-  CreateGroup: undefined;
-  Groups: undefined;
-  Matching: { currentGroupId: string; currentGroupName: string };
+  Profile: { code?: string; state?: string; error?: string };
+  PublicProfile: { userId: string };
   Chat: { groupId: string; groupName: string };
-  AddUserToGroup: { groupId: string; groupName: string };
+  MessagesList: undefined;
+  Groups: undefined;
+  CreateGroup: undefined;
   GroupDetails: { groupId: string; groupName: string };
+  AddUserToGroup: { groupId: string; groupName: string };
+  Matching: { currentGroupId: string; currentGroupName: string };
   MatchResults: { 
     type: 'activity' | 'event'; 
     query: string; 
     currentGroupId?: string;
   };
-  PublicProfile: { userId: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();

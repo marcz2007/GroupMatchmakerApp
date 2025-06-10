@@ -1,11 +1,13 @@
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,10 +16,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
 import { commonStyles } from "../theme/commonStyles";
 import { borderRadius, colors, spacing, typography } from "../theme/theme";
-import { shouldAnalyzeBio, updateAnalysisScores } from '../utils/aiAnalysis';
+import { shouldAnalyzeBio, updateAnalysisScores } from "../utils/aiAnalysis";
 
 interface Profile {
   id: string;
@@ -42,16 +45,19 @@ interface Profile {
     trigrams: string[];
     topWords: Array<{ word: string; score: number }>;
   };
+  spotify_connected?: boolean;
+  spotify_top_genres?: string[];
+  spotify_refresh_token?: string;
+  spotify_access_token?: string;
+  spotify_token_expires_at?: string;
 }
 
-type RootStackParamList = {
-  PublicProfile: { userId: string };
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Profile">;
+type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
 
 const ProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<ProfileScreenRouteProp>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -65,13 +71,29 @@ const ProfileScreen = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [selectedPhotos, setSelectedPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<
+    ImagePicker.ImagePickerAsset[]
+  >([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
-
+  const [connectingSpotify, setConnectingSpotify] = useState(false);
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Handle Spotify callback parameters
+  useEffect(() => {
+    const { code, state, error } = route.params || {};
+    if (code && state) {
+      console.log("Received Spotify callback:", { code, state });
+      // The callback will be handled by the Edge Function
+      // We just need to refresh the profile to show the updated Spotify connection
+      fetchProfile();
+    } else if (error) {
+      console.error("Spotify connection error:", error);
+      Alert.alert("Error", `Failed to connect to Spotify: ${error}`);
+    }
+  }, [route.params]);
 
   const fetchProfile = async () => {
     try {
@@ -148,7 +170,9 @@ const ProfileScreen = () => {
         setLastName(data.lastName || "");
         // Sort photos by order if they exist
         if (data.photos) {
-          data.photos.sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+          data.photos.sort(
+            (a: { order: number }, b: { order: number }) => a.order - b.order
+          );
         }
       }
     } catch (error) {
@@ -164,7 +188,7 @@ const ProfileScreen = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    console.log('[handleSave] Starting save process...');
+    console.log("[handleSave] Starting save process...");
 
     try {
       const {
@@ -172,21 +196,21 @@ const ProfileScreen = () => {
         error: userError,
       } = await supabase.auth.getUser();
       if (userError || !user) {
-        console.error('[handleSave] User authentication error:', userError);
+        console.error("[handleSave] User authentication error:", userError);
         Alert.alert("Error", "Could not get user session.");
         setIsSaving(false);
         return;
       }
-      console.log('[handleSave] User authenticated successfully:', user.id);
+      console.log("[handleSave] User authenticated successfully:", user.id);
 
       let newAvatarUrl: string | null | undefined = undefined;
       let newPhotos: { url: string; order: number }[] | undefined = undefined;
 
       if (selectedImage) {
-        console.log('[handleSave] Processing new avatar image...');
+        console.log("[handleSave] Processing new avatar image...");
         newAvatarUrl = await uploadImage(selectedImage);
         if (newAvatarUrl === null) {
-          console.error('[handleSave] Failed to upload new avatar');
+          console.error("[handleSave] Failed to upload new avatar");
           Alert.alert(
             "Save Error",
             "Failed to upload new profile picture. Profile not saved."
@@ -194,14 +218,17 @@ const ProfileScreen = () => {
           setIsSaving(false);
           return;
         }
-        console.log('[handleSave] New avatar uploaded successfully:', newAvatarUrl);
+        console.log(
+          "[handleSave] New avatar uploaded successfully:",
+          newAvatarUrl
+        );
       }
 
       if (selectedPhotos.length > 0) {
-        console.log('[handleSave] Processing new photos...');
+        console.log("[handleSave] Processing new photos...");
         const uploadedPhotos = await uploadPhotos(selectedPhotos);
         if (uploadedPhotos.length === 0) {
-          console.error('[handleSave] Failed to upload photos');
+          console.error("[handleSave] Failed to upload photos");
           Alert.alert(
             "Save Error",
             "Failed to upload photos. Profile not saved."
@@ -210,7 +237,10 @@ const ProfileScreen = () => {
           return;
         }
         newPhotos = uploadedPhotos;
-        console.log('[handleSave] New photos uploaded successfully:', uploadedPhotos.length);
+        console.log(
+          "[handleSave] New photos uploaded successfully:",
+          uploadedPhotos.length
+        );
       }
 
       const interestsArray = interests
@@ -223,12 +253,12 @@ const ProfileScreen = () => {
         bio,
         profile?.ai_analysis_scores?.lastUpdated
       );
-      console.log('[handleSave] Bio analysis check:', {
+      console.log("[handleSave] Bio analysis check:", {
         shouldAnalyze,
         enableAIAnalysis,
         bioLength: bio.length,
         lastUpdated: profile?.ai_analysis_scores?.lastUpdated,
-        bio: bio // Log the actual bio content
+        bio: bio, // Log the actual bio content
       });
 
       const updates: Partial<Profile> & {
@@ -256,12 +286,12 @@ const ProfileScreen = () => {
         updates.photos = newPhotos;
       }
 
-      console.log('[handleSave] Updating profile with data:', {
+      console.log("[handleSave] Updating profile with data:", {
         id: updates.id,
         username: updates.username,
         bioLength: updates.bio?.length,
         interestsCount: updates.interests?.length,
-        enableAIAnalysis: updates.enable_ai_analysis
+        enableAIAnalysis: updates.enable_ai_analysis,
       });
 
       const { error: updateError } = await supabase
@@ -272,34 +302,41 @@ const ProfileScreen = () => {
         .single();
 
       if (updateError) {
-        console.error('[handleSave] Error updating profile:', updateError);
+        console.error("[handleSave] Error updating profile:", updateError);
         Alert.alert("Error updating profile", updateError.message);
       } else {
         // If bio should be analyzed and AI analysis is enabled, trigger analysis
         if (shouldAnalyze && enableAIAnalysis) {
-          console.log('[handleSave] Triggering AI analysis for bio...');
+          console.log("[handleSave] Triggering AI analysis for bio...");
           try {
-            console.log('[handleSave] Sending request to analyze-text function with payload:', {
-              text: bio,
-              type: 'bio'
-            });
-            
-            const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-text', {
-              body: { text: bio, type: 'bio' }
-            });
+            console.log(
+              "[handleSave] Sending request to analyze-text function with payload:",
+              {
+                text: bio,
+                type: "bio",
+              }
+            );
+
+            const { data: analysisData, error: analysisError } =
+              await supabase.functions.invoke("analyze-text", {
+                body: { text: bio, type: "bio" },
+              });
 
             if (analysisError) {
-              console.error('[handleSave] Error analyzing bio:', analysisError);
+              console.error("[handleSave] Error analyzing bio:", analysisError);
               Alert.alert(
                 "Analysis Error",
                 "There was an error analyzing your bio. Your profile was saved, but the analysis will be retried later."
               );
             } else if (analysisData) {
-              console.log('[handleSave] Analysis successful, updating scores:', analysisData);
+              console.log(
+                "[handleSave] Analysis successful, updating scores:",
+                analysisData
+              );
               await updateAnalysisScores(user.id, analysisData);
             }
           } catch (error) {
-            console.error('[handleSave] Error in AI analysis:', error);
+            console.error("[handleSave] Error in AI analysis:", error);
             Alert.alert(
               "Analysis Error",
               "There was an error analyzing your bio. Your profile was saved, but the analysis will be retried later."
@@ -324,7 +361,7 @@ const ProfileScreen = () => {
       Alert.alert("Error", "An unexpected error occurred during save.");
     } finally {
       setIsSaving(false);
-      console.log('[handleSave] Save process completed');
+      console.log("[handleSave] Save process completed");
     }
   };
 
@@ -441,7 +478,9 @@ const ProfileScreen = () => {
     }
   };
 
-  const uploadPhotos = async (assets: ImagePicker.ImagePickerAsset[]): Promise<{ url: string; order: number }[]> => {
+  const uploadPhotos = async (
+    assets: ImagePicker.ImagePickerAsset[]
+  ): Promise<{ url: string; order: number }[]> => {
     try {
       setUploadingPhotos(true);
       const {
@@ -456,7 +495,9 @@ const ProfileScreen = () => {
       const uploadedPhotos = [];
       for (let i = 0; i < assets.length; i++) {
         const asset = assets[i];
-        const arraybuffer = await fetch(asset.uri).then((res) => res.arrayBuffer());
+        const arraybuffer = await fetch(asset.uri).then((res) =>
+          res.arrayBuffer()
+        );
         const fileExt = asset.uri?.split(".").pop()?.toLowerCase() ?? "jpg";
         const path = `${user.id}/photos/${Date.now()}_${i}.${fileExt}`;
 
@@ -494,7 +535,9 @@ const ProfileScreen = () => {
     }
   };
 
-  const getTopUncommonWord = (wordPatterns?: Profile['word_patterns']): string | null => {
+  const getTopUncommonWord = (
+    wordPatterns?: Profile["word_patterns"]
+  ): string | null => {
     if (!wordPatterns?.topWords?.length) return null;
     return wordPatterns.topWords[0]?.word || null;
   };
@@ -522,7 +565,112 @@ const ProfileScreen = () => {
 
   const handleViewPublicProfile = () => {
     if (profile?.id) {
-      navigation.navigate('PublicProfile', { userId: profile.id });
+      navigation.navigate("PublicProfile", { userId: profile.id });
+    }
+  };
+
+  const handleSpotifyConnect = async () => {
+    try {
+      setConnectingSpotify(true);
+      console.log("Starting Spotify connection process...");
+
+      // Get the current session
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error("Session error:", sessionError);
+        Alert.alert(
+          "Error",
+          "Could not get user session. Please try logging in again."
+        );
+        return;
+      }
+
+      // Call the Edge Function
+      const { data, error } = await supabase.functions.invoke("spotify-auth", {
+        method: "POST",
+        body: { userId: session.user.id },
+      });
+      console.log("data", data);
+
+      if (error) {
+        console.error("Edge Function error:", error);
+        throw new Error(error.message);
+      }
+
+      if (!data?.authUrl) {
+        throw new Error("No authorization URL received from server");
+      }
+
+      // Open the URL in the device's browser
+      const supported = await Linking.canOpenURL(data.authUrl);
+      console.log("supported", supported);
+
+      if (supported) {
+        console.log("opening url", data.authUrl);
+        await Linking.openURL(data.authUrl);
+      } else {
+        throw new Error("Cannot open URL: " + data.authUrl);
+      }
+    } catch (error: any) {
+      console.error("Error connecting to Spotify:", error);
+      Alert.alert(
+        "Error",
+        `Failed to connect to Spotify: ${error?.message || "Unknown error"}`
+      );
+    } finally {
+      setConnectingSpotify(false);
+    }
+  };
+
+  const handleSpotifyDisconnect = async () => {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert("Error", "Could not get user session.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          spotify_connected: false,
+          spotify_top_genres: null,
+          spotify_refresh_token: null,
+          spotify_access_token: null,
+          spotify_token_expires_at: null,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              spotify_connected: false,
+              spotify_top_genres: undefined,
+              spotify_refresh_token: undefined,
+              spotify_access_token: undefined,
+              spotify_token_expires_at: undefined,
+            }
+          : null
+      );
+
+      Alert.alert("Success", "Disconnected from Spotify");
+    } catch (error) {
+      console.error("Error disconnecting from Spotify:", error);
+      Alert.alert(
+        "Error",
+        "Failed to disconnect from Spotify. Please try again."
+      );
     }
   };
 
@@ -541,16 +689,15 @@ const ProfileScreen = () => {
       <ScrollView style={commonStyles.container}>
         <Text style={commonStyles.title}>Edit Profile</Text>
 
-        <View style={[commonStyles.section, { alignItems: 'center' }]}>
+        <View style={[commonStyles.section, { alignItems: "center" }]}>
           <TouchableOpacity onPress={pickImages} style={styles.avatarContainer}>
             {displayUri ? (
-              <Image
-                source={{ uri: displayUri }}
-                style={styles.avatar}
-              />
+              <Image source={{ uri: displayUri }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Text style={[typography.body, { color: colors.text.secondary }]}>
+                <Text
+                  style={[typography.body, { color: colors.text.secondary }]}
+                >
                   Add Photo
                 </Text>
               </View>
@@ -601,7 +748,9 @@ const ProfileScreen = () => {
             <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
             <View style={commonStyles.protectedContent}>
               <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>Enable AI Analysis</Text>
+                <Text style={commonStyles.protectedLabel}>
+                  Enable AI Analysis
+                </Text>
                 <Switch
                   value={enableAIAnalysis}
                   onValueChange={setEnableAIAnalysis}
@@ -610,14 +759,19 @@ const ProfileScreen = () => {
                 />
               </View>
               <Text style={[typography.body, { color: colors.text.secondary }]}>
-                When enabled, your chat messages and bio will be analyzed to help find better group matches.
-                This helps us understand your communication style and preferences.
+                When enabled, your chat messages and bio will be analyzed to
+                help find better group matches. This helps us understand your
+                communication style and preferences.
               </Text>
             </View>
           </View>
 
           <View style={styles.photoGallerySection}>
-            <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>Profile Photos (up to 6)</Text>
+            <Text
+              style={[typography.sectionTitle, { marginBottom: spacing.sm }]}
+            >
+              Profile Photos (up to 6)
+            </Text>
             <View style={styles.photoGrid}>
               {profile?.photos?.map((photo, index) => (
                 <View key={index} style={styles.photoContainer}>
@@ -627,7 +781,9 @@ const ProfileScreen = () => {
                     onPress={() => {
                       const newPhotos = [...(profile.photos || [])];
                       newPhotos.splice(index, 1);
-                      setProfile(prev => prev ? { ...prev, photos: newPhotos } : null);
+                      setProfile((prev) =>
+                        prev ? { ...prev, photos: newPhotos } : null
+                      );
                     }}
                   >
                     <Text style={styles.removePhotoButtonText}>×</Text>
@@ -646,13 +802,21 @@ const ProfileScreen = () => {
             </View>
             {selectedPhotos.length > 0 && (
               <View style={styles.selectedPhotosPreview}>
-                <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>
+                <Text
+                  style={[
+                    typography.sectionTitle,
+                    { marginBottom: spacing.sm },
+                  ]}
+                >
                   Selected Photos ({selectedPhotos.length})
                 </Text>
                 <ScrollView horizontal style={styles.selectedPhotosScroll}>
                   {selectedPhotos.map((photo, index) => (
                     <View key={index} style={styles.selectedPhotoContainer}>
-                      <Image source={{ uri: photo.uri }} style={styles.selectedPhoto} />
+                      <Image
+                        source={{ uri: photo.uri }}
+                        style={styles.selectedPhoto}
+                      />
                       <TouchableOpacity
                         style={styles.removeSelectedPhotoButton}
                         onPress={() => {
@@ -670,9 +834,100 @@ const ProfileScreen = () => {
             )}
           </View>
 
+          <View style={commonStyles.protectedSection}>
+            <Text style={commonStyles.protectedTitle}>Music Taste</Text>
+            <View style={commonStyles.protectedContent}>
+              {profile?.spotify_connected ? (
+                <>
+                  <View style={commonStyles.protectedItem}>
+                    <Text style={commonStyles.protectedLabel}>
+                      Connected to Spotify
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        commonStyles.button,
+                        { backgroundColor: "#dc3545", marginTop: spacing.sm },
+                      ]}
+                      onPress={handleSpotifyDisconnect}
+                    >
+                      <Text style={commonStyles.buttonText}>
+                        Disconnect Spotify
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {profile.spotify_top_genres &&
+                  profile.spotify_top_genres.length > 0 ? (
+                    <View
+                      style={[
+                        commonStyles.protectedItemMultiLine,
+                        { width: "100%" },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          commonStyles.protectedLabel,
+                          { marginBottom: spacing.xs },
+                        ]}
+                      >
+                        Top Genres
+                      </Text>
+                      <View style={styles.genresContainer}>
+                        {profile.spotify_top_genres.map((genre, index) => (
+                          <View key={index} style={styles.genreTag}>
+                            <Text style={styles.genreText}>{genre}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : (
+                    <Text
+                      style={[
+                        typography.body,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      Your top genres will appear here once we analyze your
+                      music taste.
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={[
+                      typography.body,
+                      {
+                        color: colors.text.secondary,
+                        marginBottom: spacing.md,
+                      },
+                    ]}
+                  >
+                    Connect your Spotify account to share your music taste and
+                    find people with similar preferences.
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      commonStyles.button,
+                      { backgroundColor: "#1DB954" },
+                    ]}
+                    onPress={handleSpotifyConnect}
+                    disabled={connectingSpotify}
+                  >
+                    <Text style={commonStyles.buttonText}>
+                      {connectingSpotify ? "Connecting..." : "Connect Spotify"}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+
           <View style={commonStyles.buttonContainer}>
             <TouchableOpacity
-              style={[commonStyles.button, isSaving || uploading ? commonStyles.disabledButton : null]}
+              style={[
+                commonStyles.button,
+                isSaving || uploading ? commonStyles.disabledButton : null,
+              ]}
               onPress={handleSave}
               disabled={isSaving || uploading}
             >
@@ -688,7 +943,12 @@ const ProfileScreen = () => {
               }}
               disabled={isSaving || uploading}
             >
-              <Text style={[commonStyles.buttonText, { color: colors.text.primary }]}>
+              <Text
+                style={[
+                  commonStyles.buttonText,
+                  { color: colors.text.primary },
+                ]}
+              >
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -702,13 +962,13 @@ const ProfileScreen = () => {
     <ScrollView style={commonStyles.container}>
       <Text style={commonStyles.title}>Your Profile</Text>
 
-      <View style={[commonStyles.section, { alignItems: 'center' }]}>
-        <TouchableOpacity onPress={() => setEditing(true)} style={styles.avatarContainer}>
+      <View style={[commonStyles.section, { alignItems: "center" }]}>
+        <TouchableOpacity
+          onPress={() => setEditing(true)}
+          style={styles.avatarContainer}
+        >
           {avatarUrl ? (
-            <Image
-              source={{ uri: avatarUrl }}
-              style={styles.avatar}
-            />
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={[typography.body, { color: colors.text.secondary }]}>
@@ -723,23 +983,49 @@ const ProfileScreen = () => {
           <View style={commonStyles.protectedContent}>
             <View style={commonStyles.protectedItem}>
               <Text style={commonStyles.protectedLabel}>Username</Text>
-              <Text style={commonStyles.protectedValue}>{username || 'Not set'}</Text>
+              <Text style={commonStyles.protectedValue}>
+                {username || "Not set"}
+              </Text>
             </View>
             <View style={commonStyles.protectedItem}>
               <Text style={commonStyles.protectedLabel}>First Name</Text>
-              <Text style={commonStyles.protectedValue}>{firstName || 'Not set'}</Text>
+              <Text style={commonStyles.protectedValue}>
+                {firstName || "Not set"}
+              </Text>
             </View>
             <View style={commonStyles.protectedItem}>
               <Text style={commonStyles.protectedLabel}>Last Name</Text>
-              <Text style={commonStyles.protectedValue}>{lastName || 'Not set'}</Text>
+              <Text style={commonStyles.protectedValue}>
+                {lastName || "Not set"}
+              </Text>
             </View>
-            <View style={[commonStyles.protectedItemMultiLine, { width: '100%' }]}>
-              <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>Bio</Text>
-              <Text style={[typography.body]}>{bio || 'Not set'}</Text>
+            <View
+              style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}
+            >
+              <Text
+                style={[
+                  commonStyles.protectedLabel,
+                  { marginBottom: spacing.xs },
+                ]}
+              >
+                Bio
+              </Text>
+              <Text style={[typography.body]}>{bio || "Not set"}</Text>
             </View>
-            <View style={[commonStyles.protectedItemMultiLine, { width: '100%' }]}>
-              <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>Interests</Text>
-              <Text style={[commonStyles.protectedValue]}>{interests || 'Not set'}</Text>
+            <View
+              style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}
+            >
+              <Text
+                style={[
+                  commonStyles.protectedLabel,
+                  { marginBottom: spacing.xs },
+                ]}
+              >
+                Interests
+              </Text>
+              <Text style={[commonStyles.protectedValue]}>
+                {interests || "Not set"}
+              </Text>
             </View>
           </View>
         </View>
@@ -748,7 +1034,9 @@ const ProfileScreen = () => {
           <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
           <View style={commonStyles.protectedContent}>
             <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>Enable AI Analysis</Text>
+              <Text style={commonStyles.protectedLabel}>
+                Enable AI Analysis
+              </Text>
               <Switch
                 value={enableAIAnalysis}
                 onValueChange={setEnableAIAnalysis}
@@ -757,18 +1045,25 @@ const ProfileScreen = () => {
               />
             </View>
             <Text style={[typography.body, { color: colors.text.secondary }]}>
-              When enabled, your chat messages and bio will be analyzed to help find better group matches.
-              This helps us understand your communication style and preferences.
+              When enabled, your chat messages and bio will be analyzed to help
+              find better group matches. This helps us understand your
+              communication style and preferences.
             </Text>
           </View>
         </View>
 
         <View style={styles.photoGallerySection}>
-          <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>Photos</Text>
+          <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>
+            Photos
+          </Text>
           {profile?.photos && profile.photos.length > 0 ? (
             <ScrollView horizontal style={styles.photoGallery}>
               {profile.photos.map((photo, index) => (
-                <Image key={index} source={{ uri: photo.url }} style={styles.galleryPhoto} />
+                <Image
+                  key={index}
+                  source={{ uri: photo.url }}
+                  style={styles.galleryPhoto}
+                />
               ))}
             </ScrollView>
           ) : (
@@ -778,50 +1073,158 @@ const ProfileScreen = () => {
 
         <View style={styles.aiInsightsSection}>
           <Text style={commonStyles.protectedTitle}>AI Insights</Text>
-          
+
           {profile?.enable_ai_analysis ? (
             <>
-              {profile.word_patterns?.topWords && profile.word_patterns.topWords.length > 0 && (
-                <View style={commonStyles.protectedItem}>
-                  <Text style={commonStyles.protectedLabel}>Your signature word:</Text>
-                  <Text style={commonStyles.protectedValue}>
-                    "{getTopUncommonWord(profile.word_patterns)}"
-                  </Text>
-                </View>
-              )}
+              {profile.word_patterns?.topWords &&
+                profile.word_patterns.topWords.length > 0 && (
+                  <View style={commonStyles.protectedItem}>
+                    <Text style={commonStyles.protectedLabel}>
+                      Your signature word:
+                    </Text>
+                    <Text style={commonStyles.protectedValue}>
+                      "{getTopUncommonWord(profile.word_patterns)}"
+                    </Text>
+                  </View>
+                )}
 
               <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>Communication Style:</Text>
+                <Text style={commonStyles.protectedLabel}>
+                  Communication Style:
+                </Text>
                 <Text style={commonStyles.protectedValue}>
-                  {getCommunicationStyleDescription(profile?.ai_analysis_scores?.communicationStyle)}
+                  {getCommunicationStyleDescription(
+                    profile?.ai_analysis_scores?.communicationStyle
+                  )}
                 </Text>
               </View>
 
               <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>Activity Preference:</Text>
+                <Text style={commonStyles.protectedLabel}>
+                  Activity Preference:
+                </Text>
                 <Text style={commonStyles.protectedValue}>
-                  {getActivityPreferenceDescription(profile?.ai_analysis_scores?.activityPreference)}
+                  {getActivityPreferenceDescription(
+                    profile?.ai_analysis_scores?.activityPreference
+                  )}
                 </Text>
               </View>
 
               <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>Social Dynamics:</Text>
+                <Text style={commonStyles.protectedLabel}>
+                  Social Dynamics:
+                </Text>
                 <Text style={commonStyles.protectedValue}>
-                  {getSocialDynamicsDescription(profile?.ai_analysis_scores?.socialDynamics)}
+                  {getSocialDynamicsDescription(
+                    profile?.ai_analysis_scores?.socialDynamics
+                  )}
                 </Text>
               </View>
 
               {profile?.ai_analysis_scores?.lastUpdated && (
-                <Text style={[typography.caption, { color: colors.text.secondary, marginTop: spacing.sm }]}>
-                  Last updated: {new Date(profile.ai_analysis_scores.lastUpdated).toLocaleDateString()}
+                <Text
+                  style={[
+                    typography.caption,
+                    { color: colors.text.secondary, marginTop: spacing.sm },
+                  ]}
+                >
+                  Last updated:{" "}
+                  {new Date(
+                    profile.ai_analysis_scores.lastUpdated
+                  ).toLocaleDateString()}
                 </Text>
               )}
             </>
           ) : (
-            <Text style={[typography.body, { color: colors.text.secondary, fontStyle: 'italic' }]}>
-              Enable AI Analysis in Edit Profile to see insights about your communication style and preferences.
+            <Text
+              style={[
+                typography.body,
+                { color: colors.text.secondary, fontStyle: "italic" },
+              ]}
+            >
+              Enable AI Analysis in Edit Profile to see insights about your
+              communication style and preferences.
             </Text>
           )}
+        </View>
+
+        <View style={commonStyles.protectedSection}>
+          <Text style={commonStyles.protectedTitle}>Music Taste</Text>
+          <View style={commonStyles.protectedContent}>
+            {profile?.spotify_connected ? (
+              <>
+                <View style={commonStyles.protectedItem}>
+                  <Text style={commonStyles.protectedLabel}>
+                    Connected to Spotify
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      commonStyles.button,
+                      { backgroundColor: "#dc3545", marginTop: spacing.sm },
+                    ]}
+                    onPress={handleSpotifyDisconnect}
+                  >
+                    <Text style={commonStyles.buttonText}>
+                      Disconnect Spotify
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {profile.spotify_top_genres &&
+                profile.spotify_top_genres.length > 0 ? (
+                  <View
+                    style={[
+                      commonStyles.protectedItemMultiLine,
+                      { width: "100%" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        commonStyles.protectedLabel,
+                        { marginBottom: spacing.xs },
+                      ]}
+                    >
+                      Top Genres
+                    </Text>
+                    <View style={styles.genresContainer}>
+                      {profile.spotify_top_genres.map((genre, index) => (
+                        <View key={index} style={styles.genreTag}>
+                          <Text style={styles.genreText}>{genre}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : (
+                  <Text
+                    style={[typography.body, { color: colors.text.secondary }]}
+                  >
+                    Your top genres will appear here once we analyze your music
+                    taste.
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text
+                  style={[
+                    typography.body,
+                    { color: colors.text.secondary, marginBottom: spacing.md },
+                  ]}
+                >
+                  Connect your Spotify account to share your music taste and
+                  find people with similar preferences.
+                </Text>
+                <TouchableOpacity
+                  style={[commonStyles.button, { backgroundColor: "#1DB954" }]}
+                  onPress={handleSpotifyConnect}
+                  disabled={connectingSpotify}
+                >
+                  <Text style={commonStyles.buttonText}>
+                    {connectingSpotify ? "Connecting..." : "Connect Spotify"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
 
         <View style={commonStyles.buttonContainer}>
@@ -838,7 +1241,7 @@ const ProfileScreen = () => {
             <Text style={commonStyles.buttonText}>View Public Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[commonStyles.button, { backgroundColor: '#dc3545' }]}
+            style={[commonStyles.button, { backgroundColor: "#dc3545" }]}
             onPress={handleLogout}
           >
             <Text style={commonStyles.buttonText}>Logout</Text>
@@ -851,7 +1254,7 @@ const ProfileScreen = () => {
 
 const styles = StyleSheet.create({
   avatarContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: spacing.xl,
   },
   avatar: {
@@ -865,8 +1268,8 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 75,
     backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: spacing.sm,
   },
   uploadButton: {
@@ -877,54 +1280,54 @@ const styles = StyleSheet.create({
   },
   uploadButtonText: {
     color: colors.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   photoGallerySection: {
-    width: '100%',
+    width: "100%",
     marginBottom: spacing.xl,
   },
   photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
   photoContainer: {
-    width: '30%',
+    width: "30%",
     aspectRatio: 1,
-    position: 'relative',
+    position: "relative",
   },
   photo: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: borderRadius.md,
   },
   removePhotoButton: {
-    position: 'absolute',
+    position: "absolute",
     top: -10,
     right: -10,
-    backgroundColor: '#dc3545',
+    backgroundColor: "#dc3545",
     width: 24,
     height: 24,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   removePhotoButtonText: {
     color: colors.white,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   addPhotoButton: {
-    width: '30%',
+    width: "30%",
     aspectRatio: 1,
     backgroundColor: colors.border,
     borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
   },
   addPhotoButtonText: {
     fontSize: 32,
@@ -940,23 +1343,23 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     marginRight: spacing.sm,
-    position: 'relative',
+    position: "relative",
   },
   selectedPhoto: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: borderRadius.md,
   },
   removeSelectedPhotoButton: {
-    position: 'absolute',
+    position: "absolute",
     top: -10,
     right: -10,
-    backgroundColor: '#dc3545',
+    backgroundColor: "#dc3545",
     width: 24,
     height: 24,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   photoGallery: {
     marginTop: spacing.sm,
@@ -969,12 +1372,28 @@ const styles = StyleSheet.create({
   },
   noPhotosText: {
     color: colors.text.secondary,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     marginTop: spacing.sm,
   },
   aiInsightsSection: {
-    width: '100%',
+    width: "100%",
     marginBottom: spacing.xl,
+  },
+  genresContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  genreTag: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  genreText: {
+    color: colors.white,
+    fontSize: typography.body.fontSize,
   },
 });
 

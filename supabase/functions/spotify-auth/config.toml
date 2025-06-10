@@ -1,0 +1,2 @@
+[functions.spotify-auth]
+verify_jwt = false 
