@@ -55,7 +55,7 @@ interface PublicProfile {
     owner: string;
     tracks_count: number;
   };
-  visibility_settings?: {
+  visibility_settings: {
     spotify: {
       top_artists: boolean;
       top_genres: boolean;
@@ -228,34 +228,43 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
-        {profile.spotify_connected && profile.visibility_settings?.spotify && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Music Taste</Text>
-            
-            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && profile.spotify_top_genres.length > 0 && (
+        {profile.spotify_connected && (
+          <View style={styles.spotifySection}>
+            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && (
               <View style={styles.spotifySection}>
                 <Text style={styles.spotifySectionTitle}>Top Genres</Text>
-                <View style={styles.genresContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.genresContainer}
+                >
                   {profile.spotify_top_genres.map((genre, index) => (
                     <View key={index} style={styles.genreTag}>
                       <Text style={styles.genreText}>{genre}</Text>
                     </View>
                   ))}
-                </View>
+                </ScrollView>
               </View>
             )}
 
-            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
+            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && (
               <View style={styles.spotifySection}>
                 <Text style={styles.spotifySectionTitle}>Top Artists</Text>
-                <ScrollView horizontal style={styles.artistsContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.artistsContainer}
+                >
                   {profile.spotify_top_artists.map((artist, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.artistCard}
                       onPress={() => Linking.openURL(artist.spotify_url)}
                     >
-                      <Image source={{ uri: artist.image }} style={styles.artistImage} />
+                      <Image
+                        source={{ uri: artist.image }}
+                        style={styles.artistImage}
+                      />
                       <Text style={styles.artistName} numberOfLines={1}>
                         {artist.name}
                       </Text>
@@ -270,7 +279,7 @@ const PublicProfileScreen = () => {
                 <Text style={styles.spotifySectionTitle}>Featured Playlist</Text>
                 <TouchableOpacity
                   style={styles.playlistCard}
-                  onPress={() => Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
+                  onPress={() => profile.spotify_selected_playlist && Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
                 >
                   <Image
                     source={{ uri: profile.spotify_selected_playlist.image }}
@@ -402,11 +411,12 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
   },
   artistsContainer: {
-    marginTop: spacing.xs,
+    paddingVertical: spacing.sm,
+    gap: spacing.md,
   },
   artistCard: {
     width: 120,
-    marginRight: spacing.sm,
+    marginRight: spacing.md,
     alignItems: 'center',
   },
   artistImage: {
@@ -414,10 +424,12 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     marginBottom: spacing.xs,
+    backgroundColor: colors.border,
   },
   artistName: {
     ...typography.body,
     textAlign: 'center',
+    color: colors.text.primary,
   },
   playlistCard: {
     flexDirection: 'row',

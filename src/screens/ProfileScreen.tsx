@@ -455,6 +455,7 @@ const ProfileScreen = () => {
       console.log("[handleSave] Save process completed");
     }
   };
+  console.log("profile", profile);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -832,8 +833,21 @@ const ProfileScreen = () => {
     try {
       const newSettings = { ...visibilitySettings };
       if (subsection) {
+        // For individual Spotify toggles
         newSettings.spotify[subsection] = !newSettings.spotify[subsection];
+      } else if (section === 'spotify') {
+        // For the main Spotify section toggle
+        const currentState = newSettings.spotify.top_artists || 
+                           newSettings.spotify.top_genres || 
+                           newSettings.spotify.selected_playlist;
+        // Toggle all Spotify settings to the opposite of current state
+        newSettings.spotify = {
+          top_artists: !currentState,
+          top_genres: !currentState,
+          selected_playlist: !currentState
+        };
       } else {
+        // For other section toggles
         (newSettings[section] as boolean) = !newSettings[section];
       }
 
