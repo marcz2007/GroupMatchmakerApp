@@ -2,13 +2,15 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { supabase } from '../supabase';
 import { commonStyles } from '../theme/commonStyles';
@@ -36,6 +38,32 @@ interface PublicProfile {
     communicationStyle?: number;
     activityPreference?: number;
     socialDynamics?: number;
+  };
+  spotify_connected?: boolean;
+  spotify_top_genres?: string[];
+  spotify_top_artists?: Array<{
+    name: string;
+    image: string;
+    spotify_url: string;
+  }>;
+  spotify_selected_playlist?: {
+    id: string;
+    name: string;
+    description: string;
+    image: string;
+    spotify_url: string;
+    owner: string;
+    tracks_count: number;
+  };
+  visibility_settings?: {
+    spotify: {
+      top_artists: boolean;
+      top_genres: boolean;
+      selected_playlist: boolean;
+    };
+    photos: boolean;
+    interests: boolean;
+    ai_analysis: boolean;
   };
 }
 
@@ -122,7 +150,7 @@ const PublicProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {allPhotos.length > 0 ? (
+      {profile.visibility_settings?.photos && allPhotos.length > 0 ? (
         <ScrollView 
           horizontal 
           pagingEnabled 
@@ -150,9 +178,8 @@ const PublicProfileScreen = () => {
       <View style={styles.contentContainer}>
         <View style={styles.nameContainer}>
           <Text style={styles.name}>
-            {profile.firstName} {profile.lastName}
+            {profile.firstName}
           </Text>
-          <Text style={styles.username}>@{profile.username}</Text>
         </View>
 
         {profile.bio && (
@@ -162,7 +189,7 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
-        {profile.interests && profile.interests.length > 0 && (
+        {profile.visibility_settings?.interests && profile.interests && profile.interests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.interestsContainer}>
@@ -175,7 +202,7 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
-        {profile.ai_analysis_scores && (
+        {profile.visibility_settings?.ai_analysis && profile.ai_analysis_scores && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Personality Insights</Text>
             <View style={styles.insightsContainer}>
@@ -198,6 +225,72 @@ const PublicProfileScreen = () => {
                 </Text>
               </View>
             </View>
+          </View>
+        )}
+
+        {profile.spotify_connected && profile.visibility_settings?.spotify && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Music Taste</Text>
+            
+            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && profile.spotify_top_genres.length > 0 && (
+              <View style={styles.spotifySection}>
+                <Text style={styles.spotifySectionTitle}>Top Genres</Text>
+                <View style={styles.genresContainer}>
+                  {profile.spotify_top_genres.map((genre, index) => (
+                    <View key={index} style={styles.genreTag}>
+                      <Text style={styles.genreText}>{genre}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
+              <View style={styles.spotifySection}>
+                <Text style={styles.spotifySectionTitle}>Top Artists</Text>
+                <ScrollView horizontal style={styles.artistsContainer}>
+                  {profile.spotify_top_artists.map((artist, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.artistCard}
+                      onPress={() => Linking.openURL(artist.spotify_url)}
+                    >
+                      <Image source={{ uri: artist.image }} style={styles.artistImage} />
+                      <Text style={styles.artistName} numberOfLines={1}>
+                        {artist.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {profile.visibility_settings.spotify.selected_playlist && profile.spotify_selected_playlist && (
+              <View style={styles.spotifySection}>
+                <Text style={styles.spotifySectionTitle}>Featured Playlist</Text>
+                <TouchableOpacity
+                  style={styles.playlistCard}
+                  onPress={() => Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
+                >
+                  <Image
+                    source={{ uri: profile.spotify_selected_playlist.image }}
+                    style={styles.playlistImage}
+                  />
+                  <View style={styles.playlistInfo}>
+                    <Text style={styles.playlistName}>
+                      {profile.spotify_selected_playlist.name}
+                    </Text>
+                    <Text style={styles.playlistDescription} numberOfLines={2}>
+                      {profile.spotify_selected_playlist.description}
+                    </Text>
+                    <Text style={styles.playlistStats}>
+                      {profile.spotify_selected_playlist.tracks_count} tracks • By{" "}
+                      {profile.spotify_selected_playlist.owner}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -284,6 +377,76 @@ const styles = StyleSheet.create({
   insightValue: {
     ...typography.body,
     color: colors.text.primary,
+  },
+  spotifySection: {
+    marginBottom: spacing.lg,
+  },
+  spotifySectionTitle: {
+    ...typography.sectionTitle,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  genresContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  genreTag: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  genreText: {
+    color: colors.white,
+    fontSize: typography.body.fontSize,
+  },
+  artistsContainer: {
+    marginTop: spacing.xs,
+  },
+  artistCard: {
+    width: 120,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+  },
+  artistImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: spacing.xs,
+  },
+  artistName: {
+    ...typography.body,
+    textAlign: 'center',
+  },
+  playlistCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginTop: spacing.xs,
+  },
+  playlistImage: {
+    width: 120,
+    height: 120,
+  },
+  playlistInfo: {
+    flex: 1,
+    padding: spacing.sm,
+    justifyContent: 'center',
+  },
+  playlistName: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
+  },
+  playlistDescription: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  playlistStats: {
+    ...typography.caption,
+    color: colors.text.secondary,
   },
 });
 
