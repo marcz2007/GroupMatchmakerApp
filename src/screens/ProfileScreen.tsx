@@ -18,68 +18,26 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AIAnalysisSection } from '../components/profile/AIAnalysisSection';
+import { InterestsSection } from '../components/profile/InterestsSection';
+import { PlaylistSelector } from '../components/profile/PlaylistSelector';
+import { ProfileActions } from '../components/profile/ProfileActions';
+import { ProfileHeader } from '../components/profile/ProfileHeader';
+import { SpotifyConnect } from '../components/profile/SpotifyConnect';
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
 import { commonStyles } from "../theme/commonStyles";
 import { borderRadius, colors, spacing, typography } from "../theme/theme";
+import { Profile } from '../types';
 import { shouldAnalyzeBio, updateAnalysisScores } from "../utils/aiAnalysis";
 
-interface Profile {
-  id: string;
-  username: string;
-  email: string;
-  bio: string;
-  interests: string[];
-  avatar_url?: string;
-  firstName?: string;
-  lastName?: string;
-  photos?: { url: string; order: number }[];
-  enable_ai_analysis?: boolean;
-  ai_analysis_scores?: {
-    communicationStyle?: number;
-    activityPreference?: number;
-    socialDynamics?: number;
-    lastUpdated?: string;
-  };
-  word_patterns?: {
-    unigrams: string[];
-    bigrams: string[];
-    trigrams: string[];
-    topWords: Array<{ word: string; score: number }>;
-  };
-  spotify_connected?: boolean;
-  spotify_top_genres?: string[];
-  spotify_refresh_token?: string;
-  spotify_access_token?: string;
-  spotify_token_expires_at?: string;
-  spotify_top_artists?: Array<{
-    name: string;
-    image: string;
-    spotify_url: string;
-  }>;
-  spotify_selected_playlist?: {
-    id: string;
-    name: string;
-    description: string;
-    image: string;
-    spotify_url: string;
-    owner: string;
-    tracks_count: number;
-  };
-  visibility_settings?: {
-    spotify: {
-      top_artists: boolean;
-      top_genres: boolean;
-      selected_playlist: boolean;
-    };
-    photos: boolean;
-    interests: boolean;
-    ai_analysis: boolean;
-  };
-}
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Profile">;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
+
+// Update the Profile type to make visibility_settings optional
+type ProfileWithOptionalSettings = Omit<Profile, 'visibility_settings'> & {
+  visibility_settings?: Profile['visibility_settings'];
+};
 
 const VisibilityToggle = ({ 
   isVisible, 
@@ -186,92 +144,35 @@ const ProfileScreen = () => {
 
   const fetchProfile = async () => {
     try {
-      setLoading(true);
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        Alert.alert("Error", "Could not get user session.");
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
         .single();
 
-      if (error) {
-        // If the error is because profile doesn't exist, create one
-        if (error.code === "PGRST116") {
-          // PostgreSQL error for "no rows returned"
-          if (!user.email) {
-            Alert.alert("Error", "User email is required to create a profile.");
-            return;
-          }
-
-          // Create a default profile
-          const defaultProfile = {
-            id: user.id,
-            username: "",
-            bio: "",
-            interests: [],
-            created_at: new Date(),
-            updated_at: new Date(),
-            email: user.email,
-          };
-
-          const { error: insertError } = await supabase
-            .from("profiles")
-            .insert(defaultProfile);
-
-          if (insertError) {
-            Alert.alert(
-              "Error",
-              "Failed to create profile: " + insertError.message
-            );
-            return;
-          }
-
-          // Set the new profile
-          setProfile(defaultProfile);
-          setUsername("");
-          setBio("");
-          setInterests("");
-          return;
-        }
-
-        // For other errors
-        Alert.alert("Error", "Failed to fetch profile: " + error.message);
-        console.error("Error fetching profile", error);
-        return;
-      }
+      if (error) throw error;
 
       if (data) {
-        setProfile(data);
-        setUsername(data.username || "");
-        setBio(data.bio || "");
-        setInterests(data.interests ? data.interests.join(", ") : "");
-        setAvatarUrl(data.avatar_url || null);
-        setFirstName(data.firstName || "");
-        setLastName(data.lastName || "");
-        // Sort photos by order if they exist
-        if (data.photos) {
-          data.photos.sort(
-            (a: { order: number }, b: { order: number }) => a.order - b.order
-          );
-        }
+        const profileWithSettings = {
+          ...data,
+          visibility_settings: data.visibility_settings || {
+            spotify: {
+              top_artists: true,
+              top_genres: true,
+              selected_playlist: true
+            },
+            photos: true,
+            interests: true,
+            ai_analysis: true
+          }
+        } as Profile;
+        setProfile(profileWithSettings);
       }
     } catch (error) {
-      console.error("Unexpected error:", error);
-      Alert.alert(
-        "Error",
-        "An unexpected error occurred while fetching your profile."
-      );
-    } finally {
-      setLoading(false);
+      console.error('Error fetching profile:', error);
     }
   };
 
@@ -656,9 +557,8 @@ const ProfileScreen = () => {
   };
 
   const handleViewPublicProfile = () => {
-    if (profile?.id) {
-      navigation.navigate("PublicProfile", { userId: profile.id });
-    }
+    if (!profile) return;
+    navigation.navigate('PublicProfile', { userId: profile.id });
   };
 
   const handleSpotifyConnect = async () => {
@@ -830,8 +730,18 @@ const ProfileScreen = () => {
     section: keyof NonNullable<Profile['visibility_settings']>,
     subsection?: keyof NonNullable<Profile['visibility_settings']>['spotify']
   ) => {
+    if (!profile) return;
+
     try {
-      const newSettings = { ...visibilitySettings };
+      const newSettings = { ...profile.visibility_settings };
+      if (!newSettings.spotify) {
+        newSettings.spotify = {
+          top_artists: true,
+          top_genres: true,
+          selected_playlist: true
+        };
+      }
+
       if (subsection) {
         // For individual Spotify toggles
         newSettings.spotify[subsection] = !newSettings.spotify[subsection];
@@ -854,14 +764,24 @@ const ProfileScreen = () => {
       const { error } = await supabase
         .from('profiles')
         .update({ visibility_settings: newSettings })
-        .eq('id', profile?.id);
+        .eq('id', profile.id);
 
       if (error) throw error;
-      setVisibilitySettings(newSettings);
+      setProfile(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          visibility_settings: newSettings as NonNullable<Profile['visibility_settings']>
+        };
+      });
     } catch (error) {
       console.error('Error updating visibility:', error);
       Alert.alert('Error', 'Failed to update visibility settings');
     }
+  };
+
+  const handleEditProfile = () => {
+    navigation.navigate('EditProfile' as never);
   };
 
   if (loading) {
@@ -1033,172 +953,12 @@ const ProfileScreen = () => {
               onToggleVisibility={() => handleVisibilityChange('spotify')}
             />
             <View style={commonStyles.protectedContent}>
-              {profile?.spotify_connected ? (
-                <>
-                  <View style={commonStyles.protectedItem}>
-                    <Text style={commonStyles.protectedLabel}>
-                      Connected to Spotify
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        commonStyles.button,
-                        { backgroundColor: "#dc3545", marginTop: spacing.sm },
-                      ]}
-                      onPress={handleSpotifyDisconnect}
-                    >
-                      <Text style={commonStyles.buttonText}>
-                        Disconnect Spotify
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  {profile.spotify_top_genres &&
-                  profile.spotify_top_genres.length > 0 ? (
-                    <View
-                      style={[
-                        commonStyles.protectedItemMultiLine,
-                        { width: "100%" },
-                      ]}
-                    >
-                      <View style={styles.sectionSubHeader}>
-                        <Text
-                          style={[
-                            commonStyles.protectedLabel,
-                            { marginBottom: spacing.xs },
-                          ]}
-                        >
-                          Top Genres
-                        </Text>
-                        <VisibilityToggle 
-                          isVisible={visibilitySettings.spotify.top_genres}
-                          onToggle={() => handleVisibilityChange('spotify', 'top_genres')}
-                          label="Top Genres"
-                        />
-                      </View>
-                      <View style={styles.genresContainer}>
-                        {profile.spotify_top_genres.map((genre, index) => (
-                          <View key={index} style={styles.genreTag}>
-                            <Text style={styles.genreText}>{genre}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  ) : (
-                    <Text
-                      style={[
-                        typography.body,
-                        { color: colors.text.secondary },
-                      ]}
-                    >
-                      Your top genres will appear here once we analyze your
-                      music taste.
-                    </Text>
-                  )}
-
-                  {/* Top Artists Section */}
-                  {profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
-                    <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
-                      <View style={styles.sectionSubHeader}>
-                        <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
-                          Top Artists
-                        </Text>
-                        <VisibilityToggle 
-                          isVisible={visibilitySettings.spotify.top_artists}
-                          onToggle={() => handleVisibilityChange('spotify', 'top_artists')}
-                          label="Top Artists"
-                        />
-                      </View>
-                      <ScrollView horizontal style={styles.artistsContainer}>
-                        {profile.spotify_top_artists.map((artist, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.artistCard}
-                            onPress={() => Linking.openURL(artist.spotify_url)}
-                          >
-                            <Image source={{ uri: artist.image }} style={styles.artistImage} />
-                            <Text style={styles.artistName} numberOfLines={1}>
-                              {artist.name}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  )}
-
-                  {/* Selected Playlist Section */}
-                  <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
-                    <View style={styles.sectionSubHeader}>
-                      <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
-                        Featured Playlist
-                      </Text>
-                      <VisibilityToggle 
-                        isVisible={visibilitySettings.spotify.selected_playlist}
-                        onToggle={() => handleVisibilityChange('spotify', 'selected_playlist')}
-                        label="Featured Playlist"
-                      />
-                    </View>
-                    {profile.spotify_selected_playlist ? (
-                      <TouchableOpacity
-                        style={styles.playlistCard}
-                        onPress={() => profile.spotify_selected_playlist && Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
-                      >
-                        <Image
-                          source={{ uri: profile.spotify_selected_playlist.image }}
-                          style={styles.playlistImage}
-                        />
-                        <View style={styles.playlistInfo}>
-                          <Text style={styles.playlistName}>
-                            {profile.spotify_selected_playlist.name}
-                          </Text>
-                          <Text style={styles.playlistDescription} numberOfLines={2}>
-                            {profile.spotify_selected_playlist.description}
-                          </Text>
-                          <Text style={styles.playlistStats}>
-                            {profile.spotify_selected_playlist.tracks_count} tracks • By{" "}
-                            {profile.spotify_selected_playlist.owner}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={[typography.body, { color: colors.text.secondary }]}>
-                        No playlist selected
-                      </Text>
-                    )}
-                    <TouchableOpacity
-                      style={[commonStyles.button, { marginTop: spacing.sm }]}
-                      onPress={handleSelectPlaylist}
-                      disabled={loadingPlaylists}
-                    >
-                      <Text style={commonStyles.buttonText}>
-                        {loadingPlaylists ? "Loading..." : "Select Playlist"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text
-                    style={[
-                      typography.body,
-                      { color: colors.text.secondary, marginBottom: spacing.md },
-                    ]}
-                  >
-                    Connect your Spotify account to share your music taste and
-                    find people with similar preferences.
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      commonStyles.button,
-                      { backgroundColor: "#1DB954" },
-                    ]}
-                    onPress={handleSpotifyConnect}
-                    disabled={connectingSpotify}
-                  >
-                    <Text style={commonStyles.buttonText}>
-                      {connectingSpotify ? "Connecting..." : "Connect Spotify"}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
+              <SpotifyConnect
+                onConnect={handleSpotifyConnect}
+                onDisconnect={handleSpotifyDisconnect}
+                isConnected={!!profile?.spotify_connected}
+                isConnecting={connectingSpotify}
+              />
             </View>
           </View>
 
@@ -1239,389 +999,65 @@ const ProfileScreen = () => {
   }
 
   return (
-    <ScrollView style={commonStyles.container}>
-      <Text style={commonStyles.title}>Your Profile</Text>
-
-      <View style={[commonStyles.section, { alignItems: "center" }]}>
-        <TouchableOpacity
-          onPress={() => setEditing(true)}
-          style={styles.avatarContainer}
-        >
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={[typography.body, { color: colors.text.secondary }]}>
-                Add Photo
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <View style={commonStyles.protectedSection}>
-          <Text style={commonStyles.protectedTitle}>Profile Information</Text>
-          <View style={commonStyles.protectedContent}>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>Username</Text>
-              <Text style={commonStyles.protectedValue}>
-                {username || "Not set"}
-              </Text>
-            </View>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>First Name</Text>
-              <Text style={commonStyles.protectedValue}>
-                {firstName || "Not set"}
-              </Text>
-            </View>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>Last Name</Text>
-              <Text style={commonStyles.protectedValue}>
-                {lastName || "Not set"}
-              </Text>
-            </View>
-            <View
-              style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}
-            >
-              <Text
-                style={[
-                  commonStyles.protectedLabel,
-                  { marginBottom: spacing.xs },
-                ]}
-              >
-                Bio
-              </Text>
-              <Text style={[typography.body]}>{bio || "Not set"}</Text>
-            </View>
-            <View
-              style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}
-            >
-              <Text
-                style={[
-                  commonStyles.protectedLabel,
-                  { marginBottom: spacing.xs },
-                ]}
-              >
-                Interests
-              </Text>
-              <Text style={[commonStyles.protectedValue]}>
-                {interests || "Not set"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={commonStyles.protectedSection}>
-          <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
-          <View style={commonStyles.protectedContent}>
-            <View style={commonStyles.protectedItem}>
-              <Text style={commonStyles.protectedLabel}>
-                Enable AI Analysis
-              </Text>
-              <Switch
-                value={enableAIAnalysis}
-                onValueChange={setEnableAIAnalysis}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.white}
+    <ScrollView style={styles.container}>
+      {profile && (
+        <>
+          <ProfileHeader
+            profile={profile}
+            onEditProfile={handleEditProfile}
+          />
+          <ProfileActions
+            onViewPublic={handleViewPublicProfile}
+            onEditProfile={handleEditProfile}
+          />
+          <View style={commonStyles.protectedSection}>
+            <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
+            <View style={commonStyles.protectedContent}>
+              <AIAnalysisSection
+                enabled={enableAIAnalysis}
+                onToggle={setEnableAIAnalysis}
               />
             </View>
-            <Text style={[typography.body, { color: colors.text.secondary }]}>
-              When enabled, your chat messages and bio will be analyzed to help
-              find better group matches. This helps us understand your
-              communication style and preferences.
-            </Text>
           </View>
-        </View>
-
-        <View style={styles.photoGallerySection}>
-          <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>
-            Photos
-          </Text>
-          {profile?.photos && profile.photos.length > 0 ? (
-            <ScrollView horizontal style={styles.photoGallery}>
-              {profile.photos.map((photo, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: photo.url }}
-                  style={styles.galleryPhoto}
+          <View style={commonStyles.protectedSection}>
+            <SectionHeader 
+              title="Music Taste" 
+              isVisible={visibilitySettings.spotify.top_artists || 
+                         visibilitySettings.spotify.top_genres || 
+                         visibilitySettings.spotify.selected_playlist}
+              onToggleVisibility={() => handleVisibilityChange('spotify')}
+            />
+            <View style={commonStyles.protectedContent}>
+              {profile?.spotify_connected && (
+                <PlaylistSelector
+                  onSelect={handleSelectPlaylist}
+                  isLoading={loadingPlaylists}
+                  selectedPlaylist={profile.spotify_selected_playlist}
                 />
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={styles.noPhotosText}>No photos added yet</Text>
-          )}
-        </View>
-
-        <View style={styles.aiInsightsSection}>
-          <Text style={commonStyles.protectedTitle}>AI Insights</Text>
-
-          {profile?.enable_ai_analysis ? (
-            <>
-              {profile.word_patterns?.topWords &&
-                profile.word_patterns.topWords.length > 0 && (
-                  <View style={commonStyles.protectedItem}>
-                    <Text style={commonStyles.protectedLabel}>
-                      Your signature word:
-                    </Text>
-                    <Text style={commonStyles.protectedValue}>
-                      "{getTopUncommonWord(profile.word_patterns)}"
-                    </Text>
-                  </View>
-                )}
-
-              <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>
-                  Communication Style:
-                </Text>
-                <Text style={commonStyles.protectedValue}>
-                  {getCommunicationStyleDescription(
-                    profile?.ai_analysis_scores?.communicationStyle
-                  )}
-                </Text>
-              </View>
-
-              <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>
-                  Activity Preference:
-                </Text>
-                <Text style={commonStyles.protectedValue}>
-                  {getActivityPreferenceDescription(
-                    profile?.ai_analysis_scores?.activityPreference
-                  )}
-                </Text>
-              </View>
-
-              <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>
-                  Social Dynamics:
-                </Text>
-                <Text style={commonStyles.protectedValue}>
-                  {getSocialDynamicsDescription(
-                    profile?.ai_analysis_scores?.socialDynamics
-                  )}
-                </Text>
-              </View>
-
-              {profile?.ai_analysis_scores?.lastUpdated && (
-                <Text
-                  style={[
-                    typography.caption,
-                    { color: colors.text.secondary, marginTop: spacing.sm },
-                  ]}
-                >
-                  Last updated:{" "}
-                  {new Date(
-                    profile.ai_analysis_scores.lastUpdated
-                  ).toLocaleDateString()}
-                </Text>
               )}
-            </>
-          ) : (
-            <Text
-              style={[
-                typography.body,
-                { color: colors.text.secondary, fontStyle: "italic" },
-              ]}
-            >
-              Enable AI Analysis in Edit Profile to see insights about your
-              communication style and preferences.
-            </Text>
-          )}
-        </View>
-
-        <View style={commonStyles.protectedSection}>
-          <SectionHeader 
-            title="Music Taste" 
-            isVisible={visibilitySettings.spotify.top_artists || 
-                       visibilitySettings.spotify.top_genres || 
-                       visibilitySettings.spotify.selected_playlist}
-            onToggleVisibility={() => handleVisibilityChange('spotify')}
-          />
-          <View style={commonStyles.protectedContent}>
-            {profile?.spotify_connected ? (
-              <>
-                <View style={commonStyles.protectedItem}>
-                  <Text style={commonStyles.protectedLabel}>
-                    Connected to Spotify
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      commonStyles.button,
-                      { backgroundColor: "#dc3545", marginTop: spacing.sm },
-                    ]}
-                    onPress={handleSpotifyDisconnect}
-                  >
-                    <Text style={commonStyles.buttonText}>
-                      Disconnect Spotify
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                {profile.spotify_top_genres &&
-                profile.spotify_top_genres.length > 0 ? (
-                  <View
-                    style={[
-                      commonStyles.protectedItemMultiLine,
-                      { width: "100%" },
-                    ]}
-                  >
-                    <View style={styles.sectionSubHeader}>
-                      <Text
-                        style={[
-                          commonStyles.protectedLabel,
-                          { marginBottom: spacing.xs },
-                        ]}
-                      >
-                        Top Genres
-                      </Text>
-                      <VisibilityToggle 
-                        isVisible={visibilitySettings.spotify.top_genres}
-                        onToggle={() => handleVisibilityChange('spotify', 'top_genres')}
-                        label="Top Genres"
-                      />
-                    </View>
-                    <View style={styles.genresContainer}>
-                      {profile.spotify_top_genres.map((genre, index) => (
-                        <View key={index} style={styles.genreTag}>
-                          <Text style={styles.genreText}>{genre}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                ) : (
-                  <Text
-                    style={[typography.body, { color: colors.text.secondary }]}
-                  >
-                    Your top genres will appear here once we analyze your music
-                    taste.
-                  </Text>
-                )}
-
-                {/* Top Artists Section */}
-                {profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
-                  <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
-                    <View style={styles.sectionSubHeader}>
-                      <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
-                        Top Artists
-                      </Text>
-                      <VisibilityToggle 
-                        isVisible={visibilitySettings.spotify.top_artists}
-                        onToggle={() => handleVisibilityChange('spotify', 'top_artists')}
-                        label="Top Artists"
-                      />
-                    </View>
-                    <ScrollView horizontal style={styles.artistsContainer}>
-                      {profile.spotify_top_artists.map((artist, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.artistCard}
-                          onPress={() => Linking.openURL(artist.spotify_url)}
-                        >
-                          <Image source={{ uri: artist.image }} style={styles.artistImage} />
-                          <Text style={styles.artistName} numberOfLines={1}>
-                            {artist.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Selected Playlist Section */}
-                <View style={[commonStyles.protectedItemMultiLine, { width: "100%" }]}>
-                  <View style={styles.sectionSubHeader}>
-                    <Text style={[commonStyles.protectedLabel, { marginBottom: spacing.xs }]}>
-                      Featured Playlist
-                    </Text>
-                    <VisibilityToggle 
-                      isVisible={visibilitySettings.spotify.selected_playlist}
-                      onToggle={() => handleVisibilityChange('spotify', 'selected_playlist')}
-                      label="Featured Playlist"
-                    />
-                  </View>
-                  {profile.spotify_selected_playlist ? (
-                    <TouchableOpacity
-                      style={styles.playlistCard}
-                      onPress={() => profile.spotify_selected_playlist && Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
-                    >
-                      <Image
-                        source={{ uri: profile.spotify_selected_playlist.image }}
-                        style={styles.playlistImage}
-                      />
-                      <View style={styles.playlistInfo}>
-                        <Text style={styles.playlistName}>
-                          {profile.spotify_selected_playlist.name}
-                        </Text>
-                        <Text style={styles.playlistDescription} numberOfLines={2}>
-                          {profile.spotify_selected_playlist.description}
-                        </Text>
-                        <Text style={styles.playlistStats}>
-                          {profile.spotify_selected_playlist.tracks_count} tracks • By{" "}
-                          {profile.spotify_selected_playlist.owner}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={[typography.body, { color: colors.text.secondary }]}>
-                      No playlist selected
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    style={[commonStyles.button, { marginTop: spacing.sm }]}
-                    onPress={handleSelectPlaylist}
-                    disabled={loadingPlaylists}
-                  >
-                    <Text style={commonStyles.buttonText}>
-                      {loadingPlaylists ? "Loading..." : "Select Playlist"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text
-                  style={[
-                    typography.body,
-                    { color: colors.text.secondary, marginBottom: spacing.md },
-                  ]}
-                >
-                  Connect your Spotify account to share your music taste and
-                  find people with similar preferences.
-                </Text>
-                <TouchableOpacity
-                  style={[commonStyles.button, { backgroundColor: "#1DB954" }]}
-                  onPress={handleSpotifyConnect}
-                  disabled={connectingSpotify}
-                >
-                  <Text style={commonStyles.buttonText}>
-                    {connectingSpotify ? "Connecting..." : "Connect Spotify"}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
+            </View>
           </View>
-        </View>
-
-        <View style={commonStyles.buttonContainer}>
-          <TouchableOpacity
-            style={commonStyles.button}
-            onPress={() => setEditing(true)}
-          >
-            <Text style={commonStyles.buttonText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[commonStyles.button, { backgroundColor: colors.primary }]}
-            onPress={handleViewPublicProfile}
-          >
-            <Text style={commonStyles.buttonText}>View Public Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[commonStyles.button, { backgroundColor: "#dc3545" }]}
-            onPress={handleLogout}
-          >
-            <Text style={commonStyles.buttonText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
+          <View style={commonStyles.protectedSection}>
+            <Text style={commonStyles.protectedTitle}>Interests</Text>
+            <View style={commonStyles.protectedContent}>
+              {profile?.interests && profile.interests.length > 0 && (
+                <InterestsSection
+                  profile={profile as Profile}
+                  onVisibilityChange={handleVisibilityChange}
+                />
+              )}
+            </View>
+          </View>
+          <View style={commonStyles.buttonContainer}>
+            <TouchableOpacity
+              style={[commonStyles.button, { backgroundColor: "#dc3545" }]}
+              onPress={handleLogout}
+            >
+              <Text style={commonStyles.buttonText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
       {/* Add Modal for Playlist Selection */}
       <Modal
         visible={showPlaylistModal}
@@ -1912,6 +1348,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xs,
     borderRadius: borderRadius.sm,
+    backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
     backgroundColor: colors.background,
   },
 });
