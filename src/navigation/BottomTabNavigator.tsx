@@ -4,10 +4,10 @@ import { StyleSheet } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 // Import screens
+import EditProfileScreen from "../screens/EditProfileScreen";
 import GroupsScreen from "../screens/GroupsScreen";
 import MatchmakingHomeScreen from "../screens/MatchmakingHomeScreen";
 import MessagesListScreen from "../screens/MessagesListScreen";
-import ProfileScreen from "../screens/ProfileScreen";
 
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
@@ -17,42 +17,19 @@ const BottomTabNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          // Use Ionicons for regular tabs
-          if (route.name === "Groups") {
-            return (
-              <Ionicons
-                name={focused ? "people" : "people-outline"}
-                size={size}
-                color={color}
-              />
-            );
+          let iconName;
+
+          if (route.name === "Matchmaking") {
+            iconName = focused ? "people" : "people-outline";
+          } else if (route.name === "Groups") {
+            iconName = focused ? "grid" : "grid-outline";
           } else if (route.name === "Messages") {
-            return (
-              <Ionicons
-                name={focused ? "chatbubbles" : "chatbubbles-outline"}
-                size={size}
-                color={color}
-              />
-            );
+            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           } else if (route.name === "Profile") {
-            return (
-              <Ionicons
-                name={focused ? "person" : "person-outline"}
-                size={size}
-                color={color}
-              />
-            );
+            iconName = focused ? "person" : "person-outline";
           }
 
-          // Use a hook-like icon for Grapple tab
-          // Options: link, construct, hammer, magnet, anchor, flash-outline
-          return (
-            <Ionicons
-              name={focused ? "magnet" : "magnet-outline"}
-              size={size * 1.2}
-              color={color}
-            />
-          );
+          return <Ionicons name={iconName as any} size={size} color={color} />;
         },
         tabBarActiveTintColor: "#ffffff",
         tabBarInactiveTintColor: "#9ca3af",
@@ -75,7 +52,7 @@ const BottomTabNavigator = () => {
         }}
       />
       <Tab.Screen name="Messages" component={MessagesListScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={EditProfileScreen} />
     </Tab.Navigator>
   );
 };

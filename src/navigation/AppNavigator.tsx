@@ -23,7 +23,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
-  Profile: { code?: string; state?: string; error?: string };
+  EditProfile: undefined;
   PublicProfile: { userId: string };
   Chat: { groupId: string; groupName: string };
   MessagesList: undefined;
