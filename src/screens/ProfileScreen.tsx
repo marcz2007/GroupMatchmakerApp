@@ -12,18 +12,16 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { AIAnalysisSection } from '../components/profile/AIAnalysisSection';
 import { InterestsSection } from '../components/profile/InterestsSection';
 import { PlaylistSelector } from '../components/profile/PlaylistSelector';
 import { ProfileActions } from '../components/profile/ProfileActions';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
-import { SpotifyConnect } from '../components/profile/SpotifyConnect';
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
 import { commonStyles } from "../theme/commonStyles";
@@ -95,18 +93,15 @@ const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [username, setUsername] = useState("");
-  const [bio, setBio] = useState("");
-  const [interests, setInterests] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const [bio, setBio] = useState("");
+  const [interests, setInterests] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [selectedImage, setSelectedImage] =
-    useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [selectedPhotos, setSelectedPhotos] = useState<
-    ImagePicker.ImagePickerAsset[]
-  >([]);
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
@@ -123,6 +118,72 @@ const ProfileScreen = () => {
     interests: true,
     ai_analysis: false
   });
+
+  // Initialize form fields when profile changes
+  useEffect(() => {
+    if (profile) {
+      console.log("Profile data available, initializing form fields:", JSON.stringify(profile, null, 2));
+      setUsername(profile.username || '');
+      setFirstName(profile.firstName || '');
+      setLastName(profile.lastName || '');
+      setBio(profile.bio || '');
+      setInterests(Array.isArray(profile.interests) ? profile.interests.join(', ') : '');
+      setAvatarUrl(profile.avatar_url || null);
+      setEnableAIAnalysis(profile.enable_ai_analysis || false);
+      setVisibilitySettings(profile.visibility_settings || {
+        spotify: {
+          top_artists: true,
+          top_genres: true,
+          selected_playlist: true
+        },
+        photos: true,
+        interests: true,
+        ai_analysis: false
+      });
+    }
+  }, [profile]);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        console.log("Raw profile data from database:", JSON.stringify(data, null, 2));
+        const profileWithSettings = {
+          ...data,
+          visibility_settings: data.visibility_settings || {
+            spotify: {
+              top_artists: true,
+              top_genres: true,
+              selected_playlist: true
+            },
+            photos: true,
+            interests: true,
+            ai_analysis: false
+          }
+        } as Profile;
+        console.log("Setting profile data:", JSON.stringify(profileWithSettings, null, 2));
+        setProfile(profileWithSettings);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -141,40 +202,6 @@ const ProfileScreen = () => {
       Alert.alert("Error", `Failed to connect to Spotify: ${error}`);
     }
   }, [route.params]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        const profileWithSettings = {
-          ...data,
-          visibility_settings: data.visibility_settings || {
-            spotify: {
-              top_artists: true,
-              top_genres: true,
-              selected_playlist: true
-            },
-            photos: true,
-            interests: true,
-            ai_analysis: true
-          }
-        } as Profile;
-        setProfile(profileWithSettings);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -356,7 +383,7 @@ const ProfileScreen = () => {
       console.log("[handleSave] Save process completed");
     }
   };
-  console.log("profile", profile);
+  // console.log("profile", profile);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -781,7 +808,84 @@ const ProfileScreen = () => {
   };
 
   const handleEditProfile = () => {
-    navigation.navigate('EditProfile' as never);
+    console.log("handleEditProfile called, current profile state:", JSON.stringify(profile, null, 2));
+    if (profile) {
+      // Log the exact values we're about to set
+      const formValues = {
+        username: profile.username || '',
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        bio: profile.bio || '',
+        interests: Array.isArray(profile.interests) && profile.interests.length > 0 
+          ? profile.interests.join(', ') 
+          : '',
+        avatar_url: profile.avatar_url || null,
+        enable_ai_analysis: profile.enable_ai_analysis || false
+      };
+      console.log("Setting form fields with values:", JSON.stringify(formValues, null, 2));
+
+      // Set all form fields
+      setUsername(formValues.username);
+      setFirstName(formValues.firstName);
+      setLastName(formValues.lastName);
+      setBio(formValues.bio);
+      setInterests(formValues.interests);
+      setAvatarUrl(formValues.avatar_url);
+      setEnableAIAnalysis(formValues.enable_ai_analysis);
+      setVisibilitySettings(profile.visibility_settings || {
+        spotify: {
+          top_artists: true,
+          top_genres: true,
+          selected_playlist: true
+        },
+        photos: true,
+        interests: true,
+        ai_analysis: false
+      });
+    } else {
+      console.log("No profile data available when trying to edit");
+    }
+    setEditing(true);
+  };
+
+  // Add useEffect to monitor state changes
+  useEffect(() => {
+    if (editing) {
+      console.log("Edit mode state values:", {
+        username,
+        firstName,
+        lastName,
+        bio,
+        interests,
+        avatarUrl,
+        enableAIAnalysis
+      });
+    }
+  }, [editing, username, firstName, lastName, bio, interests, avatarUrl, enableAIAnalysis]);
+
+  // Add useEffect to monitor profile changes
+  useEffect(() => {
+    console.log("Profile state updated:", JSON.stringify(profile, null, 2));
+  }, [profile]);
+
+  const handleAIAnalysisToggle = async (value: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ enable_ai_analysis: value })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, enable_ai_analysis: value } : null);
+      setEnableAIAnalysis(value);
+    } catch (error) {
+      console.error('Error updating AI analysis setting:', error);
+      Alert.alert('Error', 'Failed to update AI analysis setting');
+    }
   };
 
   if (loading) {
@@ -792,12 +896,33 @@ const ProfileScreen = () => {
     );
   }
 
+  if (!profile) {
+    return (
+      <View style={commonStyles.centeredContainer}>
+        <Text>No profile data available</Text>
+      </View>
+    );
+  }
+
   if (editing) {
     const displayUri = selectedImage?.uri || avatarUrl;
 
     return (
       <ScrollView style={commonStyles.container}>
-        <Text style={commonStyles.title}>Edit Profile</Text>
+        <View style={styles.editHeader}>
+          <Text style={commonStyles.title}>Edit Profile</Text>
+          <TouchableOpacity
+            style={[commonStyles.button, { backgroundColor: colors.border }]}
+            onPress={() => {
+              setEditing(false);
+              setSelectedImage(null);
+            }}
+          >
+            <Text style={[commonStyles.buttonText, { color: colors.text.primary }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={[commonStyles.section, { alignItems: "center" }]}>
           <TouchableOpacity onPress={pickImages} style={styles.avatarContainer}>
@@ -805,9 +930,7 @@ const ProfileScreen = () => {
               <Image source={{ uri: displayUri }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Text
-                  style={[typography.body, { color: colors.text.secondary }]}
-                >
+                <Text style={[typography.body, { color: colors.text.secondary }]}>
                   Add Photo
                 </Text>
               </View>
@@ -822,6 +945,7 @@ const ProfileScreen = () => {
             value={username}
             onChangeText={setUsername}
             placeholder="Username"
+            defaultValue={profile?.username || ''}
           />
 
           <TextInput
@@ -829,6 +953,7 @@ const ProfileScreen = () => {
             value={firstName}
             onChangeText={setFirstName}
             placeholder="First Name"
+            defaultValue={profile?.firstName || ''}
           />
 
           <TextInput
@@ -836,6 +961,7 @@ const ProfileScreen = () => {
             value={lastName}
             onChangeText={setLastName}
             placeholder="Last Name"
+            defaultValue={profile?.lastName || ''}
           />
 
           <TextInput
@@ -845,6 +971,7 @@ const ProfileScreen = () => {
             placeholder="Bio"
             multiline
             numberOfLines={4}
+            defaultValue={profile?.bio || ''}
           />
 
           <TextInput
@@ -852,34 +979,21 @@ const ProfileScreen = () => {
             value={interests}
             onChangeText={setInterests}
             placeholder="e.g. art, movies, hiking"
+            defaultValue={profile?.interests?.join(', ') || ''}
           />
 
           <View style={commonStyles.protectedSection}>
             <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
             <View style={commonStyles.protectedContent}>
-              <View style={commonStyles.protectedItem}>
-                <Text style={commonStyles.protectedLabel}>
-                  Enable AI Analysis
-                </Text>
-                <Switch
-                  value={enableAIAnalysis}
-                  onValueChange={setEnableAIAnalysis}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={colors.white}
-                />
-              </View>
-              <Text style={[typography.body, { color: colors.text.secondary }]}>
-                When enabled, your chat messages and bio will be analyzed to
-                help find better group matches. This helps us understand your
-                communication style and preferences.
-              </Text>
+              <AIAnalysisSection
+                enabled={profile?.enable_ai_analysis || false}
+                onToggle={handleAIAnalysisToggle}
+              />
             </View>
           </View>
 
           <View style={styles.photoGallerySection}>
-            <Text
-              style={[typography.sectionTitle, { marginBottom: spacing.sm }]}
-            >
+            <Text style={[typography.sectionTitle, { marginBottom: spacing.sm }]}>
               Profile Photos (up to 6)
             </Text>
             <View style={styles.photoGrid}>
@@ -910,56 +1024,6 @@ const ProfileScreen = () => {
                 </TouchableOpacity>
               )}
             </View>
-            {selectedPhotos.length > 0 && (
-              <View style={styles.selectedPhotosPreview}>
-                <Text
-                  style={[
-                    typography.sectionTitle,
-                    { marginBottom: spacing.sm },
-                  ]}
-                >
-                  Selected Photos ({selectedPhotos.length})
-                </Text>
-                <ScrollView horizontal style={styles.selectedPhotosScroll}>
-                  {selectedPhotos.map((photo, index) => (
-                    <View key={index} style={styles.selectedPhotoContainer}>
-                      <Image
-                        source={{ uri: photo.uri }}
-                        style={styles.selectedPhoto}
-                      />
-                      <TouchableOpacity
-                        style={styles.removeSelectedPhotoButton}
-                        onPress={() => {
-                          const newSelectedPhotos = [...selectedPhotos];
-                          newSelectedPhotos.splice(index, 1);
-                          setSelectedPhotos(newSelectedPhotos);
-                        }}
-                      >
-                        <Text style={styles.removePhotoButtonText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          <View style={commonStyles.protectedSection}>
-            <SectionHeader 
-              title="Music Taste" 
-              isVisible={visibilitySettings.spotify.top_artists || 
-                         visibilitySettings.spotify.top_genres || 
-                         visibilitySettings.spotify.selected_playlist}
-              onToggleVisibility={() => handleVisibilityChange('spotify')}
-            />
-            <View style={commonStyles.protectedContent}>
-              <SpotifyConnect
-                onConnect={handleSpotifyConnect}
-                onDisconnect={handleSpotifyDisconnect}
-                isConnected={!!profile?.spotify_connected}
-                isConnecting={connectingSpotify}
-              />
-            </View>
           </View>
 
           <View style={commonStyles.buttonContainer}>
@@ -973,23 +1037,6 @@ const ProfileScreen = () => {
             >
               <Text style={commonStyles.buttonText}>
                 {isSaving || uploading ? "Saving..." : "Save Changes"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[commonStyles.button, { backgroundColor: colors.border }]}
-              onPress={() => {
-                setEditing(false);
-                setSelectedImage(null);
-              }}
-              disabled={isSaving || uploading}
-            >
-              <Text
-                style={[
-                  commonStyles.buttonText,
-                  { color: colors.text.primary },
-                ]}
-              >
-                Cancel
               </Text>
             </TouchableOpacity>
           </View>
@@ -1014,8 +1061,8 @@ const ProfileScreen = () => {
             <Text style={commonStyles.protectedTitle}>AI Analysis</Text>
             <View style={commonStyles.protectedContent}>
               <AIAnalysisSection
-                enabled={enableAIAnalysis}
-                onToggle={setEnableAIAnalysis}
+                enabled={profile?.enable_ai_analysis || false}
+                onToggle={handleAIAnalysisToggle}
               />
             </View>
           </View>
@@ -1038,11 +1085,15 @@ const ProfileScreen = () => {
             </View>
           </View>
           <View style={commonStyles.protectedSection}>
-            <Text style={commonStyles.protectedTitle}>Interests</Text>
+            <SectionHeader 
+              title="Interests" 
+              isVisible={visibilitySettings.interests}
+              onToggleVisibility={() => handleVisibilityChange('interests')}
+            />
             <View style={commonStyles.protectedContent}>
               {profile?.interests && profile.interests.length > 0 && (
                 <InterestsSection
-                  profile={profile as Profile}
+                  profile={profile}
                   onVisibilityChange={handleVisibilityChange}
                 />
               )}
@@ -1353,6 +1404,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });
 
