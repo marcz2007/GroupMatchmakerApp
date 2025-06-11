@@ -133,12 +133,14 @@ const PublicProfileScreen = () => {
       )}
 
       <View style={styles.contentContainer}>
-        <View style={styles.nameContainer}>
-          <Text style={styles.name}>
-            {profile.firstName} {profile.lastName}
-          </Text>
-          <Text style={styles.username}>@{profile.username}</Text>
-        </View>
+        {profile.visibility_settings?.basic_info && (
+          <View style={styles.nameContainer}>
+            <Text style={styles.name}>
+              {profile.first_name} {profile.last_name}
+            </Text>
+            <Text style={styles.username}>@{profile.username}</Text>
+          </View>
+        )}
 
         {profile.bio && (
           <View style={styles.section}>
@@ -190,7 +192,7 @@ const PublicProfileScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Music Taste</Text>
             
-            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && (
+            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && profile.spotify_top_genres.length > 0 && (
               <View style={styles.spotifySection}>
                 <Text style={styles.subsectionTitle}>Top Genres</Text>
                 <View style={styles.genresContainer}>
@@ -203,7 +205,7 @@ const PublicProfileScreen = () => {
               </View>
             )}
 
-            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && (
+            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
               <View style={styles.spotifySection}>
                 <Text style={styles.subsectionTitle}>Top Artists</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -217,7 +219,7 @@ const PublicProfileScreen = () => {
               </View>
             )}
 
-            {profile.visibility_settings?.spotify.selected_playlist && profile.spotify_selected_playlist && (
+            {profile.visibility_settings.spotify.selected_playlist && profile.spotify_selected_playlist && (
               <View style={styles.spotifySection}>
                 <Text style={styles.subsectionTitle}>Featured Playlist</Text>
                 <View style={styles.playlistCard}>

@@ -33,8 +33,8 @@ interface SpotifyPlaylist {
 
 interface Profile {
   id: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   username: string;
   bio: string;
   interests: string[];
@@ -47,6 +47,7 @@ interface Profile {
     photos: boolean;
     bio: boolean;
     interests: boolean;
+    basic_info: boolean;
     spotify: {
       top_artists: boolean;
       top_genres: boolean;
@@ -63,6 +64,7 @@ const EditProfileScreen = () => {
     photos: true,
     bio: true,
     interests: true,
+    basic_info: true,
     spotify: {
       top_artists: true,
       top_genres: true,
@@ -104,6 +106,7 @@ const EditProfileScreen = () => {
           photos: true,
           bio: true,
           interests: true,
+          basic_info: true,
           spotify: {
             top_artists: true,
             top_genres: true,
@@ -278,8 +281,8 @@ const EditProfileScreen = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: profile?.firstName,
-          last_name: profile?.lastName,
+          first_name: profile?.first_name,
+          last_name: profile?.last_name,
           username: profile?.username,
           bio: profile?.bio,
           interests: profile?.interests,
@@ -368,15 +371,15 @@ const EditProfileScreen = () => {
       <View style={styles.section}>
         <SectionHeader
           title="Basic Information"
-          isVisible={true}
-          onToggleVisibility={() => {}}
+          isVisible={visibilitySettings.basic_info}
+          onToggleVisibility={() => handleVisibilityChange("basic_info")}
         />
         <View style={styles.inputGroup}>
           <Text style={styles.label}>First Name</Text>
           <TextInput
             style={styles.input}
-            value={profile?.firstName}
-            onChangeText={(text) => setProfile(prev => prev ? { ...prev, firstName: text } : null)}
+            value={profile?.first_name}
+            onChangeText={(text) => setProfile(prev => prev ? { ...prev, first_name: text } : null)}
             placeholder="Enter your first name"
           />
         </View>
@@ -384,8 +387,8 @@ const EditProfileScreen = () => {
           <Text style={styles.label}>Last Name</Text>
           <TextInput
             style={styles.input}
-            value={profile?.lastName}
-            onChangeText={(text) => setProfile(prev => prev ? { ...prev, lastName: text } : null)}
+            value={profile?.last_name}
+            onChangeText={(text) => setProfile(prev => prev ? { ...prev, last_name: text } : null)}
             placeholder="Enter your last name"
           />
         </View>

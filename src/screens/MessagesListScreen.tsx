@@ -73,7 +73,7 @@ const MessagesListScreen = () => {
             id: group.id,
             name: group.name,
             lastMessage: latestMessage.content,
-            lastMessageSender: lastMessageSender.firstName as string,
+            lastMessageSender: lastMessageSender.first_name as string,
             timestamp: new Date(latestMessage.created_at),
             isGroup: true,
           });

@@ -2,8 +2,8 @@ export interface Profile {
   id: string;
   username: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   bio?: string;
   interests?: string[];
   avatar_url?: string;
@@ -49,5 +49,6 @@ export interface Profile {
     photos: boolean;
     interests: boolean;
     ai_analysis: boolean;
+    basic_info: boolean;
   };
 }
