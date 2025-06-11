@@ -3,7 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { supabase } from "../supabase";
@@ -74,6 +74,8 @@ const EditProfileScreen = () => {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
   const [newInterest, setNewInterest] = useState('');
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [availablePlaylists, setAvailablePlaylists] = useState<SpotifyPlaylist[]>([]);
 
   useEffect(() => {
     fetchProfile();
@@ -194,12 +196,53 @@ const EditProfileScreen = () => {
     });
   };
 
-  const handleSelectPlaylist = async (playlist: SpotifyPlaylist | undefined) => {
-    if (profile && playlist) {
-      setProfile({
-        ...profile,
-        spotify_selected_playlist: playlist,
+  const handleSelectPlaylist = async () => {
+    try {
+      setLoadingPlaylists(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase.functions.invoke('spotify-playlists', {
+        body: {
+          action: 'get_playlists',
+          userId: user.id,
+        }
       });
+
+      if (error) throw error;
+      if (!data?.playlists) throw new Error('No playlists returned');
+
+      setAvailablePlaylists(data.playlists);
+      setShowPlaylistModal(true);
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
+  const handlePlaylistSelect = async (playlist: SpotifyPlaylist) => {
+    try {
+      setLoadingPlaylists(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.functions.invoke('spotify-playlists', {
+        body: {
+          action: 'select_playlist',
+          userId: user.id,
+          playlistId: playlist.id,
+        }
+      });
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, spotify_selected_playlist: playlist } : null);
+      setShowPlaylistModal(false);
+    } catch (error) {
+      console.error('Error selecting playlist:', error);
+    } finally {
+      setLoadingPlaylists(false);
     }
   };
 
@@ -456,14 +499,14 @@ const EditProfileScreen = () => {
           onToggleVisibility={() => handleVisibilityChange("spotify")}
         />
         <View style={commonStyles.container}>
-          <SpotifyConnect
-            onConnect={handleConnectSpotify}
-            onDisconnect={handleDisconnectSpotify}
-            isConnected={profile?.spotify_connected || false}
-            isConnecting={connectingSpotify}
-          />
-          
-          {profile?.spotify_connected && (
+          {!profile?.spotify_connected ? (
+            <SpotifyConnect
+              onConnect={handleConnectSpotify}
+              onDisconnect={handleDisconnectSpotify}
+              isConnected={profile?.spotify_connected || false}
+              isConnecting={connectingSpotify}
+            />
+          ) : (
             <>
               {(() => {
                 console.log('Spotify connected:', {
@@ -541,9 +584,7 @@ const EditProfileScreen = () => {
                   />
                 </View>
                 <PlaylistSelector
-                  onSelect={() => {
-                    // This will be handled by the PlaylistSelector component internally
-                  }}
+                  onSelect={handleSelectPlaylist}
                   isLoading={loadingPlaylists}
                   selectedPlaylist={profile.spotify_selected_playlist}
                 />
@@ -571,6 +612,47 @@ const EditProfileScreen = () => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showPlaylistModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPlaylistModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select a Playlist</Text>
+              <TouchableOpacity
+                onPress={() => setShowPlaylistModal(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.playlistList}>
+              {availablePlaylists.map((playlist) => (
+                <TouchableOpacity
+                  key={playlist.id}
+                  style={styles.playlistItem}
+                  onPress={() => handlePlaylistSelect(playlist)}
+                >
+                  <Image
+                    source={{ uri: playlist.image }}
+                    style={styles.playlistItemImage}
+                  />
+                  <View style={styles.playlistItemInfo}>
+                    <Text style={styles.playlistItemName}>{playlist.name}</Text>
+                    <Text style={styles.playlistItemStats}>
+                      {playlist.tracks_count} tracks • By {playlist.owner}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -790,6 +872,70 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.text.primary,
     textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    width: '90%',
+    maxHeight: '80%',
+    padding: spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    ...typography.title,
+    color: colors.text.primary,
+  },
+  closeButton: {
+    padding: spacing.xs,
+  },
+  closeButtonText: {
+    fontSize: 24,
+    color: colors.text.secondary,
+  },
+  playlistList: {
+    maxHeight: '80%',
+  },
+  playlistItem: {
+    flexDirection: 'row',
+    padding: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  playlistItemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.sm,
+  },
+  playlistItemInfo: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    justifyContent: 'center',
+  },
+  playlistItemName: {
+    ...typography.title,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  playlistItemStats: {
+    ...typography.caption,
+    color: colors.text.secondary,
+  },
+  visibilityToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
 });
 
