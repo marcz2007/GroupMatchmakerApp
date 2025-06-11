@@ -5,16 +5,15 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from 'react-native';
 import { supabase } from '../supabase';
 import { commonStyles } from '../theme/commonStyles';
 import { borderRadius, colors, spacing, typography } from '../theme/theme';
+import { Profile } from '../types';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -25,53 +24,11 @@ type RootStackParamList = {
 type PublicProfileScreenRouteProp = RouteProp<RootStackParamList, 'PublicProfile'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface PublicProfile {
-  id: string;
-  username: string;
-  firstName?: string;
-  lastName?: string;
-  bio: string;
-  interests: string[];
-  avatar_url?: string;
-  photos?: { url: string; order: number }[];
-  ai_analysis_scores?: {
-    communicationStyle?: number;
-    activityPreference?: number;
-    socialDynamics?: number;
-  };
-  spotify_connected?: boolean;
-  spotify_top_genres?: string[];
-  spotify_top_artists?: Array<{
-    name: string;
-    image: string;
-    spotify_url: string;
-  }>;
-  spotify_selected_playlist?: {
-    id: string;
-    name: string;
-    description: string;
-    image: string;
-    spotify_url: string;
-    owner: string;
-    tracks_count: number;
-  };
-  visibility_settings: {
-    spotify: {
-      top_artists: boolean;
-      top_genres: boolean;
-      selected_playlist: boolean;
-    };
-    photos: boolean;
-    interests: boolean;
-    ai_analysis: boolean;
-  };
-}
-
 const PublicProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<PublicProfileScreenRouteProp>();
   const { userId } = route.params;
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -178,8 +135,9 @@ const PublicProfileScreen = () => {
       <View style={styles.contentContainer}>
         <View style={styles.nameContainer}>
           <Text style={styles.name}>
-            {profile.firstName}
+            {profile.firstName} {profile.lastName}
           </Text>
+          <Text style={styles.username}>@{profile.username}</Text>
         </View>
 
         {profile.bio && (
@@ -204,23 +162,23 @@ const PublicProfileScreen = () => {
 
         {profile.visibility_settings?.ai_analysis && profile.ai_analysis_scores && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Personality Insights</Text>
-            <View style={styles.insightsContainer}>
-              <View style={styles.insightItem}>
-                <Text style={styles.insightLabel}>Communication Style</Text>
-                <Text style={styles.insightValue}>
+            <Text style={styles.sectionTitle}>AI Analysis</Text>
+            <View style={styles.analysisContainer}>
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>Communication Style</Text>
+                <Text style={styles.analysisValue}>
                   {getCommunicationStyleDescription(profile.ai_analysis_scores.communicationStyle)}
                 </Text>
               </View>
-              <View style={styles.insightItem}>
-                <Text style={styles.insightLabel}>Activity Preference</Text>
-                <Text style={styles.insightValue}>
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>Activity Preference</Text>
+                <Text style={styles.analysisValue}>
                   {getActivityPreferenceDescription(profile.ai_analysis_scores.activityPreference)}
                 </Text>
               </View>
-              <View style={styles.insightItem}>
-                <Text style={styles.insightLabel}>Social Dynamics</Text>
-                <Text style={styles.insightValue}>
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>Social Dynamics</Text>
+                <Text style={styles.analysisValue}>
                   {getSocialDynamicsDescription(profile.ai_analysis_scores.socialDynamics)}
                 </Text>
               </View>
@@ -228,76 +186,58 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
-        {profile.spotify_connected && (
-          <View style={styles.spotifySection}>
+        {profile.visibility_settings?.spotify && profile.spotify_connected && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Music Taste</Text>
+            
             {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && (
               <View style={styles.spotifySection}>
-                <Text style={styles.spotifySectionTitle}>Top Genres</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.genresContainer}
-                >
+                <Text style={styles.subsectionTitle}>Top Genres</Text>
+                <View style={styles.genresContainer}>
                   {profile.spotify_top_genres.map((genre, index) => (
                     <View key={index} style={styles.genreTag}>
                       <Text style={styles.genreText}>{genre}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && (
+              <View style={styles.spotifySection}>
+                <Text style={styles.subsectionTitle}>Top Artists</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {profile.spotify_top_artists.map((artist, index) => (
+                    <View key={index} style={styles.artistCard}>
+                      <Image source={{ uri: artist.image }} style={styles.artistImage} />
+                      <Text style={styles.artistName}>{artist.name}</Text>
                     </View>
                   ))}
                 </ScrollView>
               </View>
             )}
 
-            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && (
+            {profile.visibility_settings?.spotify.selected_playlist && profile.spotify_selected_playlist && (
               <View style={styles.spotifySection}>
-                <Text style={styles.spotifySectionTitle}>Top Artists</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.artistsContainer}
-                >
-                  {profile.spotify_top_artists.map((artist, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.artistCard}
-                      onPress={() => Linking.openURL(artist.spotify_url)}
-                    >
-                      <Image
-                        source={{ uri: artist.image }}
-                        style={styles.artistImage}
-                      />
-                      <Text style={styles.artistName} numberOfLines={1}>
-                        {artist.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {profile.visibility_settings.spotify.selected_playlist && profile.spotify_selected_playlist && (
-              <View style={styles.spotifySection}>
-                <Text style={styles.spotifySectionTitle}>Featured Playlist</Text>
-                <TouchableOpacity
-                  style={styles.playlistCard}
-                  onPress={() => profile.spotify_selected_playlist && Linking.openURL(profile.spotify_selected_playlist.spotify_url)}
-                >
+                <Text style={styles.subsectionTitle}>Featured Playlist</Text>
+                <View style={styles.playlistCard}>
                   <Image
                     source={{ uri: profile.spotify_selected_playlist.image }}
                     style={styles.playlistImage}
                   />
                   <View style={styles.playlistInfo}>
-                    <Text style={styles.playlistName}>
+                    <Text style={styles.playlistName} numberOfLines={1}>
                       {profile.spotify_selected_playlist.name}
                     </Text>
                     <Text style={styles.playlistDescription} numberOfLines={2}>
                       {profile.spotify_selected_playlist.description}
                     </Text>
                     <Text style={styles.playlistStats}>
-                      {profile.spotify_selected_playlist.tracks_count} tracks • By{" "}
+                      {profile.spotify_selected_playlist.tracks_count} tracks • By{' '}
                       {profile.spotify_selected_playlist.owner}
                     </Text>
                   </View>
-                </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -333,66 +273,70 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.title,
-    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   username: {
     ...typography.body,
     color: colors.text.secondary,
-    marginTop: spacing.xs,
   },
   section: {
     marginBottom: spacing.xl,
   },
   sectionTitle: {
     ...typography.sectionTitle,
-    color: colors.text.primary,
     marginBottom: spacing.sm,
   },
   bioText: {
     ...typography.body,
-    color: colors.text.primary,
     lineHeight: 24,
   },
   interestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   interestTag: {
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
   },
   interestText: {
-    ...typography.body,
     color: colors.white,
+    ...typography.body,
   },
-  insightsContainer: {
+  analysisContainer: {
     gap: spacing.md,
   },
-  insightItem: {
-    backgroundColor: colors.background,
+  analysisItem: {
+    backgroundColor: colors.border,
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  insightLabel: {
+  analysisLabel: {
     ...typography.body,
-    color: colors.text.secondary,
+    fontWeight: 'bold',
     marginBottom: spacing.xs,
   },
-  insightValue: {
+  analysisValue: {
     ...typography.body,
-    color: colors.text.primary,
+    color: colors.text.secondary,
   },
   spotifySection: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginHorizontal: spacing.md,
+    elevation: 4,
+    shadowColor: colors.text.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  spotifySectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.text.primary,
+  subsectionTitle: {
+    ...typography.body,
+    fontWeight: 'bold',
     marginBottom: spacing.sm,
   },
   genresContainer: {
@@ -408,15 +352,11 @@ const styles = StyleSheet.create({
   },
   genreText: {
     color: colors.white,
-    fontSize: typography.body.fontSize,
-  },
-  artistsContainer: {
-    paddingVertical: spacing.sm,
-    gap: spacing.md,
+    ...typography.body,
   },
   artistCard: {
     width: 120,
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
     alignItems: 'center',
   },
   artistImage: {
@@ -424,41 +364,48 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     marginBottom: spacing.xs,
-    backgroundColor: colors.border,
   },
   artistName: {
     ...typography.body,
     textAlign: 'center',
-    color: colors.text.primary,
   },
   playlistCard: {
     flexDirection: 'row',
-    backgroundColor: colors.border,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
+    elevation: 2,
+    shadowColor: colors.text.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   playlistImage: {
-    width: 120,
-    height: 120,
+    width: 200,
+    height: 200,
   },
   playlistInfo: {
     flex: 1,
-    padding: spacing.sm,
+    padding: spacing.lg,
     justifyContent: 'center',
   },
   playlistName: {
-    ...typography.sectionTitle,
-    marginBottom: spacing.xs,
+    ...typography.title,
+    marginBottom: spacing.sm,
+    fontSize: 24,
   },
   playlistDescription: {
     ...typography.body,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    lineHeight: 24,
+    fontSize: 16,
   },
   playlistStats: {
     ...typography.caption,
     color: colors.text.secondary,
+    fontSize: 14,
   },
 });
 

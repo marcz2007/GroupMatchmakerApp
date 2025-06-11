@@ -21,7 +21,7 @@ export const PlaylistSelector: React.FC<PlaylistSelectorProps> = ({
   selectedPlaylist,
 }) => {
   return (
-    <View style={styles.container}>
+    <View style={styles.playlistSelector}>
       {selectedPlaylist ? (
         <TouchableOpacity
           style={styles.playlistCard}
@@ -64,12 +64,17 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.lg,
   },
+  playlistSelector: {
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
   playlistCard: {
     flexDirection: 'row',
     backgroundColor: colors.background,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: spacing.sm,
+    width: '100%',
   },
   playlistImage: {
     width: 120,
