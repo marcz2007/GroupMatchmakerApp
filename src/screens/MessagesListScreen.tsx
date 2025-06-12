@@ -5,6 +5,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -23,12 +25,36 @@ interface ChatPreview {
   lastMessageSender: string;
   timestamp: Date;
   isGroup: boolean;
+  imageUrl?: string;
 }
 
 type MessagesScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
   "Main"
 >;
+
+const InitialsAvatar = ({ name, size }: { name: string; size: number }) => {
+  const getInitials = (name: string) => {
+    const words = name.split(" ");
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  return (
+    <View
+      style={[
+        styles.initialsAvatar,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}
+    >
+      <Text style={[styles.initialsText, { fontSize: size * 0.4 }]}>
+        {getInitials(name)}
+      </Text>
+    </View>
+  );
+};
 
 const MessagesListScreen = () => {
   const [chats, setChats] = useState<ChatPreview[]>([]);
@@ -55,6 +81,14 @@ const MessagesListScreen = () => {
       const groupPreviews: ChatPreview[] = [];
 
       for (const group of groups) {
+        // Fetch the group's primary image
+        const { data: primaryImage } = await supabase
+          .from("group_images")
+          .select("image_url")
+          .eq("group_id", group.id)
+          .eq("is_primary", true)
+          .single();
+
         const { data: latestMessage, error: messageError } = await supabase
           .from("messages")
           .select("user_id, content, created_at")
@@ -76,6 +110,7 @@ const MessagesListScreen = () => {
             lastMessageSender: lastMessageSender.first_name as string,
             timestamp: new Date(latestMessage.created_at),
             isGroup: true,
+            imageUrl: primaryImage?.image_url,
           });
         } else {
           // If no messages, still show the group
@@ -86,6 +121,7 @@ const MessagesListScreen = () => {
             lastMessageSender: "",
             timestamp: new Date(),
             isGroup: true,
+            imageUrl: primaryImage?.image_url,
           });
         }
       }
@@ -122,23 +158,58 @@ const MessagesListScreen = () => {
     // Will handle direct messages in future implementation
   };
 
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) {
+      return date.toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } else if (days === 1) {
+      return "Yesterday";
+    } else if (days < 7) {
+      return date.toLocaleDateString(undefined, { weekday: "short" });
+    } else {
+      return date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+    }
+  };
+
   const renderChatItem = ({ item }: { item: ChatPreview }) => (
     <TouchableOpacity
-      style={[commonStyles.button, { marginBottom: spacing.sm }]}
+      style={styles.chatItem}
       onPress={() => navigateToChat(item)}
     >
-      <View style={{ flex: 1 }}>
-        <Text style={[typography.sectionTitle, { marginBottom: spacing.xs }]}>{item.name}</Text>
-        <Text style={[typography.body, { color: colors.text.secondary }]} numberOfLines={1}>
-          {item.lastMessageSender}: {item.lastMessage}
-        </Text>
+      <View style={styles.avatarContainer}>
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.avatar} />
+        ) : (
+          <InitialsAvatar name={item.name} size={50} />
+        )}
       </View>
-      <Text style={[typography.caption, { marginLeft: spacing.sm }]}>
-        {item.timestamp.toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-        })}
-      </Text>
+      <View style={styles.chatInfo}>
+        <View style={styles.chatHeader}>
+          <Text style={styles.groupName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
+        </View>
+        <View style={styles.messagePreview}>
+          {item.lastMessageSender && (
+            <Text style={styles.senderName} numberOfLines={1}>
+              {item.lastMessageSender}:
+            </Text>
+          )}
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.lastMessage}
+          </Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
@@ -158,7 +229,16 @@ const MessagesListScreen = () => {
         renderItem={renderChatItem}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={[typography.body, { color: colors.text.secondary, textAlign: 'center', marginTop: spacing.xl }]}>
+          <Text
+            style={[
+              typography.body,
+              {
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginTop: spacing.xl,
+              },
+            ]}
+          >
             No messages yet
           </Text>
         }
@@ -168,5 +248,66 @@ const MessagesListScreen = () => {
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  chatItem: {
+    flexDirection: "row",
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  avatarContainer: {
+    marginRight: spacing.md,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.border,
+  },
+  chatInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  chatHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  groupName: {
+    ...typography.sectionTitle,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  timestamp: {
+    ...typography.caption,
+    color: colors.text.secondary,
+  },
+  messagePreview: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  senderName: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginRight: spacing.xs,
+  },
+  lastMessage: {
+    ...typography.body,
+    color: colors.text.secondary,
+    flex: 1,
+  },
+  initialsAvatar: {
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initialsText: {
+    color: colors.white,
+    fontWeight: "bold",
+  },
+});
 
 export default MessagesListScreen;
