@@ -13,6 +13,7 @@
 		3C7540CF97F5BA6992489663 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 845469FC6D46D01AED1BD3C3 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		518BEA3DEDF84184B6F20C62 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = D598C111DFE24FCD9D7DB0C8 /* noop-file.swift */; };
+		62BD0858776E44B8BB48533F /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9F766804979949739BB68155 /* Ionicons.ttf */; };
 		96905EF65AED1B983A6B3ABC /* libPods-GroupMatchmakerApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58EEBF8E8E6FB1BC6CAF49B5 /* libPods-GroupMatchmakerApp.a */; };
 		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -29,6 +30,7 @@
 		6C2E3173556A471DD304B334 /* Pods-GroupMatchmakerApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-GroupMatchmakerApp.debug.xcconfig"; path = "Target Support Files/Pods-GroupMatchmakerApp/Pods-GroupMatchmakerApp.debug.xcconfig"; sourceTree = "<group>"; };
 		7A4D352CD337FB3A3BF06240 /* Pods-GroupMatchmakerApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-GroupMatchmakerApp.release.xcconfig"; path = "Target Support Files/Pods-GroupMatchmakerApp/Pods-GroupMatchmakerApp.release.xcconfig"; sourceTree = "<group>"; };
 		845469FC6D46D01AED1BD3C3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = GroupMatchmakerApp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9F766804979949739BB68155 /* Ionicons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Ionicons.ttf; path = "../node_modules/react-native-vector-icons/Fonts/Ionicons.ttf"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = GroupMatchmakerApp/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		D598C111DFE24FCD9D7DB0C8 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "GroupMatchmakerApp/noop-file.swift"; sourceTree = "<group>"; };
@@ -75,6 +77,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		512C9592844A47AFA9F965AF /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				9F766804979949739BB68155 /* Ionicons.ttf */,
+			);
+			name = Resources;
+			path = "";
+			sourceTree = "<group>";
+		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
@@ -91,6 +102,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				D65327D7A22EEC0BE12398D9 /* Pods */,
 				D7E4C46ADA2E9064B798F356 /* ExpoModulesProviders */,
+				512C9592844A47AFA9F965AF /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -204,6 +216,7 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				3C7540CF97F5BA6992489663 /* PrivacyInfo.xcprivacy in Resources */,
+				62BD0858776E44B8BB48533F /* Ionicons.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,4 +1,5 @@
 // src/screens/ChatScreen.tsx
+import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import React, { useCallback, useEffect, useState } from "react";
@@ -226,6 +227,19 @@ const ChatScreen = () => {
               <Text style={styles.headerTitle}>
                 {currentGroupName || "Chat"}
               </Text>
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("GroupActions", {
+                  groupId: groupId,
+                  groupName: currentGroupName,
+                })
+              }
+              style={styles.actionButton}
+            >
+              <Ionicons name="flash" size={24} color="#FFD700" />
             </TouchableOpacity>
           ),
         });
@@ -483,6 +497,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#007AFF", // iOS blue color, adjust as needed
+  },
+  actionButton: {
+    padding: 8,
   },
 });
 
