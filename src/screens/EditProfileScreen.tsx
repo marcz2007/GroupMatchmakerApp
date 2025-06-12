@@ -378,6 +378,25 @@ const EditProfileScreen = () => {
         <Text style={commonStyles.buttonText}>View Public Profile</Text>
       </TouchableOpacity>
 
+      {profile?.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeader
+            title={`${profile.first_name}'s Signature Words`}
+            isVisible={visibilitySettings.ai_analysis}
+            onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
+          />
+          <View style={styles.wordPatternsContainer}>
+            <Text style={styles.signatureWords}>
+              {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
+                if (index === 0) return word.word;
+                if (index === 2) return ` and ${word.word}`;
+                return `, ${word.word}`;
+              })}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.section}>
         <SectionHeader
           title="About"
@@ -567,25 +586,6 @@ const EditProfileScreen = () => {
           )}
         </View>
       </View>
-
-      {profile?.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
-        <View style={styles.section}>
-          <SectionHeader
-            title={`${profile.first_name}'s Signature Words`}
-            isVisible={visibilitySettings.ai_analysis}
-            onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
-          />
-          <View style={styles.wordPatternsContainer}>
-            <Text style={styles.signatureWords}>
-              {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
-                if (index === 0) return word.word;
-                if (index === 2) return ` and ${word.word}`;
-                return `, ${word.word}`;
-              })}
-            </Text>
-          </View>
-        </View>
-      )}
 
       <View style={commonStyles.buttonContainer}>
         <TouchableOpacity

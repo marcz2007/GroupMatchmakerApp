@@ -1,6 +1,6 @@
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -8,20 +8,23 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
-} from 'react-native';
-import { supabase } from '../supabase';
-import { commonStyles } from '../theme/commonStyles';
-import { borderRadius, colors, spacing, typography } from '../theme/theme';
-import { Profile } from '../types';
+  View,
+} from "react-native";
+import { supabase } from "../supabase";
+import { commonStyles } from "../theme/commonStyles";
+import { borderRadius, colors, spacing, typography } from "../theme/theme";
+import { Profile } from "../types";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 type RootStackParamList = {
   PublicProfile: { userId: string };
 };
 
-type PublicProfileScreenRouteProp = RouteProp<RootStackParamList, 'PublicProfile'>;
+type PublicProfileScreenRouteProp = RouteProp<
+  RootStackParamList,
+  "PublicProfile"
+>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const PublicProfileScreen = () => {
@@ -38,25 +41,27 @@ const PublicProfileScreen = () => {
   const fetchProfile = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
+        console.error("Error fetching profile:", error);
         throw error;
       }
 
       if (data) {
         // Sort photos by order if they exist
         if (data.photos) {
-          data.photos.sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+          data.photos.sort(
+            (a: { order: number }, b: { order: number }) => a.order - b.order
+          );
         }
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error in fetchProfile:', error);
+      console.error("Error in fetchProfile:", error);
     } finally {
       setLoading(false);
     }
@@ -101,16 +106,16 @@ const PublicProfileScreen = () => {
 
   // Combine avatar and photos for the gallery
   const allPhotos = [
-    { url: profile.avatar_url || '', order: -1 }, // Avatar as first photo
+    { url: profile.avatar_url || "", order: -1 }, // Avatar as first photo
     ...(profile.photos || []),
-  ].filter(photo => photo.url); // Filter out any empty URLs
+  ].filter((photo) => photo.url); // Filter out any empty URLs
 
   return (
     <ScrollView style={styles.container}>
       {profile.visibility_settings?.photos && allPhotos.length > 0 ? (
-        <ScrollView 
-          horizontal 
-          pagingEnabled 
+        <ScrollView
+          horizontal
+          pagingEnabled
           showsHorizontalScrollIndicator={false}
           style={styles.galleryContainer}
         >
@@ -131,13 +136,34 @@ const PublicProfileScreen = () => {
           </Text>
         </View>
       )}
-
-      <View style={styles.contentContainer}>
-        <View style={styles.nameContainer}>
-          <Text style={styles.name}>
-            {profile.first_name}
-          </Text>
-        </View>
+      <View style={styles.profileBody}>
+        {profile.visibility_settings?.ai_analysis &&
+        profile.word_patterns &&
+        profile.word_patterns.topWords &&
+        profile.word_patterns.topWords.length > 0 ? (
+          <View style={styles.section}>
+            <Text
+              style={styles.sectionTitle}
+            >{`${profile.first_name}'s Signature Words`}</Text>
+            <View style={styles.wordPatternsContainer}>
+              <Text style={styles.signatureWords}>
+                {profile.word_patterns.topWords
+                  .slice(0, 3)
+                  .map((word, index) => {
+                    if (index === 0) return word.word;
+                    if (index === 2) return ` and ${word.word}`;
+                    return `, ${word.word}`;
+                  })}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.contentContainer}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.name}>{profile.first_name}</Text>
+            </View>
+          </View>
+        )}
 
         {profile.bio && (
           <View style={styles.section}>
@@ -146,116 +172,121 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
-        {profile.visibility_settings?.interests && profile.interests && profile.interests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <View style={styles.interestsContainer}>
-              {profile.interests.map((interest, index) => (
-                <View key={index} style={styles.interestTag}>
-                  <Text style={styles.interestText}>{interest}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {profile.visibility_settings?.ai_analysis && profile.ai_analysis_scores && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI Analysis</Text>
-            <View style={styles.analysisContainer}>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisLabel}>Communication Style</Text>
-                <Text style={styles.analysisValue}>
-                  {getCommunicationStyleDescription(profile.ai_analysis_scores.communicationStyle)}
-                </Text>
-              </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisLabel}>Activity Preference</Text>
-                <Text style={styles.analysisValue}>
-                  {getActivityPreferenceDescription(profile.ai_analysis_scores.activityPreference)}
-                </Text>
-              </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisLabel}>Social Dynamics</Text>
-                <Text style={styles.analysisValue}>
-                  {getSocialDynamicsDescription(profile.ai_analysis_scores.socialDynamics)}
-                </Text>
+        {profile.visibility_settings?.interests &&
+          profile.interests &&
+          profile.interests.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Interests</Text>
+              <View style={styles.interestsContainer}>
+                {profile.interests.map((interest, index) => (
+                  <View key={index} style={styles.interestTag}>
+                    <Text style={styles.interestText}>{interest}</Text>
+                  </View>
+                ))}
               </View>
             </View>
-          </View>
-        )}
-
-        {profile.visibility_settings?.ai_analysis && profile.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{`${profile.first_name}'s Signature Words`}</Text>
-            <View style={styles.wordPatternsContainer}>
-              <Text style={styles.signatureWords}>
-                {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
-                  if (index === 0) return word.word;
-                  if (index === 2) return ` and ${word.word}`;
-                  return `, ${word.word}`;
-                })}
-              </Text>
-            </View>
-          </View>
-        )}
+          )}
 
         {profile.visibility_settings?.spotify && profile.spotify_connected && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Music Taste</Text>
-            
-            {profile.visibility_settings.spotify.top_genres && profile.spotify_top_genres && profile.spotify_top_genres.length > 0 && (
-              <View style={styles.spotifySection}>
-                <Text style={styles.subsectionTitle}>Top Genres</Text>
-                <View style={styles.genresContainer}>
-                  {profile.spotify_top_genres.map((genre, index) => (
-                    <View key={index} style={styles.genreTag}>
-                      <Text style={styles.genreText}>{genre}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
 
-            {profile.visibility_settings.spotify.top_artists && profile.spotify_top_artists && profile.spotify_top_artists.length > 0 && (
-              <View style={styles.spotifySection}>
-                <Text style={styles.subsectionTitle}>Top Artists</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {profile.spotify_top_artists.map((artist, index) => (
-                    <View key={index} style={styles.artistCard}>
-                      <Image source={{ uri: artist.image }} style={styles.artistImage} />
-                      <Text style={styles.artistName}>{artist.name}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {profile.visibility_settings.spotify.selected_playlist && profile.spotify_selected_playlist && (
-              <View style={styles.spotifySection}>
-                <Text style={styles.subsectionTitle}>Featured Playlist</Text>
-                <View style={styles.playlistCard}>
-                  <Image
-                    source={{ uri: profile.spotify_selected_playlist.image }}
-                    style={styles.playlistImage}
-                  />
-                  <View style={styles.playlistInfo}>
-                    <Text style={styles.playlistName} numberOfLines={1}>
-                      {profile.spotify_selected_playlist.name}
-                    </Text>
-                    <Text style={styles.playlistDescription} numberOfLines={2}>
-                      {profile.spotify_selected_playlist.description}
-                    </Text>
-                    <Text style={styles.playlistStats}>
-                      {profile.spotify_selected_playlist.tracks_count} tracks • By{' '}
-                      {profile.spotify_selected_playlist.owner}
-                    </Text>
+            {profile.visibility_settings.spotify.top_genres &&
+              profile.spotify_top_genres &&
+              profile.spotify_top_genres.length > 0 && (
+                <View style={styles.spotifySection}>
+                  <Text style={styles.subsectionTitle}>Top Genres</Text>
+                  <View style={styles.genresContainer}>
+                    {profile.spotify_top_genres.map((genre, index) => (
+                      <View key={index} style={styles.genreTag}>
+                        <Text style={styles.genreText}>{genre}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              </View>
-            )}
+              )}
+
+            {profile.visibility_settings.spotify.top_artists &&
+              profile.spotify_top_artists &&
+              profile.spotify_top_artists.length > 0 && (
+                <View style={styles.spotifySection}>
+                  <Text style={styles.subsectionTitle}>Top Artists</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {profile.spotify_top_artists.map((artist, index) => (
+                      <View key={index} style={styles.artistCard}>
+                        <Image
+                          source={{ uri: artist.image }}
+                          style={styles.artistImage}
+                        />
+                        <Text style={styles.artistName}>{artist.name}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+            {profile.visibility_settings.spotify.selected_playlist &&
+              profile.spotify_selected_playlist && (
+                <View style={styles.spotifySection}>
+                  <Text style={styles.subsectionTitle}>Featured Playlist</Text>
+                  <View style={styles.playlistCard}>
+                    <Image
+                      source={{ uri: profile.spotify_selected_playlist.image }}
+                      style={styles.playlistImage}
+                    />
+                    <View style={styles.playlistInfo}>
+                      <Text style={styles.playlistName} numberOfLines={1}>
+                        {profile.spotify_selected_playlist.name}
+                      </Text>
+                      <Text
+                        style={styles.playlistDescription}
+                        numberOfLines={2}
+                      >
+                        {profile.spotify_selected_playlist.description}
+                      </Text>
+                      <Text style={styles.playlistStats}>
+                        {profile.spotify_selected_playlist.tracks_count} tracks
+                        • By {profile.spotify_selected_playlist.owner}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
           </View>
         )}
+
+        {profile.visibility_settings?.ai_analysis &&
+          profile.ai_analysis_scores && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>AI Analysis</Text>
+              <View style={styles.analysisContainer}>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Communication Style</Text>
+                  <Text style={styles.analysisValue}>
+                    {getCommunicationStyleDescription(
+                      profile.ai_analysis_scores.communicationStyle
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Activity Preference</Text>
+                  <Text style={styles.analysisValue}>
+                    {getActivityPreferenceDescription(
+                      profile.ai_analysis_scores.activityPreference
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Social Dynamics</Text>
+                  <Text style={styles.analysisValue}>
+                    {getSocialDynamicsDescription(
+                      profile.ai_analysis_scores.socialDynamics
+                    )}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
       </View>
     </ScrollView>
   );
@@ -266,18 +297,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  profileBody: {
+    padding: spacing.md,
+  },
   galleryContainer: {
     height: screenWidth,
   },
   galleryItem: {
     width: screenWidth,
     height: screenWidth,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   galleryImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   contentContainer: {
     padding: spacing.lg,
@@ -305,8 +339,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   interestTag: {
@@ -329,7 +363,7 @@ const styles = StyleSheet.create({
   },
   analysisLabel: {
     ...typography.body,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: spacing.xs,
   },
   analysisValue: {
@@ -350,12 +384,12 @@ const styles = StyleSheet.create({
   },
   subsectionTitle: {
     ...typography.body,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: spacing.sm,
   },
   genresContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   genreTag: {
@@ -371,7 +405,7 @@ const styles = StyleSheet.create({
   artistCard: {
     width: 120,
     marginRight: spacing.sm,
-    alignItems: 'center',
+    alignItems: "center",
   },
   artistImage: {
     width: 120,
@@ -381,13 +415,13 @@ const styles = StyleSheet.create({
   },
   artistName: {
     ...typography.body,
-    textAlign: 'center',
+    textAlign: "center",
   },
   playlistCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: colors.background,
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginTop: spacing.md,
     elevation: 2,
     shadowColor: colors.text.primary,
@@ -402,7 +436,7 @@ const styles = StyleSheet.create({
   playlistInfo: {
     flex: 1,
     padding: spacing.lg,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   playlistName: {
     ...typography.title,
@@ -427,10 +461,10 @@ const styles = StyleSheet.create({
   signatureWords: {
     ...typography.body,
     color: colors.text.primary,
-    fontStyle: 'italic',
-    textAlign: 'center',
+    fontStyle: "italic",
+    textAlign: "center",
     marginTop: spacing.sm,
   },
 });
 
-export default PublicProfileScreen; 
+export default PublicProfileScreen;
