@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
 import { StyleSheet } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import GrappleIcon from "../components/icons/GrappleIcon";
 
 // Import screens
 import EditProfileScreen from "../screens/EditProfileScreen";
@@ -20,7 +21,14 @@ const BottomTabNavigator = () => {
           let iconName;
 
           if (route.name === "Matchmaking") {
-            iconName = focused ? "people" : "people-outline";
+            return (
+              <GrappleIcon
+                width={size}
+                height={size}
+                color={color}
+                focused={focused}
+              />
+            );
           } else if (route.name === "Groups") {
             iconName = focused ? "grid" : "grid-outline";
           } else if (route.name === "Messages") {
@@ -37,13 +45,7 @@ const BottomTabNavigator = () => {
         headerShown: false, // Hide the header since screens have their own titles
       })}
     >
-      <Tab.Screen
-        name="Matchmaking"
-        component={MatchmakingHomeScreen}
-        options={{
-          title: "Grapple",
-        }}
-      />
+      <Tab.Screen name="Messages" component={MessagesListScreen} />
       <Tab.Screen
         name="Groups"
         component={GroupsScreen}
@@ -51,7 +53,13 @@ const BottomTabNavigator = () => {
           title: "My Groups",
         }}
       />
-      <Tab.Screen name="Messages" component={MessagesListScreen} />
+      <Tab.Screen
+        name="Matchmaking"
+        component={MatchmakingHomeScreen}
+        options={{
+          title: "Grapple",
+        }}
+      />
       <Tab.Screen name="Profile" component={EditProfileScreen} />
     </Tab.Navigator>
   );
@@ -59,13 +67,11 @@ const BottomTabNavigator = () => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#111827", // Modern dark gray/black
+    backgroundColor: "#1a1a1a",
     borderTopWidth: 0,
     elevation: 0,
-    shadowOpacity: 0,
     height: 60,
-    paddingTop: 5,
-    paddingBottom: 5,
+    paddingBottom: 8,
   },
 });
 
