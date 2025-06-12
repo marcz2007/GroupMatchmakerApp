@@ -48,11 +48,15 @@ interface Profile {
     bio: boolean;
     interests: boolean;
     basic_info: boolean;
+    ai_analysis: boolean;
     spotify: {
       top_artists: boolean;
       top_genres: boolean;
       selected_playlist: boolean;
     };
+  };
+  word_patterns?: {
+    topWords: { word: string; score: number }[];
   };
 }
 
@@ -65,6 +69,7 @@ const EditProfileScreen = () => {
     bio: true,
     interests: true,
     basic_info: true,
+    ai_analysis: true,
     spotify: {
       top_artists: true,
       top_genres: true,
@@ -107,6 +112,7 @@ const EditProfileScreen = () => {
           bio: true,
           interests: true,
           basic_info: true,
+          ai_analysis: true,
           spotify: {
             top_artists: true,
             top_genres: true,
@@ -562,6 +568,25 @@ const EditProfileScreen = () => {
         </View>
       </View>
 
+      {profile?.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeader
+            title={`${profile.first_name}'s Signature Words`}
+            isVisible={visibilitySettings.ai_analysis}
+            onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
+          />
+          <View style={styles.wordPatternsContainer}>
+            <Text style={styles.signatureWords}>
+              {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
+                if (index === 0) return word.word;
+                if (index === 2) return ` and ${word.word}`;
+                return `, ${word.word}`;
+              })}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View style={commonStyles.buttonContainer}>
         <TouchableOpacity
           style={[
@@ -931,6 +956,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xs,
     borderRadius: borderRadius.sm,
+  },
+  wordPatternsContainer: {
+    marginTop: spacing.sm,
+  },
+  signatureWords: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });
 

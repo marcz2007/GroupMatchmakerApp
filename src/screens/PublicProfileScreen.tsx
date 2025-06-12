@@ -185,6 +185,21 @@ const PublicProfileScreen = () => {
           </View>
         )}
 
+        {profile.visibility_settings?.ai_analysis && profile.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{`${profile.first_name}'s Signature Words`}</Text>
+            <View style={styles.wordPatternsContainer}>
+              <Text style={styles.signatureWords}>
+                {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
+                  if (index === 0) return word.word;
+                  if (index === 2) return ` and ${word.word}`;
+                  return `, ${word.word}`;
+                })}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {profile.visibility_settings?.spotify && profile.spotify_connected && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Music Taste</Text>
@@ -405,6 +420,16 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.text.secondary,
     fontSize: 14,
+  },
+  wordPatternsContainer: {
+    marginTop: spacing.sm,
+  },
+  signatureWords: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });
 
