@@ -172,30 +172,37 @@ const EditProfileScreen = () => {
     subsection?: keyof typeof visibilitySettings.spotify
   ) => {
     setVisibilitySettings((prev) => {
-      if (section === 'spotify' && subsection) {
-        return {
-          ...prev,
-          spotify: {
-            ...prev.spotify,
-            [subsection]: !prev.spotify[subsection],
-          },
-        };
-      } else if (section === 'spotify') {
-        const currentState = prev.spotify.top_artists || prev.spotify.top_genres || prev.spotify.selected_playlist;
-        return {
-          ...prev,
-          spotify: {
-            top_artists: !currentState,
-            top_genres: !currentState,
-            selected_playlist: !currentState,
-          },
-        };
-      } else {
-        return {
-          ...prev,
-          [section]: !prev[section],
-        };
-      }
+      const newSettings = section === 'spotify' && subsection
+        ? {
+            ...prev,
+            spotify: {
+              ...prev.spotify,
+              [subsection]: !prev.spotify[subsection],
+            },
+          }
+        : section === 'spotify'
+        ? {
+            ...prev,
+            spotify: {
+              top_artists: !prev.spotify.top_artists,
+              top_genres: !prev.spotify.top_genres,
+              selected_playlist: !prev.spotify.selected_playlist,
+            },
+          }
+        : {
+            ...prev,
+            [section]: !prev[section],
+          };
+
+      // Update profile state with new visibility settings
+      setProfile((prevProfile) => 
+        prevProfile ? {
+          ...prevProfile,
+          visibility_settings: newSettings
+        } : null
+      );
+
+      return newSettings;
     });
   };
 
@@ -343,65 +350,27 @@ const EditProfileScreen = () => {
     <ScrollView style={commonStyles.container}>
       <View style={styles.editHeader}>
         <Text style={commonStyles.title}>Edit Profile</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[
-              commonStyles.button,
-              { backgroundColor: colors.primary, marginRight: spacing.sm },
-            ]}
-            onPress={() =>
-              profile?.id && navigation.navigate("PublicProfile", { userId: profile.id })
-            }
-          >
-            <Text style={commonStyles.buttonText}>View Public Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[commonStyles.button, { backgroundColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text
-              style={[commonStyles.buttonText, { color: colors.text.primary }]}
-            >
-              Cancel
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[commonStyles.button, { backgroundColor: colors.border }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={[commonStyles.buttonText, { color: colors.text.primary }]}>
+            Cancel
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <SectionHeader
-          title="Basic Information"
-          isVisible={visibilitySettings.basic_info}
-          onToggleVisibility={() => handleVisibilityChange("basic_info")}
-        />
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>First Name</Text>
-          <TextInput
-            style={styles.input}
-            value={profile?.first_name}
-            onChangeText={(text) => setProfile(prev => prev ? { ...prev, first_name: text } : null)}
-            placeholder="Enter your first name"
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Last Name</Text>
-          <TextInput
-            style={styles.input}
-            value={profile?.last_name}
-            onChangeText={(text) => setProfile(prev => prev ? { ...prev, last_name: text } : null)}
-            placeholder="Enter your last name"
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            value={profile?.username}
-            onChangeText={(text) => setProfile(prev => prev ? { ...prev, username: text } : null)}
-            placeholder="Choose a username"
-          />
-        </View>
-      </View>
+      <TouchableOpacity
+        style={[
+          commonStyles.button,
+          { backgroundColor: colors.primary, marginHorizontal: spacing.md, marginBottom: spacing.lg }
+        ]}
+        onPress={() =>
+          profile?.id && navigation.navigate("PublicProfile", { userId: profile.id })
+        }
+      >
+        <Text style={commonStyles.buttonText}>View Public Profile</Text>
+      </TouchableOpacity>
 
       <View style={styles.section}>
         <SectionHeader
@@ -511,14 +480,6 @@ const EditProfileScreen = () => {
             />
           ) : (
             <>
-              {(() => {
-                console.log('Spotify connected:', {
-                  topGenres: profile.spotify_top_genres,
-                  topArtists: profile.spotify_top_artists,
-                  visibilitySettings: visibilitySettings.spotify
-                });
-                return null;
-              })()}
               {profile.spotify_top_genres && (
                 <View style={styles.spotifySubsection}>
                   <View style={styles.sectionHeader}>
@@ -614,6 +575,37 @@ const EditProfileScreen = () => {
             {isSaving || uploadingPhotos ? "Saving..." : "Save Changes"}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={[styles.section, { marginBottom: spacing.xl }]}>
+        <Text style={styles.sectionTitle}>Basic Information</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>First Name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.background }]}
+            value={profile?.first_name}
+            editable={false}
+            placeholder="Enter your first name"
+          />
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.background }]}
+            value={profile?.last_name}
+            editable={false}
+            placeholder="Enter your last name"
+          />
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Username</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.background }]}
+            value={profile?.username}
+            editable={false}
+            placeholder="Choose a username"
+          />
+        </View>
       </View>
 
       <Modal

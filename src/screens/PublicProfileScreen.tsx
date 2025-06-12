@@ -133,14 +133,11 @@ const PublicProfileScreen = () => {
       )}
 
       <View style={styles.contentContainer}>
-        {profile.visibility_settings?.basic_info && (
-          <View style={styles.nameContainer}>
-            <Text style={styles.name}>
-              {profile.first_name} {profile.last_name}
-            </Text>
-            <Text style={styles.username}>@{profile.username}</Text>
-          </View>
-        )}
+        <View style={styles.nameContainer}>
+          <Text style={styles.name}>
+            {profile.first_name}
+          </Text>
+        </View>
 
         {profile.bio && (
           <View style={styles.section}>
