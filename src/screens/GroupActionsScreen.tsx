@@ -16,7 +16,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
 import { colors, spacing, typography } from "../theme/theme";
-import DatePicker from "react-native-date-picker";
 
 type GroupActionsScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -206,7 +205,7 @@ const GroupActionsScreen = () => {
               <View style={styles.datePickerModalContainer}>
                 <View style={styles.datePickerModalContent}>
                   <Text style={styles.datePickerTitle}>Select Date</Text>
-                  <DatePicker date={date} onDateChange={setDate} mode="date" />
+                  
                   <TouchableOpacity
                     style={[styles.modalButton, styles.cancelButton]}
                     onPress={() => setShowDatePicker(false)}

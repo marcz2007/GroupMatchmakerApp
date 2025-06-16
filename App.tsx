@@ -5,7 +5,7 @@ import { Session } from '@supabase/supabase-js';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import AppNavigator, { RootStackParamList } from './src/navigation/AppNavigator';
+import AppNavigator from './src/navigation/AppNavigator';
 import { supabase } from "./src/supabase";
 
 // Export the navigation prop type for reuse in components
