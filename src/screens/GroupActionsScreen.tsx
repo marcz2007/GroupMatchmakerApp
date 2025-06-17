@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from "../contexts/AuthContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
@@ -197,24 +198,19 @@ const GroupActionsScreen = () => {
               </Text>
             </TouchableOpacity>
 
-            <Modal
-              visible={showDatePicker}
-              transparent={true}
-              animationType="slide"
-            >
-              <View style={styles.datePickerModalContainer}>
-                <View style={styles.datePickerModalContent}>
-                  <Text style={styles.datePickerTitle}>Select Date</Text>
-                  
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>
+            {/* {showDatePicker && (
+              <DateTimePicker
+                value={newSuggestion.date}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setNewSuggestion((prev) => ({ ...prev, date: selectedDate }));
+                  }
+                }}
+              />
+            )} */}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
