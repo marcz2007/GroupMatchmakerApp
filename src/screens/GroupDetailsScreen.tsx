@@ -292,6 +292,39 @@ const GroupDetailsScreen = () => {
     setIsUploadingPicture(true);
     setShowImagePreview(false);
 
+    // Check if user is authenticated
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error(
+        "[handleConfirmImageUpload] Authentication error:",
+        authError
+      );
+      Alert.alert("Error", "Please log in to upload images.");
+      setIsUploadingPicture(false);
+      return;
+    }
+    console.log("[handleConfirmImageUpload] User authenticated:", user.id);
+
+    // Debug Supabase configuration
+    console.log(
+      "[handleConfirmImageUpload] Supabase URL:",
+      process.env.SUPABASE_URL || "Not set"
+    );
+    console.log(
+      "[handleConfirmImageUpload] Supabase Anon Key:",
+      process.env.SUPABASE_ANON_KEY ? "Set" : "Not set"
+    );
+
+    // Check if supabase client is properly configured
+    console.log("[handleConfirmImageUpload] Supabase client:", {
+      hasStorage: !!supabase.storage,
+      hasAuth: !!supabase.auth,
+      hasFrom: !!supabase.storage?.from,
+    });
+
     try {
       const { uri: imageUri, asset } = selectedImageData;
 
@@ -300,6 +333,9 @@ const GroupDetailsScreen = () => {
         .pop()}`;
       const filePath = `${fileName}`;
 
+      // Also try a simpler path for testing
+      const simpleFilePath = `test_${Date.now()}.jpg`;
+
       // Convert URI to Blob using fetch instead of XMLHttpRequest
       console.log(
         "[handleConfirmImageUpload] Attempting Blob conversion via fetch..."
@@ -307,7 +343,16 @@ const GroupDetailsScreen = () => {
 
       let blob: Blob;
       try {
-        const response = await fetch(imageUri);
+        // Add timeout to fetch request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(imageUri, {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -315,13 +360,80 @@ const GroupDetailsScreen = () => {
         console.log(
           `[handleConfirmImageUpload] Blob conversion successful. Size: ${blob.size}, Type: ${blob.type}`
         );
+
+        // Check file size (limit to 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (blob.size > maxSize) {
+          throw new Error(
+            `Image file too large (${Math.round(
+              blob.size / 1024 / 1024
+            )}MB). Please select a smaller image (max 10MB).`
+          );
+        }
+
+        // Ensure blob has proper type
+        if (!blob.type || blob.type === "") {
+          console.log(
+            "[handleConfirmImageUpload] Blob has no type, setting to image/jpeg"
+          );
+          // Create a new blob with proper type
+          blob = new Blob([blob], { type: "image/jpeg" });
+        }
       } catch (fetchError) {
         console.error("[handleConfirmImageUpload] Fetch error:", fetchError);
-        const errorMessage =
-          fetchError instanceof Error
-            ? fetchError.message
-            : "Unknown fetch error";
-        throw new Error(`Failed to read image file: ${errorMessage}`);
+
+        // Try alternative method using XMLHttpRequest
+        try {
+          console.log(
+            "[handleConfirmImageUpload] Trying XMLHttpRequest fallback..."
+          );
+          blob = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", imageUri);
+            xhr.responseType = "blob";
+            xhr.onload = () => {
+              if (xhr.status === 200) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error(`HTTP error! status: ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error("Network request failed"));
+            xhr.send();
+          });
+          console.log(
+            `[handleConfirmImageUpload] XMLHttpRequest fallback successful. Size: ${blob.size}, Type: ${blob.type}`
+          );
+
+          // Check file size (limit to 10MB)
+          const maxSize = 10 * 1024 * 1024; // 10MB
+          if (blob.size > maxSize) {
+            throw new Error(
+              `Image file too large (${Math.round(
+                blob.size / 1024 / 1024
+              )}MB). Please select a smaller image (max 10MB).`
+            );
+          }
+
+          // Ensure blob has proper type
+          if (!blob.type || blob.type === "") {
+            console.log(
+              "[handleConfirmImageUpload] XMLHttpRequest blob has no type, setting to image/jpeg"
+            );
+            // Create a new blob with proper type
+            blob = new Blob([blob], { type: "image/jpeg" });
+          }
+        } catch (fallbackError) {
+          console.error(
+            "[handleConfirmImageUpload] Fallback also failed:",
+            fallbackError
+          );
+          const errorMessage =
+            fetchError instanceof Error
+              ? fetchError.message
+              : "Unknown fetch error";
+          throw new Error(`Failed to read image file: ${errorMessage}`);
+        }
       }
 
       // If there was an old primary image, delete it from storage first
@@ -350,21 +462,252 @@ const GroupDetailsScreen = () => {
           asset.mimeType || blob.type || "image/jpeg"
         }`
       );
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("group-images") // Use hyphen for bucket name
-        .upload(filePath, blob, {
-          cacheControl: "3600",
-          upsert: true,
-          contentType: asset.mimeType || blob.type || "image/jpeg",
+
+      // Check if bucket exists and is accessible
+      try {
+        const { data: bucketData, error: bucketError } = await supabase.storage
+          .from("group-images")
+          .list("", { limit: 1 });
+
+        if (bucketError) {
+          console.error(
+            "[handleConfirmImageUpload] Bucket access error:",
+            bucketError
+          );
+          throw new Error(
+            `Storage bucket not accessible: ${bucketError.message}`
+          );
+        }
+        console.log("[handleConfirmImageUpload] Bucket access confirmed");
+        console.log("[handleConfirmImageUpload] Bucket data:", bucketData);
+      } catch (bucketCheckError) {
+        console.error(
+          "[handleConfirmImageUpload] Bucket check failed:",
+          bucketCheckError
+        );
+        throw new Error(
+          "Storage bucket not available. Please check your Supabase configuration."
+        );
+      }
+
+      // Test a simple storage operation
+      try {
+        console.log("[handleConfirmImageUpload] Testing storage connection...");
+        const testResult = await supabase.storage
+          .from("group-images")
+          .list("", { limit: 0 });
+        console.log(
+          "[handleConfirmImageUpload] Storage connection test successful"
+        );
+      } catch (testError) {
+        console.error(
+          "[handleConfirmImageUpload] Storage connection test failed:",
+          testError
+        );
+        throw new Error(
+          "Storage connection failed. Please check your Supabase storage configuration."
+        );
+      }
+
+      // Validate blob before upload
+      console.log("[handleConfirmImageUpload] Blob validation:", {
+        size: blob.size,
+        type: blob.type,
+        hasData: blob.size > 0,
+      });
+
+      if (!blob || blob.size === 0) {
+        throw new Error(
+          "Invalid blob data. Please try selecting the image again."
+        );
+      }
+
+      // Try alternative upload method using FormData
+      console.log(
+        "[handleConfirmImageUpload] Trying FormData upload method..."
+      );
+
+      let uploadData = null;
+      let uploadError = null;
+
+      try {
+        // Convert blob to File object
+        const file = new File([blob], filePath, { type: "image/jpeg" });
+
+        // Create FormData
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Get the upload URL
+        const uploadUrl = `${process.env.SUPABASE_URL}/storage/v1/object/group-images/${filePath}`;
+
+        console.log("[handleConfirmImageUpload] Upload URL:", uploadUrl);
+
+        // Make direct HTTP request
+        console.log(
+          "[handleConfirmImageUpload] Making direct HTTP request to:",
+          uploadUrl
+        );
+        console.log("[handleConfirmImageUpload] Request headers:", {
+          Authorization: `Bearer ${
+            process.env.SUPABASE_ANON_KEY ? "SET" : "NOT SET"
+          }`,
+          "Content-Type": "multipart/form-data",
+        });
+        console.log("[handleConfirmImageUpload] FormData created successfully");
+
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+            "Content-Type": "multipart/form-data",
+          },
+          body: formData,
+          // Add timeout to identify network issues
+          signal: AbortSignal.timeout(30000), // 30 second timeout
         });
 
-      if (uploadError) {
-        console.error(
-          "[handleConfirmImageUpload] Supabase upload error:",
-          uploadError
+        console.log("[handleConfirmImageUpload] Direct upload response:", {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            "[handleConfirmImageUpload] Direct upload error:",
+            errorText
+          );
+          throw new Error(
+            `Upload failed: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const uploadResult = await response.json();
+        console.log(
+          "[handleConfirmImageUpload] Direct upload success:",
+          uploadResult
         );
-        throw uploadError; // Re-throw Supabase specific error
+
+        uploadData = uploadResult;
+        uploadError = null;
+      } catch (directUploadError) {
+        console.error(
+          "[handleConfirmImageUpload] Direct upload failed:",
+          directUploadError
+        );
+
+        // Check if it's a timeout error
+        if (directUploadError instanceof Error) {
+          if (directUploadError.name === "AbortError") {
+            console.error(
+              "[handleConfirmImageUpload] Upload timed out after 30 seconds"
+            );
+          } else if (
+            directUploadError.message.includes("Network request failed")
+          ) {
+            console.error(
+              "[handleConfirmImageUpload] Network request failed - possible connectivity issue"
+            );
+          }
+        }
+
+        // Fallback to original Supabase method
+        console.log(
+          "[handleConfirmImageUpload] Falling back to Supabase client method..."
+        );
+
+        const maxRetries = 3;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            console.log(
+              `[handleConfirmImageUpload] Upload attempt ${attempt}/${maxRetries}`
+            );
+
+            // Try different upload approaches
+            let result;
+
+            if (attempt === 1) {
+              // First attempt: Standard upload with proper content type
+              result = await supabase.storage
+                .from("group-images")
+                .upload(filePath, blob, {
+                  cacheControl: "3600",
+                  upsert: true,
+                  contentType: "image/jpeg", // Force JPEG content type
+                });
+            } else if (attempt === 2) {
+              // Second attempt: Try without upsert and with explicit content type
+              result = await supabase.storage
+                .from("group-images")
+                .upload(filePath, blob, {
+                  cacheControl: "3600",
+                  upsert: false,
+                  contentType: "image/jpeg", // Force JPEG content type
+                });
+            } else {
+              // Third attempt: Try with simple path and minimal options
+              result = await supabase.storage
+                .from("group-images")
+                .upload(simpleFilePath, blob, {
+                  contentType: "image/jpeg", // Force JPEG content type
+                });
+            }
+
+            // Log the result for debugging
+            console.log(
+              `[handleConfirmImageUpload] Upload result for attempt ${attempt}:`,
+              {
+                success: !result.error,
+                error: result.error,
+                data: result.data,
+              }
+            );
+
+            uploadData = result.data;
+            uploadError = result.error;
+
+            if (!uploadError) {
+              console.log(
+                `[handleConfirmImageUpload] Upload successful on attempt ${attempt}`
+              );
+              break;
+            }
+
+            console.log(
+              `[handleConfirmImageUpload] Upload error on attempt ${attempt}:`,
+              uploadError
+            );
+
+            if (attempt < maxRetries) {
+              console.log(
+                `[handleConfirmImageUpload] Upload failed, retrying in 2 seconds...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+          } catch (retryError) {
+            console.error(
+              `[handleConfirmImageUpload] Upload attempt ${attempt} failed:`,
+              retryError
+            );
+            if (attempt === maxRetries) {
+              throw retryError;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+
+        if (uploadError) {
+          console.error(
+            "[handleConfirmImageUpload] Supabase upload error after retries:",
+            uploadError
+          );
+          throw uploadError; // Re-throw Supabase specific error
+        }
       }
+
       if (!uploadData)
         throw new Error("Supabase upload failed, no data returned.");
       console.log(
@@ -470,8 +813,22 @@ const GroupDetailsScreen = () => {
       } else if (err.message.includes("HTTP error")) {
         errorMessage =
           "Network error while processing image. Please check your connection and try again.";
-      } else if (err.message.includes("storage")) {
+      } else if (
+        err.message.includes("Storage bucket not accessible") ||
+        err.message.includes("Storage bucket not available")
+      ) {
+        errorMessage =
+          "Storage configuration issue. Please check your Supabase setup.";
+      } else if (
+        err.message.includes("storage") ||
+        err.message.includes("Storage")
+      ) {
         errorMessage = "Failed to upload image to storage. Please try again.";
+      } else if (err.message.includes("Network request failed")) {
+        errorMessage =
+          "Network connection failed. Please check your internet connection and try again.";
+      } else if (err.message.includes("Image file too large")) {
+        errorMessage = err.message;
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -700,26 +1057,27 @@ const GroupDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f4f8",
+    backgroundColor: "#1a1a1a", // Anthracite grey background
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    backgroundColor: "#1a1a1a",
   },
   errorText: {
-    color: "red",
+    color: "#ef4444", // Red for errors
     fontSize: 16,
     textAlign: "center",
   },
   pictureSection: {
     alignItems: "center",
     paddingVertical: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a", // Dark surface
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#333333", // Dark divider
   },
   groupImage: {
     width: 150,
@@ -731,26 +1089,26 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#3a3a3a", // Dark surface light
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 15,
   },
   placeholderText: {
-    color: "#777",
+    color: "#b0b0b0", // Medium grey
   },
   bioSection: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a", // Dark surface
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#333333", // Dark divider
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#333",
+    color: "#ffffff", // White text
   },
   sectionHeader: {
     flexDirection: "row",
@@ -761,17 +1119,18 @@ const styles = StyleSheet.create({
   bioText: {
     fontSize: 16,
     lineHeight: 24,
-    color: "#555",
+    color: "#e0e0e0", // Light grey text
     marginBottom: 15,
   },
   input: {
-    borderColor: "#ddd",
+    borderColor: "#404040", // Dark border
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
     paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#3a3a3a", // Dark surface light
+    color: "#ffffff", // White text
   },
   bioInput: {
     minHeight: 100,
@@ -785,35 +1144,35 @@ const styles = StyleSheet.create({
   },
   membersSection: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a", // Dark surface
   },
   memberItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#333333", // Dark divider
   },
   memberAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
     marginRight: 15,
-    backgroundColor: "#e9e9e9",
+    backgroundColor: "#3a3a3a", // Dark surface light
   },
   memberAvatarPlaceholder: {
     width: 40,
     height: 40,
     borderRadius: 20,
     marginRight: 15,
-    backgroundColor: "#ccc",
+    backgroundColor: "#404040", // Dark grey
   },
   memberName: {
     fontSize: 16,
-    color: "#333",
+    color: "#ffffff", // White text
   },
   actionButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#5762b7", // Primary color
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 5,
@@ -821,19 +1180,19 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   actionButtonText: {
-    color: "#fff",
+    color: "#ffffff", // White text
     fontWeight: "bold",
     fontSize: 14,
   },
   disabledButton: {
-    backgroundColor: "#cccccc",
+    backgroundColor: "#555555", // Disabled grey
   },
   section: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a", // Dark surface
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#333333", // Dark divider
   },
   toggleContainer: {
     flexDirection: "row",
@@ -844,31 +1203,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginRight: 10,
-    color: "#333",
+    color: "#ffffff", // White text
   },
   settingDescription: {
     fontSize: 14,
-    color: "#555",
+    color: "#b0b0b0", // Medium grey
   },
   shareButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#5762b7", // Primary color
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 5,
   },
   shareButtonText: {
-    color: "#fff",
+    color: "#ffffff", // White text
     fontWeight: "bold",
     fontSize: 14,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)", // Darker overlay
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "white",
+    backgroundColor: "#2a2a2a", // Dark surface
     padding: 20,
     borderRadius: 20,
     width: "80%",
@@ -878,7 +1237,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#333",
+    color: "#ffffff", // White text
   },
   previewImage: {
     width: "100%",
@@ -888,7 +1247,7 @@ const styles = StyleSheet.create({
   },
   modalDescription: {
     fontSize: 16,
-    color: "#555",
+    color: "#e0e0e0", // Light grey
     marginBottom: 20,
   },
   modalButtons: {
@@ -898,12 +1257,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   cancelModalButton: {
-    backgroundColor: "#ccc",
+    backgroundColor: "#555555", // Dark grey
     flex: 1,
     marginRight: 10,
   },
   confirmModalButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#5762b7", // Primary color
     flex: 1,
     marginLeft: 10,
   },
@@ -915,7 +1274,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalButtonText: {
-    color: "#fff",
+    color: "#ffffff", // White text
     fontWeight: "bold",
     fontSize: 14,
   },

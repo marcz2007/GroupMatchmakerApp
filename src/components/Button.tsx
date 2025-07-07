@@ -1,18 +1,24 @@
-import React from 'react';
-import { ActivityIndicator, Text, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
-import { tw } from '../utils/tailwind';
+import React from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  ViewStyle,
+} from "react-native";
+import { tw } from "../utils/tailwind";
 
-type ButtonVariant = 
-  | 'primary'    // Filled button with background color
-  | 'secondary'  // Outlined button with border
-  | 'text'       // Text only, no background or border
-  | 'link'       // Text with underline
-  | 'ghost'      // Text with hover effect
-  | 'danger'     // Red variant for destructive actions
-  | 'success'    // Green variant for success actions
-  | 'warning';   // Yellow/Orange variant for warnings
+type ButtonVariant =
+  | "primary" // Filled button with background color
+  | "secondary" // Outlined button with border
+  | "text" // Text only, no background or border
+  | "link" // Text with underline
+  | "ghost" // Text with hover effect
+  | "danger" // Red variant for destructive actions
+  | "success" // Green variant for success actions
+  | "warning"; // Yellow/Orange variant for warnings
 
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps {
   variant?: ButtonVariant;
@@ -29,8 +35,8 @@ interface ButtonProps {
 }
 
 export const Button: React.FC<ButtonProps> = ({
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   onPress,
   children,
   disabled = false,
@@ -43,7 +49,7 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   // Base styles for all buttons
   const baseStyles = tw`flex-row items-center justify-center rounded-lg`;
-  
+
   // Size styles
   const sizeStyles = {
     sm: tw`px-3 py-1.5`,
@@ -51,35 +57,35 @@ export const Button: React.FC<ButtonProps> = ({
     lg: tw`px-6 py-3`,
   };
 
-  // Variant styles
+  // Variant styles - updated for dark theme
   const variantStyles = {
     primary: tw`bg-blue-600 active:bg-blue-700`,
-    secondary: tw`border-2 border-blue-600 active:bg-blue-50`,
-    text: tw`active:bg-blue-50`,
-    link: tw`active:bg-blue-50`,
-    ghost: tw`active:bg-gray-100`,
+    secondary: tw`border-2 border-blue-600 bg-gray-800 active:bg-gray-700`,
+    text: tw`active:bg-gray-800`,
+    link: tw`active:bg-gray-800`,
+    ghost: tw`active:bg-gray-800`,
     danger: tw`bg-red-600 active:bg-red-700`,
     success: tw`bg-green-600 active:bg-green-700`,
     warning: tw`bg-yellow-500 active:bg-yellow-600`,
   };
 
-  // Text color styles
+  // Text color styles - updated for dark theme
   const textColorStyles = {
-    primary: { color: '#ffffff' },
-    secondary: { color: '#2563eb' },
-    text: { color: '#2563eb' },
-    link: { color: '#2563eb', textDecorationLine: 'underline' },
-    ghost: { color: '#374151' },
-    danger: { color: '#ffffff' },
-    success: { color: '#ffffff' },
-    warning: { color: '#ffffff' },
+    primary: { color: "#ffffff" },
+    secondary: { color: "#ffffff" },
+    text: { color: "#ffffff" },
+    link: { color: "#3b82f6", textDecorationLine: "underline" },
+    ghost: { color: "#ffffff" },
+    danger: { color: "#ffffff" },
+    success: { color: "#ffffff" },
+    warning: { color: "#ffffff" },
   };
 
   // Disabled styles
-  const disabledStyles = disabled ? tw`opacity-50` : '';
+  const disabledStyles = disabled ? tw`opacity-50` : "";
 
   // Width styles
-  const widthStyles = fullWidth ? tw`w-full` : '';
+  const widthStyles = fullWidth ? tw`w-full` : "";
 
   // Combine all styles
   const buttonStyles = [
@@ -91,11 +97,7 @@ export const Button: React.FC<ButtonProps> = ({
     style,
   ];
 
-  const textStyles = [
-    tw`font-medium`,
-    textColorStyles[variant],
-    textStyle,
-  ];
+  const textStyles = [tw`font-medium`, textColorStyles[variant], textStyle];
 
   return (
     <TouchableOpacity
@@ -104,9 +106,16 @@ export const Button: React.FC<ButtonProps> = ({
       style={buttonStyles}
     >
       {loading ? (
-        <ActivityIndicator 
-          color={variant === 'primary' || variant === 'danger' || variant === 'success' || variant === 'warning' ? 'white' : '#2563eb'} 
-          size="small" 
+        <ActivityIndicator
+          color={
+            variant === "primary" ||
+            variant === "danger" ||
+            variant === "success" ||
+            variant === "warning"
+              ? "white"
+              : "#ffffff"
+          }
+          size="small"
         />
       ) : (
         <>
@@ -152,4 +161,4 @@ export const Button: React.FC<ButtonProps> = ({
 <Button size="sm" variant="primary" onPress={() => {}}>Small</Button>
 <Button size="md" variant="primary" onPress={() => {}}>Medium</Button>
 <Button size="lg" variant="primary" onPress={() => {}}>Large</Button>
-*/ 
+*/

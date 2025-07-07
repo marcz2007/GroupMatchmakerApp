@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing.xl,
     padding: spacing.md,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
   },
   inputGroup: {
@@ -850,6 +850,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     padding: spacing.sm,
     ...typography.body,
+    backgroundColor: colors.surfaceLight,
+    color: colors.text.primary,
   },
   bioInput: {
     minHeight: 100,
@@ -972,7 +974,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     width: "90%",
     maxHeight: "80%",

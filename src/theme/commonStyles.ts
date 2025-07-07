@@ -10,14 +10,25 @@ export const commonStyles = StyleSheet.create({
   title: {
     ...typography.title,
     marginBottom: spacing.xl,
-    textAlign: "center",
+    textAlign: "left",
+    color: colors.text.primary,
   },
   section: {
     marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+  },
+  containerCard: {
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
   },
   sectionTitle: {
     ...typography.sectionTitle,
     marginBottom: spacing.sm,
+    color: colors.text.primary,
   },
   sectionDescription: {
     ...typography.body,
@@ -31,9 +42,10 @@ export const commonStyles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     fontSize: typography.body.fontSize,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surfaceLight,
     marginBottom: spacing.md,
     width: "100%",
+    color: colors.text.primary,
   },
   multilineInput: {
     borderWidth: 1,
@@ -42,11 +54,12 @@ export const commonStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typography.body.fontSize,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surfaceLight,
     marginBottom: spacing.md,
     width: "100%",
     minHeight: 100,
     textAlignVertical: "top",
+    color: colors.text.primary,
   },
   button: {
     backgroundColor: colors.primary,
@@ -79,19 +92,19 @@ export const commonStyles = StyleSheet.create({
   protectedSection: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    borderColor: colors.border,
   },
   protectedTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#495057",
+    color: colors.text.primary,
     marginBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#dee2e6",
+    borderBottomColor: colors.divider,
     paddingBottom: spacing.sm,
   },
   protectedContent: {
@@ -111,17 +124,18 @@ export const commonStyles = StyleSheet.create({
   },
   protectedLabel: {
     fontSize: 15,
-    color: "#6c757d",
+    color: colors.text.secondary,
     fontWeight: "500",
   },
   protectedValue: {
     fontSize: 15,
-    color: "#212529",
+    color: colors.text.primary,
     fontWeight: "400",
   },
   centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.background,
   },
 });

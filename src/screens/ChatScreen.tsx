@@ -304,11 +304,32 @@ const ChatScreen = () => {
       return; // Do nothing, or clean up if a channel exists
     }
 
+    // Test Realtime connection
+    console.log("[Realtime] Testing connection...");
+    const testChannel = supabase.channel("test-connection");
+    testChannel.subscribe((status, err) => {
+      if (status === "SUBSCRIBED") {
+        console.log("[Realtime] Connection test successful");
+        supabase.removeChannel(testChannel);
+      } else if (err) {
+        console.error("[Realtime] Connection test failed:", err);
+        supabase.removeChannel(testChannel);
+      }
+    });
+
     let channel: RealtimeChannel | null = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+
     const setupSubscription = () => {
+      console.log(
+        `[Realtime] Setting up subscription for group ${groupId}, attempt ${
+          retryCount + 1
+        }`
+      );
+
       channel = supabase
         .channel(`public:messages:group_id=eq.${groupId}`)
-        // ... (on and subscribe logic as before) ...
         .on<any>(
           "postgres_changes",
           {
@@ -318,7 +339,6 @@ const ChatScreen = () => {
             filter: `group_id=eq.${groupId}`,
           },
           async (payload) => {
-            // ... (payload handling as before) ...
             const newMessagePayload = payload.new;
             if (newMessagePayload.user_id === currentUserId) return;
             const { data: profileData } = await supabase
@@ -344,10 +364,36 @@ const ChatScreen = () => {
         )
         .subscribe((status, err) => {
           if (status === "SUBSCRIBED") {
-            console.log(`Realtime subscribed for group ${groupId}`);
+            console.log(
+              `[Realtime] Successfully subscribed for group ${groupId}`
+            );
+            retryCount = 0; // Reset retry count on success
           } else if (err) {
-            console.error(`Realtime error for group ${groupId}:`, err);
-            Alert.alert("Realtime Error", "Chat connection issue.");
+            console.error(`[Realtime] Error for group ${groupId}:`, err);
+
+            // Retry subscription if we haven't exceeded max retries
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(
+                `[Realtime] Retrying subscription for group ${groupId} (${retryCount}/${maxRetries})`
+              );
+
+              // Clean up current channel
+              if (channel) {
+                supabase.removeChannel(channel);
+                channel = null;
+              }
+
+              // Retry after a delay
+              setTimeout(() => {
+                setupSubscription();
+              }, 2000 * retryCount); // Exponential backoff
+            } else {
+              console.log(
+                `[Realtime] Max retries exceeded for group ${groupId}, giving up`
+              );
+              // Users can still send messages even if realtime fails
+            }
           }
         });
     };
@@ -477,6 +523,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#1a1a1a", // Anthracite grey background
   },
   headerRightContainer: {
     // To accommodate multiple buttons if needed in future
@@ -491,12 +538,12 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     fontSize: 16,
-    color: "#007AFF", // Example color, adjust as per your app's theme
+    color: "#5762b7", // Primary color
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#007AFF", // iOS blue color, adjust as needed
+    color: "#ffffff", // White text
   },
   actionButton: {
     padding: 8,

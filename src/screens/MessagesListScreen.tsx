@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
     ...typography.sectionTitle,
     flex: 1,
     marginRight: spacing.sm,
+    color: colors.text.primary,
   },
   timestamp: {
     ...typography.caption,

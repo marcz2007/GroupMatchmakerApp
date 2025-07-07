@@ -5,16 +5,13 @@ import React from "react";
 import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
-import AppNavigator from "./src/navigation/AppNavigator";
+import AppNavigator, {
+  RootStackParamList,
+} from "./src/navigation/AppNavigator";
 
 // Export the navigation prop type for reuse in components
 export type RootStackNavigationProp<T extends keyof RootStackParamList> =
   StackNavigationProp<RootStackParamList, T>;
-
-type RootStackParamList = {
-  Chat: { groupId: string };
-  Profile: { code?: string; state?: string; error?: string };
-};
 
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
@@ -32,7 +29,7 @@ const linking: LinkingOptions<RootStackParamList> = {
         },
       },
       // Add Spotify callback handler
-      Profile: {
+      PublicProfile: {
         path: "functions/v1/spotify-callback",
         parse: {
           code: (code: string) => code,
@@ -99,6 +96,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc", // Modern light gray/white
+    backgroundColor: "#1a1a1a", // Anthracite grey background
   },
 });
