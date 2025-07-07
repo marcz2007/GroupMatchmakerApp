@@ -334,6 +334,7 @@ const EditProfileScreen = () => {
           username: profile?.username,
           bio: profile?.bio,
           interests: profile?.interests,
+          photos: profile?.photos,
           visibility_settings: visibilitySettings,
           updated_at: new Date().toISOString(),
         })
