@@ -77,6 +77,7 @@ export const createGroup = async (groupData: {
     .insert({
       name: groupData.name,
       description: groupData.description,
+      owner_id: groupData.created_by,
     })
     .select()
     .single();

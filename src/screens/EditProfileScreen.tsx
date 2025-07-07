@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AIAnalysisSection } from "../components/profile/AIAnalysisSection";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { supabase } from "../supabase";
@@ -69,6 +70,7 @@ interface Profile {
   word_patterns?: {
     topWords: { word: string; score: number }[];
   };
+  enable_ai_analysis: boolean;
 }
 
 const EditProfileScreen = () => {
@@ -88,14 +90,15 @@ const EditProfileScreen = () => {
     },
   });
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [connectingSpotify, setConnectingSpotify] = useState(false);
-  const [newInterest, setNewInterest] = useState("");
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [availablePlaylists, setAvailablePlaylists] = useState<
     SpotifyPlaylist[]
   >([]);
+  const [messageCount, setMessageCount] = useState(0);
+  const [hasAnalysis, setHasAnalysis] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [connectingSpotify, setConnectingSpotify] = useState(false);
+  const [newInterest, setNewInterest] = useState("");
 
   useEffect(() => {
     fetchProfile();
@@ -136,6 +139,23 @@ const EditProfileScreen = () => {
             },
           }
         );
+
+        // Check if user has AI analysis data
+        setHasAnalysis(!!data.word_patterns?.topWords?.length);
+
+        // Fetch message count
+        try {
+          const { count, error: messageError } = await supabase
+            .from("messages")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id);
+
+          if (!messageError && count !== null) {
+            setMessageCount(count);
+          }
+        } catch (messageCountError) {
+          console.error("Error fetching message count:", messageCountError);
+        }
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -199,41 +219,45 @@ const EditProfileScreen = () => {
     subsection?: keyof typeof visibilitySettings.spotify
   ) => {
     setVisibilitySettings((prev) => {
-      const newSettings =
-        section === "spotify" && subsection
-          ? {
-              ...prev,
-              spotify: {
-                ...prev.spotify,
-                [subsection]: !prev.spotify[subsection],
-              },
-            }
-          : section === "spotify"
-          ? {
-              ...prev,
-              spotify: {
-                top_artists: !prev.spotify.top_artists,
-                top_genres: !prev.spotify.top_genres,
-                selected_playlist: !prev.spotify.selected_playlist,
-              },
-            }
-          : {
-              ...prev,
-              [section]: !prev[section],
-            };
-
-      // Update profile state with new visibility settings
-      setProfile((prevProfile) =>
-        prevProfile
-          ? {
-              ...prevProfile,
-              visibility_settings: newSettings,
-            }
-          : null
-      );
-
-      return newSettings;
+      if (subsection) {
+        return {
+          ...prev,
+          spotify: {
+            ...prev.spotify,
+            [subsection]: !prev.spotify[subsection],
+          },
+        };
+      }
+      return {
+        ...prev,
+        [section]: !prev[section],
+      };
     });
+  };
+
+  const handleAIAnalysisToggle = async (enabled: boolean) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("No user found");
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ enable_ai_analysis: enabled })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      // Update local profile state
+      setProfile((prev) =>
+        prev ? { ...prev, enable_ai_analysis: enabled } : null
+      );
+    } catch (error) {
+      console.error("Error updating AI analysis setting:", error);
+    }
   };
 
   const handleSelectPlaylist = async () => {
@@ -313,39 +337,6 @@ const EditProfileScreen = () => {
         ...profile,
         interests: newInterests,
       });
-    }
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("No user found");
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: profile?.first_name,
-          last_name: profile?.last_name,
-          username: profile?.username,
-          bio: profile?.bio,
-          interests: profile?.interests,
-          photos: profile?.photos,
-          visibility_settings: visibilitySettings,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
-      navigation.goBack();
-    } catch (error) {
-      console.error("Error saving profile:", error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -643,19 +634,16 @@ const EditProfileScreen = () => {
         </View>
       </View>
 
-      <View style={commonStyles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            commonStyles.button,
-            isSaving || uploadingPhotos ? commonStyles.disabledButton : null,
-          ]}
-          onPress={handleSave}
-          disabled={isSaving || uploadingPhotos}
-        >
-          <Text style={commonStyles.buttonText}>
-            {isSaving || uploadingPhotos ? "Saving..." : "Save Changes"}
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.section}>
+        <AIAnalysisSection
+          enabled={profile?.enable_ai_analysis || false}
+          onToggle={handleAIAnalysisToggle}
+          hasBio={!!profile?.bio}
+          bioLength={profile?.bio?.length || 0}
+          hasMessages={messageCount > 0}
+          messageCount={messageCount}
+          hasAnalysis={hasAnalysis}
+        />
       </View>
 
       <View style={[styles.section, { marginBottom: spacing.xl }]}>

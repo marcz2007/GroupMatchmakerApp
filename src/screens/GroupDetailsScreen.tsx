@@ -10,13 +10,13 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Button as CustomButton } from "../components/Button";
+import { GroupAIAnalysisSection } from "../components/profile/GroupAIAnalysisSection";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
 
@@ -81,6 +81,8 @@ const GroupDetailsScreen = () => {
   const [isSavingBio, setIsSavingBio] = useState(false);
 
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
+  const [groupMessageCount, setGroupMessageCount] = useState(0);
+  const [hasGroupMessages, setHasGroupMessages] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -178,6 +180,21 @@ const GroupDetailsScreen = () => {
         .single();
 
       setEnableAIAnalysis(groupSettings?.enable_ai_analysis || false);
+
+      // Fetch group message count for AI analysis
+      try {
+        const { count, error: messageError } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", groupId);
+
+        if (!messageError && count !== null) {
+          setGroupMessageCount(count);
+          setHasGroupMessages(count > 0);
+        }
+      } catch (messageCountError) {
+        console.error("Error fetching group message count:", messageCountError);
+      }
     } catch (err: any) {
       console.error("Failed to fetch group details:", err);
       setError(err.message || "Could not load group information.");
@@ -974,7 +991,7 @@ const GroupDetailsScreen = () => {
         )}
       </View>
 
-      <View style={styles.section}>
+      {/* <View style={styles.section}>
         <Text style={styles.sectionTitle}>AI Analysis</Text>
         <View style={styles.toggleContainer}>
           <Text style={styles.toggleLabel}>Enable AI Analysis</Text>
@@ -998,11 +1015,63 @@ const GroupDetailsScreen = () => {
             thumbColor={enableAIAnalysis ? "#f4f3f4" : "#f4f3f4"}
           />
         </View>
-        <Text style={styles.settingDescription}>
-          When enabled, messages in this group will be analyzed to help find
-          better matches. This helps us understand communication styles and
-          preferences of group members.
-        </Text>
+
+        {!enableAIAnalysis ? (
+          <Text style={styles.settingDescription}>
+            Enable AI analysis to get insights about group communication
+            patterns and help find better matches for group members.
+          </Text>
+        ) : (
+          <View>
+            <Text style={styles.settingDescription}>
+              ✅ AI analysis is enabled for this group! Messages will be
+              analyzed to understand communication styles and preferences.
+            </Text>
+            <View style={styles.requirementsContainer}>
+              <Text style={styles.requirementsTitle}>How it works:</Text>
+              <Text style={styles.requirementText}>
+                • Messages sent in this group will be analyzed for communication
+                patterns
+              </Text>
+              <Text style={styles.requirementText}>
+                • Analysis helps match group members with compatible people
+              </Text>
+              <Text style={styles.requirementText}>
+                • Only works when both users and groups have AI analysis enabled
+              </Text>
+              <Text style={styles.requirementText}>
+                • Requires at least 5 messages per user to generate insights
+              </Text>
+            </View>
+            <Text style={styles.note}>
+              💡 Encourage group members to enable AI analysis in their profiles
+              and send messages to get the most out of this feature.
+            </Text>
+          </View>
+        )}
+      </View> */}
+
+      <View style={styles.section}>
+        <GroupAIAnalysisSection
+          enabled={enableAIAnalysis}
+          onToggle={async (value) => {
+            try {
+              const { error } = await supabase
+                .from("groups")
+                .update({ enable_ai_analysis: value })
+                .eq("id", groupId);
+
+              if (error) throw error;
+              setEnableAIAnalysis(value);
+            } catch (error) {
+              console.error("Error updating AI analysis setting:", error);
+              Alert.alert("Error", "Failed to update AI analysis setting");
+            }
+          }}
+          memberCount={members.length}
+          hasMessages={hasGroupMessages}
+          messageCount={groupMessageCount}
+        />
       </View>
 
       {/* Image Preview Modal */}
@@ -1277,6 +1346,27 @@ const styles = StyleSheet.create({
     color: "#ffffff", // White text
     fontWeight: "bold",
     fontSize: 14,
+  },
+  requirementsContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  requirementsTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#ffffff", // White text
+  },
+  requirementText: {
+    fontSize: 14,
+    color: "#e0e0e0", // Light grey
+    marginBottom: 4,
+  },
+  note: {
+    fontSize: 12,
+    color: "#b0b0b0", // Medium grey
+    fontStyle: "italic",
+    marginTop: 10,
   },
 });
 
