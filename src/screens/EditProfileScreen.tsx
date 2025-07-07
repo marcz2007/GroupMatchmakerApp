@@ -1,9 +1,20 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { supabase } from "../supabase";
@@ -80,9 +91,11 @@ const EditProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
-  const [newInterest, setNewInterest] = useState('');
+  const [newInterest, setNewInterest] = useState("");
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
-  const [availablePlaylists, setAvailablePlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [availablePlaylists, setAvailablePlaylists] = useState<
+    SpotifyPlaylist[]
+  >([]);
 
   useEffect(() => {
     fetchProfile();
@@ -91,37 +104,41 @@ const EditProfileScreen = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
         return;
       }
 
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
       if (error) throw error;
 
       if (data) {
         setProfile(data);
-        setVisibilitySettings(data.visibility_settings || {
-          photos: true,
-          bio: true,
-          interests: true,
-          basic_info: true,
-          ai_analysis: true,
-          spotify: {
-            top_artists: true,
-            top_genres: true,
-            selected_playlist: true,
-          },
-        });
+        setVisibilitySettings(
+          data.visibility_settings || {
+            photos: true,
+            bio: true,
+            interests: true,
+            basic_info: true,
+            ai_analysis: true,
+            spotify: {
+              top_artists: true,
+              top_genres: true,
+              selected_playlist: true,
+            },
+          }
+        );
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
@@ -130,19 +147,21 @@ const EditProfileScreen = () => {
   const handleConnectSpotify = async () => {
     try {
       setConnectingSpotify(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
 
-      const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      const { data, error } = await supabase.functions.invoke("spotify-auth", {
         body: { userId: user.id },
       });
 
       if (error) throw error;
-      if (!data?.authUrl) throw new Error('No auth URL received');
+      if (!data?.authUrl) throw new Error("No auth URL received");
 
       await Linking.openURL(data.authUrl);
     } catch (error) {
-      console.error('Error connecting to Spotify:', error);
+      console.error("Error connecting to Spotify:", error);
     } finally {
       setConnectingSpotify(false);
     }
@@ -150,11 +169,13 @@ const EditProfileScreen = () => {
 
   const handleDisconnectSpotify = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
 
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
           spotify_connected: false,
           spotify_top_genres: null,
@@ -164,12 +185,12 @@ const EditProfileScreen = () => {
           spotify_access_token: null,
           spotify_token_expires_at: null,
         })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (error) throw error;
       await fetchProfile();
     } catch (error) {
-      console.error('Error disconnecting Spotify:', error);
+      console.error("Error disconnecting Spotify:", error);
     }
   };
 
@@ -178,34 +199,37 @@ const EditProfileScreen = () => {
     subsection?: keyof typeof visibilitySettings.spotify
   ) => {
     setVisibilitySettings((prev) => {
-      const newSettings = section === 'spotify' && subsection
-        ? {
-            ...prev,
-            spotify: {
-              ...prev.spotify,
-              [subsection]: !prev.spotify[subsection],
-            },
-          }
-        : section === 'spotify'
-        ? {
-            ...prev,
-            spotify: {
-              top_artists: !prev.spotify.top_artists,
-              top_genres: !prev.spotify.top_genres,
-              selected_playlist: !prev.spotify.selected_playlist,
-            },
-          }
-        : {
-            ...prev,
-            [section]: !prev[section],
-          };
+      const newSettings =
+        section === "spotify" && subsection
+          ? {
+              ...prev,
+              spotify: {
+                ...prev.spotify,
+                [subsection]: !prev.spotify[subsection],
+              },
+            }
+          : section === "spotify"
+          ? {
+              ...prev,
+              spotify: {
+                top_artists: !prev.spotify.top_artists,
+                top_genres: !prev.spotify.top_genres,
+                selected_playlist: !prev.spotify.selected_playlist,
+              },
+            }
+          : {
+              ...prev,
+              [section]: !prev[section],
+            };
 
       // Update profile state with new visibility settings
-      setProfile((prevProfile) => 
-        prevProfile ? {
-          ...prevProfile,
-          visibility_settings: newSettings
-        } : null
+      setProfile((prevProfile) =>
+        prevProfile
+          ? {
+              ...prevProfile,
+              visibility_settings: newSettings,
+            }
+          : null
       );
 
       return newSettings;
@@ -215,23 +239,28 @@ const EditProfileScreen = () => {
   const handleSelectPlaylist = async () => {
     try {
       setLoadingPlaylists(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase.functions.invoke('spotify-playlists', {
-        body: {
-          action: 'get_playlists',
-          userId: user.id,
+      const { data, error } = await supabase.functions.invoke(
+        "spotify-playlists",
+        {
+          body: {
+            action: "get_playlists",
+            userId: user.id,
+          },
         }
-      });
+      );
 
       if (error) throw error;
-      if (!data?.playlists) throw new Error('No playlists returned');
+      if (!data?.playlists) throw new Error("No playlists returned");
 
       setAvailablePlaylists(data.playlists);
       setShowPlaylistModal(true);
     } catch (error) {
-      console.error('Error fetching playlists:', error);
+      console.error("Error fetching playlists:", error);
     } finally {
       setLoadingPlaylists(false);
     }
@@ -240,23 +269,27 @@ const EditProfileScreen = () => {
   const handlePlaylistSelect = async (playlist: SpotifyPlaylist) => {
     try {
       setLoadingPlaylists(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.functions.invoke('spotify-playlists', {
+      const { error } = await supabase.functions.invoke("spotify-playlists", {
         body: {
-          action: 'select_playlist',
+          action: "select_playlist",
           userId: user.id,
           playlistId: playlist.id,
-        }
+        },
       });
 
       if (error) throw error;
 
-      setProfile(prev => prev ? { ...prev, spotify_selected_playlist: playlist } : null);
+      setProfile((prev) =>
+        prev ? { ...prev, spotify_selected_playlist: playlist } : null
+      );
       setShowPlaylistModal(false);
     } catch (error) {
-      console.error('Error selecting playlist:', error);
+      console.error("Error selecting playlist:", error);
     } finally {
       setLoadingPlaylists(false);
     }
@@ -266,9 +299,9 @@ const EditProfileScreen = () => {
     if (newInterest.trim() && profile) {
       setProfile({
         ...profile,
-        interests: [...(profile.interests || []), newInterest.trim()]
+        interests: [...(profile.interests || []), newInterest.trim()],
       });
-      setNewInterest('');
+      setNewInterest("");
     }
   };
 
@@ -278,7 +311,7 @@ const EditProfileScreen = () => {
       newInterests.splice(index, 1);
       setProfile({
         ...profile,
-        interests: newInterests
+        interests: newInterests,
       });
     }
   };
@@ -286,13 +319,15 @@ const EditProfileScreen = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        throw new Error('No user found');
+        throw new Error("No user found");
       }
 
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
           first_name: profile?.first_name,
           last_name: profile?.last_name,
@@ -302,7 +337,7 @@ const EditProfileScreen = () => {
           visibility_settings: visibilitySettings,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (error) throw error;
       navigation.goBack();
@@ -344,6 +379,11 @@ const EditProfileScreen = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // Optionally, navigate to the login screen or reset navigation here
+  };
+
   if (loading) {
     return (
       <View style={commonStyles.centeredContainer}>
@@ -356,46 +396,47 @@ const EditProfileScreen = () => {
     <ScrollView style={commonStyles.container}>
       <View style={styles.editHeader}>
         <Text style={commonStyles.title}>Edit Profile</Text>
-        <TouchableOpacity
-          style={[commonStyles.button, { backgroundColor: colors.border }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={[commonStyles.buttonText, { color: colors.text.primary }]}>
-            Cancel
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
         style={[
           commonStyles.button,
-          { backgroundColor: colors.primary, marginHorizontal: spacing.md, marginBottom: spacing.lg }
+          {
+            backgroundColor: colors.primary,
+            marginHorizontal: spacing.md,
+            marginBottom: spacing.lg,
+          },
         ]}
         onPress={() =>
-          profile?.id && navigation.navigate("PublicProfile", { userId: profile.id })
+          profile?.id &&
+          navigation.navigate("PublicProfile", { userId: profile.id })
         }
       >
         <Text style={commonStyles.buttonText}>View Public Profile</Text>
       </TouchableOpacity>
 
-      {profile?.word_patterns && profile.word_patterns.topWords && profile.word_patterns.topWords.length > 0 && (
-        <View style={styles.section}>
-          <SectionHeader
-            title={`${profile.first_name}'s Signature Words`}
-            isVisible={visibilitySettings.ai_analysis}
-            onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
-          />
-          <View style={styles.wordPatternsContainer}>
-            <Text style={styles.signatureWords}>
-              {profile.word_patterns.topWords.slice(0, 3).map((word, index) => {
-                if (index === 0) return word.word;
-                if (index === 2) return ` and ${word.word}`;
-                return `, ${word.word}`;
-              })}
-            </Text>
+      {profile?.word_patterns &&
+        profile.word_patterns.topWords &&
+        profile.word_patterns.topWords.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader
+              title={`${profile.first_name}'s Signature Words`}
+              isVisible={visibilitySettings.ai_analysis}
+              onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
+            />
+            <View style={styles.wordPatternsContainer}>
+              <Text style={styles.signatureWords}>
+                {profile.word_patterns.topWords
+                  .slice(0, 3)
+                  .map((word, index) => {
+                    if (index === 0) return word.word;
+                    if (index === 2) return ` and ${word.word}`;
+                    return `, ${word.word}`;
+                  })}
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
       <View style={styles.section}>
         <SectionHeader
@@ -406,7 +447,9 @@ const EditProfileScreen = () => {
         <TextInput
           style={[styles.input, styles.bioInput]}
           value={profile?.bio}
-          onChangeText={(text) => setProfile(prev => prev ? { ...prev, bio: text } : null)}
+          onChangeText={(text) =>
+            setProfile((prev) => (prev ? { ...prev, bio: text } : null))
+          }
           placeholder="Tell us about yourself..."
           multiline
           numberOfLines={4}
@@ -509,9 +552,11 @@ const EditProfileScreen = () => {
                 <View style={styles.spotifySubsection}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Top Genres</Text>
-                    <VisibilityToggle 
+                    <VisibilityToggle
                       isVisible={visibilitySettings.spotify.top_genres}
-                      onToggle={() => handleVisibilityChange("spotify", "top_genres")}
+                      onToggle={() =>
+                        handleVisibilityChange("spotify", "top_genres")
+                      }
                       label="Genres"
                     />
                   </View>
@@ -533,9 +578,11 @@ const EditProfileScreen = () => {
                 <View style={styles.spotifySubsection}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Top Artists</Text>
-                    <VisibilityToggle 
+                    <VisibilityToggle
                       isVisible={visibilitySettings.spotify.top_artists}
-                      onToggle={() => handleVisibilityChange("spotify", "top_artists")}
+                      onToggle={() =>
+                        handleVisibilityChange("spotify", "top_artists")
+                      }
                       label="Artists"
                     />
                   </View>
@@ -566,9 +613,11 @@ const EditProfileScreen = () => {
               <View style={styles.spotifySubsection}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Featured Playlist</Text>
-                  <VisibilityToggle 
+                  <VisibilityToggle
                     isVisible={visibilitySettings.spotify.selected_playlist}
-                    onToggle={() => handleVisibilityChange("spotify", "selected_playlist")}
+                    onToggle={() =>
+                      handleVisibilityChange("spotify", "selected_playlist")
+                    }
                     label="Playlist"
                   />
                 </View>
@@ -579,8 +628,14 @@ const EditProfileScreen = () => {
                 />
               </View>
 
-              <Text style={[typography.caption, { color: colors.text.secondary, marginTop: spacing.sm }]}>
-                Toggle visibility to control what others see in your public profile
+              <Text
+                style={[
+                  typography.caption,
+                  { color: colors.text.secondary, marginTop: spacing.sm },
+                ]}
+              >
+                Toggle visibility to control what others see in your public
+                profile
               </Text>
             </>
           )}
@@ -673,6 +728,23 @@ const EditProfileScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <TouchableOpacity
+        onPress={handleLogout}
+        style={{
+          marginTop: 20,
+          marginBottom: 60,
+          backgroundColor: "red",
+          padding: 12,
+          borderRadius: 8,
+        }}
+      >
+        <Text
+          style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+        >
+          Log Out
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -781,10 +853,10 @@ const styles = StyleSheet.create({
   },
   bioInput: {
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   interestsInputContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: spacing.sm,
   },
   interestsInput: {
@@ -794,8 +866,8 @@ const styles = StyleSheet.create({
   addInterestButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderRadius: borderRadius.sm,
   },
   addInterestButtonText: {
@@ -803,8 +875,8 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   interestTag: {
@@ -812,8 +884,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   interestText: {
     ...typography.body,
@@ -835,15 +907,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   spotifySection: {
-    width: '100%',
+    width: "100%",
     marginBottom: spacing.xl,
   },
   headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   playlistSelector: {
-    width: '100%',
+    width: "100%",
   },
   spotifySubsection: {
     marginBottom: spacing.lg,
@@ -891,25 +963,25 @@ const styles = StyleSheet.create({
   artistName: {
     ...typography.caption,
     color: colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    width: '90%',
-    maxHeight: '80%',
+    width: "90%",
+    maxHeight: "80%",
     padding: spacing.lg,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.lg,
   },
   modalTitle: {
@@ -924,10 +996,10 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   playlistList: {
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   playlistItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -940,7 +1012,7 @@ const styles = StyleSheet.create({
   playlistItemInfo: {
     flex: 1,
     marginLeft: spacing.sm,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   playlistItemName: {
     ...typography.title,
@@ -952,8 +1024,8 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   visibilityToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: spacing.xs,
     borderRadius: borderRadius.sm,
   },
@@ -963,8 +1035,8 @@ const styles = StyleSheet.create({
   signatureWords: {
     ...typography.body,
     color: colors.text.primary,
-    fontStyle: 'italic',
-    textAlign: 'center',
+    fontStyle: "italic",
+    textAlign: "center",
     marginTop: spacing.sm,
   },
 });

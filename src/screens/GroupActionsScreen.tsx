@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from "../contexts/AuthContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "../supabase";
@@ -55,6 +54,9 @@ const GroupActionsScreen = () => {
     date: new Date(),
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
   const handleSuggestActivity = async () => {
     if (!newSuggestion.title.trim()) {
@@ -62,13 +64,26 @@ const GroupActionsScreen = () => {
       return;
     }
 
+    console.log("Current user:", user);
+    console.log("User ID:", user?.id);
+    console.log("User email:", user?.email);
+
     if (!user) {
       Alert.alert("Error", "You must be logged in to suggest an activity");
       return;
     }
 
     try {
-      const { error } = await supabase
+      console.log("Attempting to insert activity suggestion with data:", {
+        group_id: groupId,
+        suggestion: newSuggestion.title.trim(),
+        suggested_date: newSuggestion.date.toISOString(),
+        description: newSuggestion.description.trim(),
+        created_by: user.id,
+        status: "pending",
+      });
+
+      const { data, error } = await supabase
         .from("group_activity_suggestions")
         .insert({
           group_id: groupId,
@@ -77,26 +92,52 @@ const GroupActionsScreen = () => {
           description: newSuggestion.description.trim(),
           created_by: user.id,
           status: "pending",
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      console.log("Supabase response - data:", data);
+      console.log("Supabase response - error:", error);
+
+      if (error) {
+        console.error("Supabase error details:", error);
+        throw error;
+      }
+
+      console.log("Activity suggestion inserted successfully:", data);
 
       // Notify group members about the new suggestion
-      const { data: members } = await supabase
+      const { data: members, error: membersError } = await supabase
         .from("group_members")
         .select("user_id")
         .eq("group_id", groupId);
 
+      console.log("Group members query - data:", members);
+      console.log("Group members query - error:", membersError);
+
+      if (membersError) {
+        console.error("Error fetching group members:", membersError);
+      }
+
       if (members) {
         for (const member of members) {
           if (member.user_id !== user.id) {
-            await supabase.from("notifications").insert({
-              user_id: member.user_id,
-              type: "activity_suggestion",
-              group_id: groupId,
-              message: `New activity suggestion in ${groupName}`,
-              read: false,
-            });
+            const { error: notificationError } = await supabase
+              .from("notifications")
+              .insert({
+                user_id: member.user_id,
+                type: "activity_suggestion",
+                group_id: groupId,
+                message: `New activity suggestion in ${groupName}`,
+                read: false,
+              });
+
+            if (notificationError) {
+              console.error(
+                "Error creating notification for member:",
+                member.user_id,
+                notificationError
+              );
+            }
           }
         }
       }
@@ -110,41 +151,163 @@ const GroupActionsScreen = () => {
       });
     } catch (error: any) {
       console.error("Error suggesting activity:", error);
-      Alert.alert("Error", "Failed to submit activity suggestion");
+      console.error("Error message:", error.message);
+      console.error("Error details:", error.details);
+      console.error("Error hint:", error.hint);
+      Alert.alert(
+        "Error",
+        `Failed to submit activity suggestion: ${
+          error.message || "Unknown error"
+        }`
+      );
     }
   };
 
-  const handleDateSelect = (daysToAdd: number) => {
-    const newDate = new Date();
-    newDate.setDate(newDate.getDate() + daysToAdd);
+  const handleDateConfirm = () => {
+    const newDate = new Date(selectedYear, selectedMonth, selectedDay);
     setNewSuggestion((prev) => ({ ...prev, date: newDate }));
     setShowDatePicker(false);
   };
 
-  const renderDateOptions = () => {
-    const options = [
-      { label: "Today", days: 0 },
-      { label: "Tomorrow", days: 1 },
-      { label: "In 2 days", days: 2 },
-      { label: "In 3 days", days: 3 },
-      { label: "In 4 days", days: 4 },
-      { label: "In 5 days", days: 5 },
-      { label: "In 6 days", days: 6 },
-      { label: "Next week", days: 7 },
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const renderDatePicker = () => {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
+    const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
     return (
-      <View style={styles.dateOptionsContainer}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option.label}
-            style={styles.dateOption}
-            onPress={() => handleDateSelect(option.days)}
-          >
-            <Text style={styles.dateOptionText}>{option.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Modal visible={showDatePicker} animationType="slide" transparent={true}>
+        <View style={styles.datePickerModalContainer}>
+          <View style={styles.datePickerModalContent}>
+            <Text style={styles.datePickerTitle}>Select Date</Text>
+
+            <View style={styles.datePickerRow}>
+              <Text style={styles.datePickerLabel}>Year:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.pickerContainer}
+                contentContainerStyle={styles.pickerContentContainer}
+              >
+                {years.map((year) => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.pickerOption,
+                      selectedYear === year && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setSelectedYear(year)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        selectedYear === year &&
+                          styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {year}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.datePickerRow}>
+              <Text style={styles.datePickerLabel}>Month:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.pickerContainer}
+                contentContainerStyle={styles.pickerContentContainer}
+              >
+                {months.map((month, index) => (
+                  <TouchableOpacity
+                    key={month}
+                    style={[
+                      styles.pickerOption,
+                      selectedMonth === index && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setSelectedMonth(index)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        selectedMonth === index &&
+                          styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {month}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.datePickerRow}>
+              <Text style={styles.datePickerLabel}>Day:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.pickerContainer}
+                contentContainerStyle={styles.pickerContentContainer}
+              >
+                {days.map((day) => (
+                  <TouchableOpacity
+                    key={day}
+                    style={[
+                      styles.pickerOption,
+                      selectedDay === day && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setSelectedDay(day)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        selectedDay === day && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.datePickerButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton]}
+                onPress={handleDateConfirm}
+              >
+                <Text style={styles.modalButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     );
   };
 
@@ -198,20 +361,6 @@ const GroupActionsScreen = () => {
               </Text>
             </TouchableOpacity>
 
-            {/* {showDatePicker && (
-              <DateTimePicker
-                value={newSuggestion.date}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
-                    setNewSuggestion((prev) => ({ ...prev, date: selectedDate }));
-                  }
-                }}
-              />
-            )} */}
-
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -230,6 +379,8 @@ const GroupActionsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {renderDatePicker()}
     </View>
   );
 };
@@ -322,18 +473,6 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
   },
-  dateOptionsContainer: {
-    padding: spacing.md,
-  },
-  dateOption: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  dateOptionText: {
-    ...typography.body,
-    color: colors.text.primary,
-  },
   datePickerModalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -345,12 +484,50 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: spacing.lg,
     width: "90%",
-    maxHeight: "80%",
+    maxWidth: 500,
   },
   datePickerTitle: {
     ...typography.title,
     marginBottom: spacing.lg,
     textAlign: "center",
+  },
+  datePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.md,
+  },
+  datePickerLabel: {
+    ...typography.body,
+    color: colors.text.primary,
+    marginRight: spacing.md,
+  },
+  pickerContainer: {
+    flexDirection: "row",
+  },
+  pickerOption: {
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+  },
+  pickerOptionSelected: {
+    backgroundColor: colors.primary,
+  },
+  pickerOptionText: {
+    ...typography.body,
+    color: colors.text.primary,
+  },
+  pickerOptionTextSelected: {
+    ...typography.body,
+    color: colors.white,
+  },
+  datePickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: spacing.md,
+  },
+  pickerContentContainer: {
+    alignItems: "center",
   },
 });
 

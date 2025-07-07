@@ -2,12 +2,12 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
 import React, { useCallback, useEffect, useState } from "react";
-import * as Share from "react-native";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -69,6 +69,11 @@ const GroupDetailsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [selectedImageData, setSelectedImageData] = useState<{
+    uri: string;
+    asset: any;
+  } | null>(null);
 
   // State for bio editing
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -83,15 +88,24 @@ const GroupDetailsScreen = () => {
     });
   }, [navigation, initialGroupName, groupDetails?.name]);
 
+  useEffect(() => {
+    console.log(
+      "[Modal State] showImagePreview:",
+      showImagePreview,
+      "selectedImageData:",
+      !!selectedImageData
+    );
+  }, [showImagePreview, selectedImageData]);
+
   const handleShareInvite = async () => {
     const nameForShare = groupDetails?.name || initialGroupName;
     const inviteLink = `groupmatchmakerapp://group/invite/${groupId}`;
     try {
-      await Share.share({
-        message: `Join my group "${nameForShare}" on GroupMatchmaker App! Link: ${inviteLink}`,
-        url: inviteLink,
-        title: `Invite to ${nameForShare}`,
-      });
+      // For now, just show an alert with the invite link
+      Alert.alert(
+        "Share Invite",
+        `Share this link to invite others to "${nameForShare}": ${inviteLink}`
+      );
     } catch (error: any) {
       Alert.alert("Error", "Could not share invite link.");
     }
@@ -180,7 +194,6 @@ const GroupDetailsScreen = () => {
 
   const handleChoosePrimaryPicture = async () => {
     console.log("[handleChoosePrimaryPicture] Initiated.");
-    setIsUploadingPicture(true);
     try {
       const permissionResult =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -189,13 +202,11 @@ const GroupDetailsScreen = () => {
           "Permission required",
           "Please grant permission to access the photo library."
         );
-        setIsUploadingPicture(false);
         return;
       }
       console.log("[handleChoosePrimaryPicture] Permissions granted.");
 
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.6,
@@ -209,7 +220,6 @@ const GroupDetailsScreen = () => {
         console.log(
           "[handleChoosePrimaryPicture] Image picker cancelled or no assets."
         );
-        setIsUploadingPicture(false);
         return;
       }
 
@@ -220,181 +230,16 @@ const GroupDetailsScreen = () => {
         JSON.stringify(asset)
       );
 
-      const fileName = `${groupId}_primary_${Date.now()}.${imageUri
-        .split(".")
-        .pop()}`;
-      const filePath = `${fileName}`;
-
-      // Convert URI to Blob using XMLHttpRequest
+      // Store the selected image data and show preview
+      setSelectedImageData({ uri: imageUri, asset });
+      setShowImagePreview(true);
       console.log(
-        "[handleChoosePrimaryPicture] Attempting Blob conversion via XHR..."
-      );
-      const blob: Blob = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = function () {
-          console.log(
-            `[handleChoosePrimaryPicture] XHR onload success. Status: ${xhr.status}, Response size: ${xhr.response?.size}`
-          );
-          resolve(xhr.response);
-        };
-        xhr.onerror = function (e) {
-          console.error("[handleChoosePrimaryPicture] XHR onerror: ", e);
-          reject(new TypeError("XHR request failed during blob conversion."));
-        };
-        xhr.responseType = "blob";
-        xhr.open("GET", imageUri, true);
-        xhr.send(null);
-      });
-      console.log(
-        `[handleChoosePrimaryPicture] Blob conversion successful. Size: ${blob.size}, Type: ${blob.type}`
-      );
-
-      // If there was an old primary image, delete it from storage first
-      if (primaryImage && primaryImage.image_storage_path) {
-        console.log(
-          `[handleChoosePrimaryPicture] Attempting to delete old image: ${primaryImage.image_storage_path}`
-        );
-        const { error: deleteError } = await supabase.storage
-          .from("group-images") // Use hyphen for bucket name
-          .remove([primaryImage.image_storage_path]);
-        if (deleteError) {
-          console.warn(
-            "[handleChoosePrimaryPicture] Failed to delete old image from storage:",
-            deleteError
-          );
-        } else {
-          console.log(
-            "[handleChoosePrimaryPicture] Old image deleted successfully from storage."
-          );
-        }
-      }
-
-      // Upload new image to Supabase Storage
-      console.log(
-        `[handleChoosePrimaryPicture] Attempting to upload to Supabase Storage. Bucket: group-images, Path: ${filePath}, ContentType: ${
-          asset.mimeType || blob.type || "image/jpeg"
-        }`
-      );
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("group-images") // Use hyphen for bucket name
-        .upload(filePath, blob, {
-          cacheControl: "3600",
-          upsert: true,
-          contentType: asset.mimeType || blob.type || "image/jpeg",
-        });
-
-      if (uploadError) {
-        console.error(
-          "[handleChoosePrimaryPicture] Supabase upload error:",
-          uploadError
-        );
-        throw uploadError; // Re-throw Supabase specific error
-      }
-      if (!uploadData)
-        throw new Error("Supabase upload failed, no data returned.");
-      console.log(
-        "[handleChoosePrimaryPicture] Supabase upload successful:",
-        uploadData
-      );
-
-      // Get public URL
-      console.log("[handleChoosePrimaryPicture] Getting public URL...");
-      const { data: urlData } = supabase.storage
-        .from("group-images") // Use hyphen for bucket name
-        .getPublicUrl(filePath);
-
-      if (!urlData.publicUrl) throw new Error("Failed to get public URL.");
-      const newImageUrl = urlData.publicUrl;
-      console.log(
-        `[handleChoosePrimaryPicture] Public URL obtained: ${newImageUrl}`
-      );
-
-      // Update database (group_images table)
-      console.log("[handleChoosePrimaryPicture] Updating database records...");
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser();
-      const uploaderUserId = currentUser?.id;
-
-      const { error: demoteError } = await supabase
-        .from("group_images") // Underscore for table
-        .update({ is_primary: false })
-        .eq("group_id", groupId)
-        .eq("is_primary", true);
-
-      if (demoteError) {
-        console.error(
-          "[handleChoosePrimaryPicture] Error demoting old primary image in DB:",
-          demoteError
-        );
-      }
-
-      let newPrimaryImageRecord: GroupImageRecord | null = null;
-      if (primaryImage) {
-        console.log(
-          `[handleChoosePrimaryPicture] Updating existing DB record ID: ${primaryImage.id}`
-        );
-        const { data: updatedRecord, error: updateDbError } = await supabase
-          .from("group_images") // Underscore for table
-          .update({
-            image_url: newImageUrl,
-            image_storage_path: filePath,
-            is_primary: true,
-            uploaded_at: new Date().toISOString(),
-            uploader_user_id: uploaderUserId,
-          })
-          .eq("id", primaryImage.id)
-          .select("id, image_url, is_primary, image_storage_path")
-          .single();
-        if (updateDbError) {
-          console.error(
-            "[handleChoosePrimaryPicture] Error updating DB record:",
-            updateDbError
-          );
-          throw updateDbError;
-        }
-        newPrimaryImageRecord = updatedRecord;
-        console.log("[handleChoosePrimaryPicture] DB record updated.");
-      } else {
-        console.log("[handleChoosePrimaryPicture] Inserting new DB record...");
-        const { data: insertedRecord, error: insertDbError } = await supabase
-          .from("group_images") // Underscore for table
-          .insert({
-            group_id: groupId,
-            image_url: newImageUrl,
-            image_storage_path: filePath,
-            is_primary: true,
-            uploader_user_id: uploaderUserId,
-          })
-          .select("id, image_url, is_primary, image_storage_path")
-          .single();
-        if (insertDbError) {
-          console.error(
-            "[handleChoosePrimaryPicture] Error inserting DB record:",
-            insertDbError
-          );
-          throw insertDbError;
-        }
-        newPrimaryImageRecord = insertedRecord;
-        console.log("[handleChoosePrimaryPicture] New DB record inserted.");
-      }
-
-      setPrimaryImage(newPrimaryImageRecord);
-      Alert.alert("Success", "Group picture updated!");
-      console.log(
-        "[handleChoosePrimaryPicture] Process completed successfully."
+        "[handleChoosePrimaryPicture] Image data set, modal should be visible:",
+        { uri: imageUri, showModal: true }
       );
     } catch (err: any) {
-      console.error("[handleChoosePrimaryPicture] Caught Error:", err);
-      // Distinguish between XHR error and other errors
-      const errorMessage =
-        err.message === "XHR request failed during blob conversion."
-          ? "Could not read selected image file."
-          : err.message || "Could not change group picture.";
-      Alert.alert("Error", errorMessage);
-    } finally {
-      console.log("[handleChoosePrimaryPicture] Finished.");
-      setIsUploadingPicture(false);
+      console.error("[handleChoosePrimaryPicture] Error selecting image:", err);
+      Alert.alert("Error", "Could not select image. Please try again.");
     }
   };
 
@@ -438,6 +283,209 @@ const GroupDetailsScreen = () => {
     } finally {
       setIsSavingBio(false);
     }
+  };
+
+  const handleConfirmImageUpload = async () => {
+    if (!selectedImageData) return;
+
+    console.log("[handleConfirmImageUpload] Starting upload process.");
+    setIsUploadingPicture(true);
+    setShowImagePreview(false);
+
+    try {
+      const { uri: imageUri, asset } = selectedImageData;
+
+      const fileName = `${groupId}_primary_${Date.now()}.${imageUri
+        .split(".")
+        .pop()}`;
+      const filePath = `${fileName}`;
+
+      // Convert URI to Blob using fetch instead of XMLHttpRequest
+      console.log(
+        "[handleConfirmImageUpload] Attempting Blob conversion via fetch..."
+      );
+
+      let blob: Blob;
+      try {
+        const response = await fetch(imageUri);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        blob = await response.blob();
+        console.log(
+          `[handleConfirmImageUpload] Blob conversion successful. Size: ${blob.size}, Type: ${blob.type}`
+        );
+      } catch (fetchError) {
+        console.error("[handleConfirmImageUpload] Fetch error:", fetchError);
+        const errorMessage =
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Unknown fetch error";
+        throw new Error(`Failed to read image file: ${errorMessage}`);
+      }
+
+      // If there was an old primary image, delete it from storage first
+      if (primaryImage && primaryImage.image_storage_path) {
+        console.log(
+          `[handleConfirmImageUpload] Attempting to delete old image: ${primaryImage.image_storage_path}`
+        );
+        const { error: deleteError } = await supabase.storage
+          .from("group-images") // Use hyphen for bucket name
+          .remove([primaryImage.image_storage_path]);
+        if (deleteError) {
+          console.warn(
+            "[handleConfirmImageUpload] Failed to delete old image from storage:",
+            deleteError
+          );
+        } else {
+          console.log(
+            "[handleConfirmImageUpload] Old image deleted successfully from storage."
+          );
+        }
+      }
+
+      // Upload new image to Supabase Storage
+      console.log(
+        `[handleConfirmImageUpload] Attempting to upload to Supabase Storage. Bucket: group-images, Path: ${filePath}, ContentType: ${
+          asset.mimeType || blob.type || "image/jpeg"
+        }`
+      );
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("group-images") // Use hyphen for bucket name
+        .upload(filePath, blob, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: asset.mimeType || blob.type || "image/jpeg",
+        });
+
+      if (uploadError) {
+        console.error(
+          "[handleConfirmImageUpload] Supabase upload error:",
+          uploadError
+        );
+        throw uploadError; // Re-throw Supabase specific error
+      }
+      if (!uploadData)
+        throw new Error("Supabase upload failed, no data returned.");
+      console.log(
+        "[handleConfirmImageUpload] Supabase upload successful:",
+        uploadData
+      );
+
+      // Get public URL
+      console.log("[handleConfirmImageUpload] Getting public URL...");
+      const { data: urlData } = supabase.storage
+        .from("group-images") // Use hyphen for bucket name
+        .getPublicUrl(filePath);
+
+      if (!urlData.publicUrl) throw new Error("Failed to get public URL.");
+      const newImageUrl = urlData.publicUrl;
+      console.log(
+        `[handleConfirmImageUpload] Public URL obtained: ${newImageUrl}`
+      );
+
+      // Update database (group_images table)
+      console.log("[handleConfirmImageUpload] Updating database records...");
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+      const uploaderUserId = currentUser?.id;
+
+      const { error: demoteError } = await supabase
+        .from("group_images") // Underscore for table
+        .update({ is_primary: false })
+        .eq("group_id", groupId)
+        .eq("is_primary", true);
+
+      if (demoteError) {
+        console.error(
+          "[handleConfirmImageUpload] Error demoting old primary image in DB:",
+          demoteError
+        );
+      }
+
+      let newPrimaryImageRecord: GroupImageRecord | null = null;
+      if (primaryImage) {
+        console.log(
+          `[handleConfirmImageUpload] Updating existing DB record ID: ${primaryImage.id}`
+        );
+        const { data: updatedRecord, error: updateDbError } = await supabase
+          .from("group_images") // Underscore for table
+          .update({
+            image_url: newImageUrl,
+            image_storage_path: filePath,
+            is_primary: true,
+            uploaded_at: new Date().toISOString(),
+            uploader_user_id: uploaderUserId,
+          })
+          .eq("id", primaryImage.id)
+          .select("id, image_url, is_primary, image_storage_path")
+          .single();
+        if (updateDbError) {
+          console.error(
+            "[handleConfirmImageUpload] Error updating DB record:",
+            updateDbError
+          );
+          throw updateDbError;
+        }
+        newPrimaryImageRecord = updatedRecord;
+        console.log("[handleConfirmImageUpload] DB record updated.");
+      } else {
+        console.log("[handleConfirmImageUpload] Inserting new DB record...");
+        const { data: insertedRecord, error: insertDbError } = await supabase
+          .from("group_images") // Underscore for table
+          .insert({
+            group_id: groupId,
+            image_url: newImageUrl,
+            image_storage_path: filePath,
+            is_primary: true,
+            uploader_user_id: uploaderUserId,
+          })
+          .select("id, image_url, is_primary, image_storage_path")
+          .single();
+        if (insertDbError) {
+          console.error(
+            "[handleConfirmImageUpload] Error inserting DB record:",
+            insertDbError
+          );
+          throw insertDbError;
+        }
+        newPrimaryImageRecord = insertedRecord;
+        console.log("[handleConfirmImageUpload] New DB record inserted.");
+      }
+
+      setPrimaryImage(newPrimaryImageRecord);
+      setSelectedImageData(null);
+      Alert.alert("Success", "Group picture updated!");
+      console.log("[handleConfirmImageUpload] Process completed successfully.");
+    } catch (err: any) {
+      console.error("[handleConfirmImageUpload] Caught Error:", err);
+
+      // Provide more specific error messages
+      let errorMessage = "Could not change group picture.";
+
+      if (err.message.includes("Failed to read image file")) {
+        errorMessage =
+          "Could not read the selected image. Please try selecting a different image.";
+      } else if (err.message.includes("HTTP error")) {
+        errorMessage =
+          "Network error while processing image. Please check your connection and try again.";
+      } else if (err.message.includes("storage")) {
+        errorMessage = "Failed to upload image to storage. Please try again.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      Alert.alert("Error", errorMessage);
+    } finally {
+      console.log("[handleConfirmImageUpload] Finished.");
+      setIsUploadingPicture(false);
+    }
+  };
+
+  const handleCancelImageUpload = () => {
+    setShowImagePreview(false);
+    setSelectedImageData(null);
   };
 
   if (isLoading) {
@@ -599,6 +647,52 @@ const GroupDetailsScreen = () => {
           preferences of group members.
         </Text>
       </View>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={showImagePreview}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelImageUpload}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Preview Group Picture</Text>
+
+            {selectedImageData && (
+              <Image
+                source={{ uri: selectedImageData.uri }}
+                style={styles.previewImage}
+                resizeMode="cover"
+              />
+            )}
+
+            <Text style={styles.modalDescription}>
+              This will be your group's profile picture. Do you want to upload
+              it?
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelModalButton]}
+                onPress={handleCancelImageUpload}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmModalButton]}
+                onPress={handleConfirmImageUpload}
+                disabled={isUploadingPicture}
+              >
+                <Text style={styles.modalButtonText}>
+                  {isUploadingPicture ? "Uploading..." : "Upload"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -763,6 +857,64 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   shareButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 20,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  previewImage: {
+    width: "100%",
+    height: "50%",
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: "#555",
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginTop: 20,
+  },
+  cancelModalButton: {
+    backgroundColor: "#ccc",
+    flex: 1,
+    marginRight: 10,
+  },
+  confirmModalButton: {
+    backgroundColor: "#007AFF",
+    flex: 1,
+    marginLeft: 10,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalButtonText: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,

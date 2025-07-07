@@ -354,6 +354,7 @@ PODS:
     - React-RCTText (= 0.79.4)
     - React-RCTVibration (= 0.79.4)
   - React-callinvoker (0.79.4)
+  - React-Codegen (0.1.0)
   - React-Core (0.79.4):
     - glog
     - hermes-engine
@@ -2109,30 +2110,14 @@ PODS:
     - React-logger (= 0.79.4)
     - React-perflogger (= 0.79.4)
     - React-utils (= 0.79.4)
-  - RNDateTimePicker (8.4.1):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.11.18.00)
+  - RNDateTimePicker (6.7.3):
+    - RCT-Folly
     - RCTRequired
     - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-hermes
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
+    - React
+    - React-Codegen
     - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - Yoga
   - RNGestureHandler (2.25.0):
     - DoubleConversion
     - glog
@@ -2359,6 +2344,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - React-Codegen
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -2582,6 +2568,7 @@ SPEC CHECKSUMS:
   RCTTypeSafety: 397515ea9a8122b62a7a310adf30205f0a5e3bfc
   React: 2c0acddaddd2b9c9ccaa52f357625c283a19187a
   React-callinvoker: edb3b90ce47dd7ffec9caf7024dc3b9d6c52c52d
+  React-Codegen: 4b8b4817cea7a54b83851d4c1f91f79aa73de30a
   React-Core: 6f7a30432fbbcf9bdd703e4f94c479c9fe66e1ad
   React-CoreModules: cdf0deab038609673be7e8705d27cdafaf34bc12
   React-cxxreact: 4ef4ae6b97456b423da5e4de1d67054c13c4f177
@@ -2641,7 +2628,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: bf62814e0fde923f73fc64b7e82d76c63c284da9
   ReactCodegen: f891084749d03b8af8a244cefaa492e491b763fd
   ReactCommon: c7d636ec1b9801ff4ee83cce8e0bf74a1610fc3f
-  RNDateTimePicker: a4ad049fdd568755003c479beac3bdea742ac4d0
+  RNDateTimePicker: 8f2a49684f7ea61f2dacdd23691a6c69b3c8cbb0
   RNGestureHandler: ebef699ea17e7c0006c1074e1e423ead60ce0121
   RNReanimated: b7927c4dcb1d1b9b45651e2536b2e93e8c53190f
   RNScreens: 482e9707f9826230810c92e765751af53826d509
