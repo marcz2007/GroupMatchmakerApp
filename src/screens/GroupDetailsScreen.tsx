@@ -148,29 +148,35 @@ const GroupDetailsScreen = () => {
       // Fetch group members
       const { data: memberData, error: memberError } = await supabase
         .from("group_members")
-        .select(`user_id, profiles ( id, username, avatar_url )`)
+        .select("user_id")
         .eq("group_id", groupId);
 
       if (memberError) throw memberError;
-      const mappedMembers =
-        memberData
-          ?.map((m) => {
-            const profileData = m.profiles as any;
-            if (
-              profileData &&
-              typeof profileData === "object" &&
-              profileData.id
-            ) {
-              return {
-                id: profileData.id,
-                username: profileData.username,
-                avatar_url: profileData.avatar_url,
-              } as GroupMember;
-            }
-            return null;
-          })
-          .filter((profile): profile is GroupMember => profile !== null) || [];
-      setMembers(mappedMembers);
+
+      // Fetch profiles for the member user IDs
+      if (memberData && memberData.length > 0) {
+        const userIds = memberData.map((m) => m.user_id);
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .in("id", userIds);
+
+        if (profileError) throw profileError;
+
+        const mappedMembers =
+          profileData?.map(
+            (profile) =>
+              ({
+                id: profile.id,
+                username: profile.username,
+                avatar_url: profile.avatar_url,
+              } as GroupMember)
+          ) || [];
+
+        setMembers(mappedMembers);
+      } else {
+        setMembers([]);
+      }
 
       // Add this after fetching group details
       const { data: groupSettings } = await supabase
