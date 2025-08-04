@@ -76,7 +76,7 @@ const ChatScreen = () => {
                     content,
                     created_at,
                     user_id,
-                    profiles ( username )
+                    profiles!user_id(username)
                 `
           )
           .eq("group_id", groupId)
