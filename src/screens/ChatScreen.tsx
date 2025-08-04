@@ -68,20 +68,13 @@ const ChatScreen = () => {
       if (!userId || !isGroupMember || processingJoin) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("messages")
-          .select(
-            `
-                    id,
-                    content,
-                    created_at,
-                    user_id,
-                    profiles!user_id(username)
-                `
-          )
-          .eq("group_id", groupId)
-          .order("created_at", { ascending: false })
-          .limit(50);
+        const { data, error } = await supabase.rpc(
+          "get_messages_with_usernames",
+          {
+            p_group_id: groupId,
+            p_limit: 50,
+          }
+        );
 
         if (error) throw error;
 
@@ -93,9 +86,7 @@ const ChatScreen = () => {
               createdAt: new Date(msg.created_at),
               user: {
                 _id: msg.user_id,
-                name:
-                  msg.profiles?.username ||
-                  `User ${msg.user_id.substring(0, 4)}`,
+                name: msg.username || `User ${msg.user_id.substring(0, 4)}`,
               },
             })
           );
