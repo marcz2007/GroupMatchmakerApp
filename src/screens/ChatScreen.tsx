@@ -7,6 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
   Share,
   StyleSheet,
   Text,
@@ -311,8 +314,17 @@ const ChatScreen = () => {
     let channel: RealtimeChannel | null = null;
     let retryCount = 0;
     const maxRetries = 3;
+    let isSubscribing = false;
 
     const setupSubscription = () => {
+      if (isSubscribing) {
+        console.log(
+          `[Realtime] Already subscribing for group ${groupId}, skipping`
+        );
+        return;
+      }
+
+      isSubscribing = true;
       console.log(
         `[Realtime] Setting up subscription for group ${groupId}, attempt ${
           retryCount + 1
@@ -354,6 +366,7 @@ const ChatScreen = () => {
           }
         )
         .subscribe((status, err) => {
+          isSubscribing = false;
           if (status === "SUBSCRIBED") {
             console.log(
               `[Realtime] Successfully subscribed for group ${groupId}`
@@ -392,6 +405,7 @@ const ChatScreen = () => {
     setupSubscription();
 
     return () => {
+      isSubscribing = false;
       if (channel) {
         supabase.removeChannel(channel).then(() => {
           console.log(`Realtime unsubscribed for group ${groupId}`);
@@ -399,9 +413,7 @@ const ChatScreen = () => {
         channel = null;
       }
     };
-    // This effect depends on these to re-subscribe if any of them change AFTER initial setup.
-    // The conditions at the start of the effect prevent subscription during processing states.
-  }, [groupId, currentUserId, isGroupMember, processingJoin]);
+  }, [groupId, currentUserId, isGroupMember]);
 
   const onSend = useCallback(
     async (newMessages: IMessage[] = []) => {
@@ -496,20 +508,48 @@ const ChatScreen = () => {
   }
 
   return (
-    <GiftedChat
-      messages={messages}
-      onSend={(msgs) => onSend(msgs)}
-      user={{ _id: currentUserId }}
-      messagesContainerStyle={{ paddingBottom: 10 }}
-      placeholder="Type your message here..."
-      alwaysShowSend
-      renderUsernameOnMessage={true}
-    />
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 200 : 100}
+      >
+        <GiftedChat
+          messages={messages}
+          onSend={(msgs) => onSend(msgs)}
+          user={{ _id: currentUserId }}
+          messagesContainerStyle={{ paddingBottom: 10 }}
+          placeholder="Type your message here..."
+          alwaysShowSend
+          renderUsernameOnMessage={true}
+          keyboardShouldPersistTaps="handled"
+          renderAvatarOnTop={true}
+          textInputProps={{
+            multiline: true,
+            maxLength: 1000,
+            backgroundColor: "#2a2a2a",
+            style: {
+              color: "#ffffff",
+              backgroundColor: "#2a2a2a",
+              fontSize: 16,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              flex: 1,
+            },
+            placeholderTextColor: "#888888",
+          }}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 // Add centered style for loading/error states
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#1a1a1a", // Anthracite grey background
+  },
   centered: {
     flex: 1,
     justifyContent: "center",
@@ -538,6 +578,21 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 8,
+  },
+  inputToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#404040",
+  },
+  composerContainer: {
+    flex: 1,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 8,
+    marginRight: 8,
   },
 });
 
