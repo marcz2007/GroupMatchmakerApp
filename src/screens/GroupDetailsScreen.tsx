@@ -50,6 +50,7 @@ interface GroupImageRecord {
 interface GroupMember {
   id: string; // user_id from profiles
   username: string;
+  first_name?: string | null;
   avatar_url?: string | null;
 }
 
@@ -153,26 +154,47 @@ const GroupDetailsScreen = () => {
 
       if (memberError) throw memberError;
 
+      console.log("Member data from group_members:", memberData);
+
       // Fetch profiles for the member user IDs
       if (memberData && memberData.length > 0) {
         const userIds = memberData.map((m) => m.user_id);
+        console.log("User IDs to fetch profiles for:", userIds);
+
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url")
+          .select("id, username, first_name, last_name, avatar_url")
           .in("id", userIds);
+
+        console.log("Profile data fetched:", profileData);
+        console.log("Profile error:", profileError);
 
         if (profileError) throw profileError;
 
         const mappedMembers =
-          profileData?.map(
-            (profile) =>
-              ({
-                id: profile.id,
-                username: profile.username,
-                avatar_url: profile.avatar_url,
-              } as GroupMember)
-          ) || [];
+          profileData?.map((profile) => {
+            console.log("Processing profile:", profile);
+            // Create a display name using username, first_name, last_name, or fallback
+            let displayName = profile.username;
+            if (!displayName && (profile.first_name || profile.last_name)) {
+              displayName = `${profile.first_name || ""} ${
+                profile.last_name || ""
+              }`.trim();
+            }
+            if (!displayName) {
+              displayName = "Unknown User";
+            }
+            console.log("Final display name:", displayName);
 
+            return {
+              id: profile.id,
+              username: displayName,
+              first_name: profile.first_name,
+              avatar_url: profile.avatar_url,
+            } as GroupMember;
+          }) || [];
+
+        console.log("Fetched members:", mappedMembers);
         setMembers(mappedMembers);
       } else {
         setMembers([]);
@@ -886,16 +908,53 @@ const GroupDetailsScreen = () => {
     );
   }
 
-  const renderMemberItem = ({ item }: { item: GroupMember }) => (
-    <View style={styles.memberItem}>
-      {item.avatar_url ? (
-        <Image source={{ uri: item.avatar_url }} style={styles.memberAvatar} />
-      ) : (
-        <View style={styles.memberAvatarPlaceholder} />
-      )}
-      <Text style={styles.memberName}>{item.username}</Text>
-    </View>
-  );
+  const renderMemberItem = ({ item }: { item: GroupMember }) => {
+    console.log("Rendering member item:", item);
+
+    const firstName = item.first_name || "";
+    const username = item.username;
+
+    return (
+      <View style={styles.memberItem}>
+        {item.avatar_url ? (
+          <Image
+            source={{ uri: item.avatar_url }}
+            style={styles.memberAvatar}
+          />
+        ) : (
+          <View style={styles.memberAvatarPlaceholder} />
+        )}
+        <View style={styles.memberNameContainer}>
+          {firstName ? (
+            <View style={styles.memberNameRow}>
+              <Text
+                style={styles.memberFirstName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {firstName}
+              </Text>
+              <Text
+                style={styles.memberUsername}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                @{username}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={styles.memberUsername}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              @{username}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -1245,6 +1304,26 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     color: "#ffffff", // White text
+  },
+  memberNameContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  memberNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  memberFirstName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#ffffff", // White text
+    marginRight: 8,
+  },
+  memberUsername: {
+    fontSize: 14,
+    fontStyle: "italic",
+    color: "#b0b0b0", // Medium grey
   },
   actionButton: {
     backgroundColor: "#5762b7", // Primary color

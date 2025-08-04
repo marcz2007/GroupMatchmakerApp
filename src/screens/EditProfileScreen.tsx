@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Modal,
@@ -99,6 +100,13 @@ const EditProfileScreen = () => {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
   const [newInterest, setNewInterest] = useState("");
+  const [editingBasicInfo, setEditingBasicInfo] = useState(false);
+  const [basicInfoForm, setBasicInfoForm] = useState({
+    first_name: "",
+    last_name: "",
+    username: "",
+  });
+  const [savingBasicInfo, setSavingBasicInfo] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -125,6 +133,11 @@ const EditProfileScreen = () => {
 
       if (data) {
         setProfile(data);
+        setBasicInfoForm({
+          first_name: data.first_name || "",
+          last_name: data.last_name || "",
+          username: data.username || "",
+        });
         setVisibilitySettings(
           data.visibility_settings || {
             photos: true,
@@ -368,6 +381,38 @@ const EditProfileScreen = () => {
       console.error("Error picking images:", error);
     } finally {
       setUploadingPhotos(false);
+    }
+  };
+
+  const handleSaveBasicInfo = async () => {
+    try {
+      setSavingBasicInfo(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("No user found");
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: basicInfoForm.first_name,
+          last_name: basicInfoForm.last_name,
+          username: basicInfoForm.username,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      // Update local profile state
+      setProfile((prev) => (prev ? { ...prev, ...basicInfoForm } : null));
+      setEditingBasicInfo(false);
+    } catch (error) {
+      console.error("Error updating basic info:", error);
+      Alert.alert("Error", "Failed to update basic information");
+    } finally {
+      setSavingBasicInfo(false);
     }
   };
 
@@ -648,32 +693,118 @@ const EditProfileScreen = () => {
 
       <View style={[styles.section, { marginBottom: spacing.xl }]}>
         <Text style={styles.sectionTitle}>Basic Information</Text>
+
+        {/* Check if any basic info fields are empty */}
+        {(!profile?.first_name ||
+          !profile?.last_name ||
+          !profile?.username) && (
+          <Text style={styles.helpText}>
+            Complete your basic information to help others identify you
+          </Text>
+        )}
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>First Name</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.background }]}
-            value={profile?.first_name}
-            editable={false}
+            style={[
+              styles.input,
+              { backgroundColor: colors.background },
+              editingBasicInfo && styles.editableInput,
+              !editingBasicInfo && styles.readOnlyInput,
+            ]}
+            value={
+              editingBasicInfo ? basicInfoForm.first_name : profile?.first_name
+            }
+            onChangeText={(text) =>
+              setBasicInfoForm((prev) => ({ ...prev, first_name: text }))
+            }
+            editable={editingBasicInfo}
             placeholder="Enter your first name"
           />
         </View>
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Last Name</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.background }]}
-            value={profile?.last_name}
-            editable={false}
+            style={[
+              styles.input,
+              { backgroundColor: colors.background },
+              editingBasicInfo && styles.editableInput,
+              !editingBasicInfo && styles.readOnlyInput,
+            ]}
+            value={
+              editingBasicInfo ? basicInfoForm.last_name : profile?.last_name
+            }
+            onChangeText={(text) =>
+              setBasicInfoForm((prev) => ({ ...prev, last_name: text }))
+            }
+            editable={editingBasicInfo}
             placeholder="Enter your last name"
           />
         </View>
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Username</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.background }]}
-            value={profile?.username}
-            editable={false}
+            style={[
+              styles.input,
+              { backgroundColor: colors.background },
+              editingBasicInfo && styles.editableInput,
+              !editingBasicInfo && styles.readOnlyInput,
+            ]}
+            value={
+              editingBasicInfo ? basicInfoForm.username : profile?.username
+            }
+            onChangeText={(text) =>
+              setBasicInfoForm((prev) => ({ ...prev, username: text }))
+            }
+            editable={editingBasicInfo}
             placeholder="Choose a username"
           />
+        </View>
+
+        {/* Show edit button when not editing, save/cancel when editing */}
+        <View style={styles.basicInfoActions}>
+          {!editingBasicInfo ? (
+            <TouchableOpacity
+              style={[commonStyles.button, { backgroundColor: colors.primary }]}
+              onPress={() => setEditingBasicInfo(true)}
+            >
+              <Text style={commonStyles.buttonText}>Edit Basic Info</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.basicInfoActionButtons}>
+              <TouchableOpacity
+                style={[
+                  commonStyles.button,
+                  { backgroundColor: colors.secondary, marginRight: 10 },
+                ]}
+                onPress={() => {
+                  setEditingBasicInfo(false);
+                  setBasicInfoForm({
+                    first_name: profile?.first_name || "",
+                    last_name: profile?.last_name || "",
+                    username: profile?.username || "",
+                  });
+                }}
+                disabled={savingBasicInfo}
+              >
+                <Text style={commonStyles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  commonStyles.button,
+                  { backgroundColor: colors.primary },
+                ]}
+                onPress={handleSaveBasicInfo}
+                disabled={savingBasicInfo}
+              >
+                <Text style={commonStyles.buttonText}>
+                  {savingBasicInfo ? "Saving..." : "Save"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
 
@@ -1029,6 +1160,27 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginTop: spacing.sm,
+  },
+  helpText: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    fontStyle: "italic",
+  },
+  editableInput: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  readOnlyInput: {
+    backgroundColor: colors.surface,
+    opacity: 0.7,
+  },
+  basicInfoActions: {
+    marginTop: spacing.md,
+  },
+  basicInfoActionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 });
 
