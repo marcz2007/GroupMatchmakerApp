@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { GiftedChat, IMessage } from "react-native-gifted-chat";
+import { GiftedChat, IMessage, InputToolbar } from "react-native-gifted-chat";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { RootStackNavigationProp } from "../../App";
 import { RootStackParamList } from "../navigation/AppNavigator";
@@ -524,6 +524,22 @@ const ChatScreen = () => {
           renderUsernameOnMessage={true}
           keyboardShouldPersistTaps="handled"
           renderAvatarOnTop={true}
+          renderInputToolbar={(props) => (
+            <InputToolbar
+              {...props}
+              containerStyle={{
+                backgroundColor: "#2a2a2a",
+                borderTopColor: "#404040",
+                borderTopWidth: StyleSheet.hairlineWidth,
+              }}
+              primaryStyle={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+              }}
+            />
+          )}
           textInputProps={{
             multiline: true,
             maxLength: 1000,
