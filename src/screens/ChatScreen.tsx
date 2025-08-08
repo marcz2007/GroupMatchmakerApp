@@ -16,7 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { GiftedChat, IMessage, InputToolbar } from "react-native-gifted-chat";
+import {
+  Composer,
+  GiftedChat,
+  IMessage,
+  InputToolbar,
+  Send,
+} from "react-native-gifted-chat";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import { RootStackNavigationProp } from "../../App";
 import { RootStackParamList } from "../navigation/AppNavigator";
@@ -529,28 +535,52 @@ const ChatScreen = () => {
               {...props}
               containerStyle={{
                 backgroundColor: "#2a2a2a",
-                borderTopColor: "#404040",
-                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: "#2a2a2a",
+                borderTopWidth: 0,
+                paddingHorizontal: 8,
+                paddingVertical: 6,
               }}
               primaryStyle={{
                 flexDirection: "row",
                 alignItems: "center",
-                paddingVertical: 6,
-                paddingHorizontal: 8,
               }}
             />
+          )}
+          renderComposer={(composerProps) => (
+            <View style={styles.composerWrapper}>
+              <Composer
+                {...composerProps}
+                textInputStyle={styles.composerInput}
+                textInputProps={{
+                  placeholderTextColor: "#9CA3AF",
+                  ...composerProps.textInputProps,
+                }}
+              />
+            </View>
+          )}
+          renderSend={(sendProps) => (
+            <Send
+              {...sendProps}
+              containerStyle={{
+                justifyContent: "center",
+                alignItems: "center",
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+                marginHorizontal: 6,
+                marginVertical: 0,
+              }}
+            >
+              <View style={styles.sendButton}>
+                <Ionicons name="send" size={18} color="#ffffff" />
+              </View>
+            </Send>
           )}
           textInputProps={{
             multiline: true,
             maxLength: 1000,
-            backgroundColor: "#2a2a2a",
             style: {
               color: "#ffffff",
-              backgroundColor: "#2a2a2a",
               fontSize: 16,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              flex: 1,
             },
             placeholderTextColor: "#888888",
           }}
@@ -595,20 +625,33 @@ const styles = StyleSheet.create({
   actionButton: {
     padding: 8,
   },
-  inputToolbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#2a2a2a",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#404040",
-  },
-  composerContainer: {
+  composerWrapper: {
     flex: 1,
-    backgroundColor: "#2a2a2a",
-    borderRadius: 8,
-    marginRight: 8,
+    backgroundColor: "#333333",
+    borderRadius: 22,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === "ios" ? 8 : 4,
+    marginRight: 6,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  composerInput: {
+    color: "#ffffff",
+    fontSize: 16,
+    paddingTop: 0,
+    paddingBottom: 0,
+    marginLeft: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    backgroundColor: "transparent",
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#3A3A3A",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
