@@ -14,7 +14,7 @@ import { Button } from "../components/Button";
 import { supabase } from "../supabase";
 
 // Set to true to see debug alerts
-const DEBUG_AUTH = true;
+const DEBUG_AUTH = false;
 
 const SignupScreen = () => {
   const [email, setEmail] = useState("");

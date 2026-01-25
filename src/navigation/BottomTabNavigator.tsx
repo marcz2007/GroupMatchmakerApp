@@ -4,9 +4,9 @@ import { StyleSheet } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 // Import screens
-import CreateGroupScreen from "../screens/CreateGroupScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import GroupsScreen from "../screens/GroupsScreen";
+import ProposeScreen from "../screens/ProposeScreen";
 
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
@@ -21,7 +21,7 @@ const BottomTabNavigator = () => {
           if (route.name === "Groups") {
             iconName = focused ? "grid" : "grid-outline";
           } else if (route.name === "Propose") {
-            iconName = focused ? "add-circle" : "add-circle-outline";
+            iconName = focused ? "rocket" : "rocket-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
           }
@@ -43,7 +43,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen
         name="Propose"
-        component={CreateGroupScreen}
+        component={ProposeScreen}
         options={{
           title: "Propose",
         }}
