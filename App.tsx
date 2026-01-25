@@ -20,6 +20,10 @@ const linking: LinkingOptions<RootStackParamList> = {
   ],
   config: {
     screens: {
+      // Password reset deep link
+      ResetPassword: {
+        path: "reset-password",
+      },
       // Group invite deep link - navigates to group details
       GroupDetails: {
         path: "group/invite/:groupId",

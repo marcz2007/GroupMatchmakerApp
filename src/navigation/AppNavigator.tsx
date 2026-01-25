@@ -11,6 +11,7 @@ import GroupDetailsScreen from "../screens/GroupDetailsScreen";
 import GroupsScreen from "../screens/GroupsScreen";
 import LoginScreen from "../screens/LoginScreen";
 import PublicProfileScreen from "../screens/PublicProfileScreen";
+import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 import SignupScreen from "../screens/SignupScreen";
 
 // Import the bottom tab navigator
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   AuthLoading: undefined;
   Login: undefined;
   Signup: undefined;
+  ResetPassword: undefined;
   Main: undefined;
   EditProfile: undefined;
   PublicProfile: { userId: string };
@@ -35,11 +37,12 @@ export type RootStackParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-// Auth stack that shows Login/Signup screens
+// Auth stack that shows Login/Signup/ResetPassword screens
 const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Signup" component={SignupScreen} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
   </Stack.Navigator>
 );
 
