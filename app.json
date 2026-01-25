@@ -50,7 +50,8 @@
         {
           "photosPermission": "The app needs access to your photos to let you set a profile picture."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

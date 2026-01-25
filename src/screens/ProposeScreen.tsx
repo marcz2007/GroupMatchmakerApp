@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -8,14 +8,26 @@ import {
   SafeAreaView,
   Text,
   Keyboard,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { IdeaInput } from "../components/propose/IdeaInput";
 import { IdeaPill } from "../components/propose/IdeaPill";
 import { StepIndicator } from "../components/propose/StepIndicator";
-import { colors, spacing } from "../theme";
+import { DetailChips } from "../components/propose/DetailChips";
+import { colors, spacing, borderRadius } from "../theme";
+import { useAuth } from "../contexts/AuthContext";
+import { getUserGroups } from "../services/groupService";
 
 type Step = "idea" | "details" | "groups" | "launching" | "success";
+
+interface Group {
+  id: string;
+  name: string;
+  member_count?: number;
+}
 
 const TOTAL_STEPS = 4;
 
@@ -36,23 +48,67 @@ const getStepNumber = (step: Step): number => {
 };
 
 const ProposeScreen = () => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>("idea");
   const [ideaTitle, setIdeaTitle] = useState("");
+
+  // Details state
+  const [date, setDate] = useState<Date | null>(null);
+  const [time, setTime] = useState<Date | null>(null);
+  const [location, setLocation] = useState("");
+
+  // Groups state
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
 
   // Animation values
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const inputScale = useRef(new Animated.Value(1)).current;
-  const pillOpacity = useRef(new Animated.Value(0)).current;
-  const step2Opacity = useRef(new Animated.Value(0)).current;
+  const stepContentOpacity = useRef(new Animated.Value(0)).current;
+
+  // Load groups when reaching step 3
+  useEffect(() => {
+    if (currentStep === "groups" && user) {
+      loadGroups();
+    }
+  }, [currentStep, user]);
+
+  const loadGroups = async () => {
+    if (!user) return;
+    setLoadingGroups(true);
+    try {
+      const userGroups = await getUserGroups(user.id);
+      setGroups(userGroups || []);
+    } catch (error) {
+      console.error("Error loading groups:", error);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const animateToNextStep = (nextStep: Step) => {
+    Animated.timing(stepContentOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep(nextStep);
+      Animated.timing(stepContentOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
 
   const handleIdeaSubmit = useCallback(() => {
     if (ideaTitle.trim().length === 0) return;
 
     Keyboard.dismiss();
 
-    // Animate input out and pill in
+    // Animate input out
     Animated.parallel([
-      // Fade and shrink input
       Animated.timing(inputOpacity, {
         toValue: 0,
         duration: 300,
@@ -64,24 +120,49 @@ const ProposeScreen = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // After input fades, show pill and move to step 2
       setCurrentStep("details");
-
-      Animated.parallel([
-        Animated.timing(pillOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(step2Opacity, {
-          toValue: 1,
-          duration: 400,
-          delay: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      Animated.timing(stepContentOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
     });
-  }, [ideaTitle, inputOpacity, inputScale, pillOpacity, step2Opacity]);
+  }, [ideaTitle, inputOpacity, inputScale, stepContentOpacity]);
+
+  const handleDetailsNext = () => {
+    animateToNextStep("groups");
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(groupId)
+        ? prev.filter((id) => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
+
+  const renderGroupItem = ({ item }: { item: Group }) => {
+    const isSelected = selectedGroups.includes(item.id);
+    return (
+      <TouchableOpacity
+        style={[styles.groupRow, isSelected && styles.groupRowSelected]}
+        onPress={() => toggleGroupSelection(item.id)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <View style={styles.groupInfo}>
+          <Text style={styles.groupName}>{item.name}</Text>
+          {item.member_count && (
+            <Text style={styles.groupMembers}>
+              {item.member_count} members
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderStepContent = () => {
     if (currentStep === "idea") {
@@ -111,32 +192,152 @@ const ProposeScreen = () => {
       );
     }
 
-    // Steps 2-4 (to be implemented in Task 2 & 3)
-    return (
-      <View style={styles.stepContent}>
-        {/* Locked idea pill at top */}
-        <Animated.View style={[styles.pillContainer, { opacity: pillOpacity }]}>
-          <IdeaPill title={ideaTitle} animateIn={false} />
-        </Animated.View>
+    if (currentStep === "details") {
+      return (
+        <Animated.View
+          style={[styles.stepContent, { opacity: stepContentOpacity }]}
+        >
+          {/* Locked idea pill at top */}
+          <View style={styles.pillContainer}>
+            <IdeaPill title={ideaTitle} animateIn={true} />
+          </View>
 
-        {/* Step 2 content placeholder */}
-        <Animated.View style={[styles.nextStepContent, { opacity: step2Opacity }]}>
-          <Text style={styles.stepTitle}>Add details</Text>
-          <Text style={styles.stepSubtitle}>
-            When and where? (optional)
-          </Text>
+          {/* Step 2 content */}
+          <View style={styles.detailsContent}>
+            <Text style={styles.stepTitle}>Add details</Text>
+            <Text style={styles.stepSubtitle}>When and where? (optional)</Text>
 
-          <View style={styles.placeholderBox}>
-            <Text style={styles.placeholderText}>
-              📅 Date & Time chips coming in Task 2
-            </Text>
-            <Text style={styles.placeholderText}>
-              📍 Location chip coming in Task 2
-            </Text>
+            <View style={styles.chipsContainer}>
+              <DetailChips
+                date={date}
+                time={time}
+                location={location}
+                onDateChange={setDate}
+                onTimeChange={setTime}
+                onLocationChange={setLocation}
+              />
+            </View>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={handleDetailsNext}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.skipButtonText}>Skip</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.nextButton}
+                onPress={handleDetailsNext}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.nextButtonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
-      </View>
-    );
+      );
+    }
+
+    if (currentStep === "groups") {
+      return (
+        <Animated.View
+          style={[styles.stepContent, { opacity: stepContentOpacity }]}
+        >
+          {/* Locked idea pill at top */}
+          <View style={styles.pillContainer}>
+            <IdeaPill title={ideaTitle} animateIn={false} />
+          </View>
+
+          {/* Details summary if any */}
+          {(date || time || location) && (
+            <View style={styles.detailsSummary}>
+              {date && (
+                <Text style={styles.detailsSummaryText}>
+                  📅 {date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </Text>
+              )}
+              {time && (
+                <Text style={styles.detailsSummaryText}>
+                  🕐 {time.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                </Text>
+              )}
+              {location && (
+                <Text style={styles.detailsSummaryText}>📍 {location}</Text>
+              )}
+            </View>
+          )}
+
+          {/* Step 3 content */}
+          <View style={styles.groupsContent}>
+            <Text style={styles.stepTitle}>Choose groups</Text>
+            <Text style={styles.stepSubtitle}>
+              Send this idea to one or more groups
+            </Text>
+
+            {loadingGroups ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                style={styles.loader}
+              />
+            ) : groups.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>📭</Text>
+                <Text style={styles.emptyTitle}>No groups yet</Text>
+                <Text style={styles.emptySubtitle}>
+                  Create or join a group to send ideas
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={groups}
+                keyExtractor={(item) => item.id}
+                renderItem={renderGroupItem}
+                style={styles.groupsList}
+                contentContainerStyle={styles.groupsListContent}
+              />
+            )}
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => animateToNextStep("details")}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.launchButton,
+                  selectedGroups.length === 0 && styles.launchButtonDisabled,
+                ]}
+                onPress={() => {
+                  // TODO: Implement launch in Task 3
+                  console.log("Launch idea:", {
+                    title: ideaTitle,
+                    date,
+                    time,
+                    location,
+                    groups: selectedGroups,
+                  });
+                }}
+                disabled={selectedGroups.length === 0}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.launchButtonText}>
+                  Launch 🚀
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -162,9 +363,7 @@ const ProposeScreen = () => {
           </View>
 
           {/* Main content area */}
-          <View style={styles.content}>
-            {renderStepContent()}
-          </View>
+          <View style={styles.content}>{renderStepContent()}</View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -191,11 +390,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
   },
   stepContent: {
     flex: 1,
-    justifyContent: "center",
     paddingHorizontal: spacing.lg,
   },
   stepTitle: {
@@ -209,33 +406,175 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text.tertiary,
     textAlign: "center",
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   inputContainer: {
     marginTop: spacing.lg,
   },
   pillContainer: {
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    alignItems: "center",
+  },
+  detailsContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  chipsContainer: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    paddingBottom: spacing.xl,
+  },
+  skipButton: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  skipButtonText: {
+    color: colors.text.secondary,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  nextButton: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary,
+  },
+  nextButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  backButton: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  backButtonText: {
+    color: colors.text.secondary,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  detailsSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  detailsSummaryText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  groupsContent: {
+    flex: 1,
+  },
+  groupsList: {
+    flex: 1,
+    marginTop: spacing.md,
+  },
+  groupsListContent: {
     paddingBottom: spacing.lg,
   },
-  nextStepContent: {
-    flex: 1,
-    paddingTop: spacing.xl,
-  },
-  placeholderBox: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    borderStyle: "dashed",
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginTop: spacing.lg,
+  groupRow: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
-  placeholderText: {
+  groupRowSelected: {
+    backgroundColor: "rgba(87, 98, 183, 0.15)",
+    borderColor: "rgba(87, 98, 183, 0.4)",
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    marginRight: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: {
+    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  groupMembers: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  loader: {
+    marginTop: spacing.xl,
+  },
+  emptyState: {
+    alignItems: "center",
+    marginTop: spacing.xl,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
     fontSize: 14,
     color: colors.text.tertiary,
+    textAlign: "center",
+  },
+  launchButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.success,
+    alignItems: "center",
+  },
+  launchButtonDisabled: {
+    backgroundColor: colors.disabled,
+  },
+  launchButtonText: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
 

@@ -1,0 +1,355 @@
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Platform,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { colors, spacing, borderRadius } from "../../theme";
+
+interface DetailChipsProps {
+  date: Date | null;
+  time: Date | null;
+  location: string;
+  onDateChange: (date: Date | null) => void;
+  onTimeChange: (time: Date | null) => void;
+  onLocationChange: (location: string) => void;
+}
+
+export const DetailChips: React.FC<DetailChipsProps> = ({
+  date,
+  time,
+  location,
+  onDateChange,
+  onTimeChange,
+  onLocationChange,
+}) => {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState(location);
+
+  const formatDate = (d: Date) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (d.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (d.toDateString() === tomorrow.toDateString()) {
+      return "Tomorrow";
+    }
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const formatTime = (t: Date) => {
+    return t.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      onDateChange(selectedDate);
+    }
+  };
+
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    if (Platform.OS === "android") {
+      setShowTimePicker(false);
+    }
+    if (selectedTime) {
+      onTimeChange(selectedTime);
+    }
+  };
+
+  const handleLocationSave = () => {
+    onLocationChange(locationInput.trim());
+    setShowLocationModal(false);
+  };
+
+  const clearDate = () => onDateChange(null);
+  const clearTime = () => onTimeChange(null);
+  const clearLocation = () => {
+    onLocationChange("");
+    setLocationInput("");
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Date Chip */}
+      <TouchableOpacity
+        style={[styles.chip, date && styles.chipFilled]}
+        onPress={() => setShowDatePicker(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.chipIcon}>📅</Text>
+        <Text style={[styles.chipText, date && styles.chipTextFilled]}>
+          {date ? formatDate(date) : "Add date"}
+        </Text>
+        {date && (
+          <TouchableOpacity onPress={clearDate} style={styles.clearButton}>
+            <Text style={styles.clearText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+
+      {/* Time Chip */}
+      <TouchableOpacity
+        style={[styles.chip, time && styles.chipFilled]}
+        onPress={() => setShowTimePicker(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.chipIcon}>🕐</Text>
+        <Text style={[styles.chipText, time && styles.chipTextFilled]}>
+          {time ? formatTime(time) : "Add time"}
+        </Text>
+        {time && (
+          <TouchableOpacity onPress={clearTime} style={styles.clearButton}>
+            <Text style={styles.clearText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+
+      {/* Location Chip */}
+      <TouchableOpacity
+        style={[styles.chip, styles.chipWide, location && styles.chipFilled]}
+        onPress={() => {
+          setLocationInput(location);
+          setShowLocationModal(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.chipIcon}>📍</Text>
+        <Text
+          style={[styles.chipText, location && styles.chipTextFilled]}
+          numberOfLines={1}
+        >
+          {location || "Add location"}
+        </Text>
+        {location && (
+          <TouchableOpacity onPress={clearLocation} style={styles.clearButton}>
+            <Text style={styles.clearText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+
+      {/* iOS Date Picker Modal */}
+      {Platform.OS === "ios" && showDatePicker && (
+        <Modal transparent animationType="slide">
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Date</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={date || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+                textColor={colors.text.primary}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android Date Picker */}
+      {Platform.OS === "android" && showDatePicker && (
+        <DateTimePicker
+          value={date || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* iOS Time Picker Modal */}
+      {Platform.OS === "ios" && showTimePicker && (
+        <Modal transparent animationType="slide">
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Time</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={time || new Date()}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeChange}
+                textColor={colors.text.primary}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android Time Picker */}
+      {Platform.OS === "android" && showTimePicker && (
+        <DateTimePicker
+          value={time || new Date()}
+          mode="time"
+          display="default"
+          onChange={handleTimeChange}
+        />
+      )}
+
+      {/* Location Modal */}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.pickerModal}>
+          <View style={styles.locationContainer}>
+            <View style={styles.pickerHeader}>
+              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <Text style={styles.pickerCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.pickerTitle}>Location</Text>
+              <TouchableOpacity onPress={handleLocationSave}>
+                <Text style={styles.pickerDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.locationInput}
+              placeholder="Where is this happening?"
+              placeholderTextColor={colors.text.tertiary}
+              value={locationInput}
+              onChangeText={setLocationInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleLocationSave}
+            />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "center",
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderStyle: "dashed",
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+  },
+  chipFilled: {
+    backgroundColor: "rgba(87, 98, 183, 0.2)",
+    borderColor: "rgba(87, 98, 183, 0.4)",
+    borderStyle: "solid",
+  },
+  chipWide: {
+    minWidth: 150,
+  },
+  chipIcon: {
+    fontSize: 14,
+  },
+  chipText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+  },
+  chipTextFilled: {
+    color: colors.text.primary,
+    fontWeight: "500",
+  },
+  clearButton: {
+    marginLeft: spacing.xs,
+    padding: 2,
+  },
+  clearText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+  },
+  pickerModal: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  pickerContainer: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    paddingBottom: spacing.xl,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  pickerCancel: {
+    fontSize: 16,
+    color: colors.text.tertiary,
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  locationContainer: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    paddingBottom: spacing.xl,
+  },
+  locationInput: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+});
