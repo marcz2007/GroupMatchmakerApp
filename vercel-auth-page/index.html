@@ -167,53 +167,66 @@
     }
 
     async function handleAuth() {
-      // Get the hash fragment (Supabase puts tokens here)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const queryParams = new URLSearchParams(window.location.search);
+      try {
+        // Get the hash fragment (Supabase puts tokens here)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
 
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      const type = hashParams.get('type') || queryParams.get('type');
-      const error = hashParams.get('error') || queryParams.get('error');
-      const errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type') || queryParams.get('type');
+        const error = hashParams.get('error') || queryParams.get('error');
+        const errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
 
-      console.log('Auth params:', { type, accessToken: !!accessToken, error });
+        console.log('Auth params:', { type, accessToken: !!accessToken, error });
+        console.log('Full URL:', window.location.href);
+        console.log('Hash:', window.location.hash);
 
-      if (error) {
-        showError(errorDescription || error);
-        return;
-      }
-
-      if (accessToken) {
-        // Set the session in Supabase
-        const { data, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError) {
-          showError(sessionError.message);
+        if (error) {
+          showError(errorDescription || error);
           return;
         }
 
-        // Check what type of auth this is
-        if (type === 'recovery') {
-          // Password recovery - show the reset form
-          showSection('password-form');
-        } else if (type === 'signup' || type === 'email') {
-          // Email confirmation
-          showSection('email-verified');
-        } else {
-          // Default to email verified
-          showSection('email-verified');
+        // No parameters at all - user accessed page directly
+        if (!accessToken && !type && !error) {
+          showError('No authentication parameters found. Please use a link from your email.');
+          return;
         }
-      } else {
-        // No token - check if just a type parameter
-        if (type === 'recovery') {
-          showError('Invalid or expired reset link. Please request a new one.');
+
+        if (accessToken) {
+          // Set the session in Supabase
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            showError(sessionError.message);
+            return;
+          }
+
+          // Check what type of auth this is
+          if (type === 'recovery') {
+            // Password recovery - show the reset form
+            showSection('password-form');
+          } else if (type === 'signup' || type === 'email') {
+            // Email confirmation
+            showSection('email-verified');
+          } else {
+            // Default to email verified
+            showSection('email-verified');
+          }
         } else {
-          showError('Invalid link. Please try again from the app.');
+          // No token - check if just a type parameter
+          if (type === 'recovery') {
+            showError('Invalid or expired reset link. Please request a new one.');
+          } else {
+            showError('Invalid link. Please try again from the app.');
+          }
         }
+      } catch (err) {
+        console.error('Auth error:', err);
+        showError('An error occurred: ' + (err.message || 'Unknown error'));
       }
     }
 
