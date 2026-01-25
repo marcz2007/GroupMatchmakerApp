@@ -33,6 +33,10 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationInput, setLocationInput] = useState(location);
 
+  // Temp values for pickers - allows "Done" to work without changing value
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+  const [tempTime, setTempTime] = useState<Date>(new Date());
+
   const formatDate = (d: Date) => {
     const today = new Date();
     const tomorrow = new Date(today);
@@ -58,22 +62,46 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
     });
   };
 
+  const openDatePicker = () => {
+    setTempDate(date || new Date());
+    setShowDatePicker(true);
+  };
+
+  const openTimePicker = () => {
+    setTempTime(time || new Date());
+    setShowTimePicker(true);
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      onDateChange(selectedDate);
+      if (event.type === "set" && selectedDate) {
+        onDateChange(selectedDate);
+      }
+    } else if (selectedDate) {
+      setTempDate(selectedDate);
     }
   };
 
   const handleTimeChange = (event: any, selectedTime?: Date) => {
     if (Platform.OS === "android") {
       setShowTimePicker(false);
+      if (event.type === "set" && selectedTime) {
+        onTimeChange(selectedTime);
+      }
+    } else if (selectedTime) {
+      setTempTime(selectedTime);
     }
-    if (selectedTime) {
-      onTimeChange(selectedTime);
-    }
+  };
+
+  const handleDateDone = () => {
+    onDateChange(tempDate);
+    setShowDatePicker(false);
+  };
+
+  const handleTimeDone = () => {
+    onTimeChange(tempTime);
+    setShowTimePicker(false);
   };
 
   const handleLocationSave = () => {
@@ -93,7 +121,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Date Chip */}
       <TouchableOpacity
         style={[styles.chip, date && styles.chipFilled]}
-        onPress={() => setShowDatePicker(true)}
+        onPress={openDatePicker}
         activeOpacity={0.7}
       >
         <Text style={styles.chipIcon}>📅</Text>
@@ -110,7 +138,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Time Chip */}
       <TouchableOpacity
         style={[styles.chip, time && styles.chipFilled]}
-        onPress={() => setShowTimePicker(true)}
+        onPress={openTimePicker}
         activeOpacity={0.7}
       >
         <Text style={styles.chipIcon}>🕐</Text>
@@ -157,12 +185,12 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                   <Text style={styles.pickerCancel}>Cancel</Text>
                 </TouchableOpacity>
                 <Text style={styles.pickerTitle}>Select Date</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <TouchableOpacity onPress={handleDateDone}>
                   <Text style={styles.pickerDone}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={date || new Date()}
+                value={tempDate}
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
@@ -177,7 +205,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Android Date Picker */}
       {Platform.OS === "android" && showDatePicker && (
         <DateTimePicker
-          value={date || new Date()}
+          value={tempDate}
           mode="date"
           display="default"
           onChange={handleDateChange}
@@ -195,12 +223,12 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                   <Text style={styles.pickerCancel}>Cancel</Text>
                 </TouchableOpacity>
                 <Text style={styles.pickerTitle}>Select Time</Text>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                <TouchableOpacity onPress={handleTimeDone}>
                   <Text style={styles.pickerDone}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={time || new Date()}
+                value={tempTime}
                 mode="time"
                 display="spinner"
                 onChange={handleTimeChange}
@@ -214,7 +242,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Android Time Picker */}
       {Platform.OS === "android" && showTimePicker && (
         <DateTimePicker
-          value={time || new Date()}
+          value={tempTime}
           mode="time"
           display="default"
           onChange={handleTimeChange}

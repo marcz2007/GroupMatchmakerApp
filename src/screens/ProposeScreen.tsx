@@ -11,8 +11,11 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import ConfettiCannon from "react-native-confetti-cannon";
 import { IdeaInput } from "../components/propose/IdeaInput";
 import { IdeaPill } from "../components/propose/IdeaPill";
 import { StepIndicator } from "../components/propose/StepIndicator";
@@ -20,6 +23,7 @@ import { DetailChips } from "../components/propose/DetailChips";
 import { colors, spacing, borderRadius } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 import { getUserGroups } from "../services/groupService";
+import { createProposal } from "../services/proposalService";
 
 type Step = "idea" | "details" | "groups" | "launching" | "success";
 
@@ -30,6 +34,7 @@ interface Group {
 }
 
 const TOTAL_STEPS = 4;
+const DEFAULT_VOTE_WINDOW_HOURS = 24;
 
 const getStepNumber = (step: Step): number => {
   switch (step) {
@@ -62,10 +67,19 @@ const ProposeScreen = () => {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
 
+  // Launch state
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiRef = useRef<any>(null);
+
   // Animation values
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const inputScale = useRef(new Animated.Value(1)).current;
   const stepContentOpacity = useRef(new Animated.Value(0)).current;
+  const launchCardScale = useRef(new Animated.Value(1)).current;
+  const launchCardTranslateY = useRef(new Animated.Value(0)).current;
+  const launchCardOpacity = useRef(new Animated.Value(1)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
 
   // Load groups when reaching step 3
   useEffect(() => {
@@ -139,6 +153,137 @@ const ProposeScreen = () => {
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId]
     );
+  };
+
+  const combineDateTime = (): Date | null => {
+    if (!date && !time) return null;
+
+    const combined = new Date();
+
+    if (date) {
+      combined.setFullYear(date.getFullYear());
+      combined.setMonth(date.getMonth());
+      combined.setDate(date.getDate());
+    }
+
+    if (time) {
+      combined.setHours(time.getHours());
+      combined.setMinutes(time.getMinutes());
+      combined.setSeconds(0);
+      combined.setMilliseconds(0);
+    }
+
+    return combined;
+  };
+
+  const handleLaunch = async () => {
+    if (selectedGroups.length === 0 || isLaunching) return;
+
+    setIsLaunching(true);
+
+    // Haptic feedback immediately
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Animate the card flying up
+    Animated.parallel([
+      Animated.timing(launchCardScale, {
+        toValue: 0.8,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(launchCardTranslateY, {
+        toValue: -400,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(launchCardOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    try {
+      // Calculate vote window end time
+      const voteWindowEndsAt = new Date();
+      voteWindowEndsAt.setHours(
+        voteWindowEndsAt.getHours() + DEFAULT_VOTE_WINDOW_HOURS
+      );
+
+      // Combine date and time for starts_at
+      const startsAt = combineDateTime();
+
+      // Build description with location if provided
+      const description = location ? `📍 ${location}` : undefined;
+
+      // Create proposal in each selected group
+      const createPromises = selectedGroups.map((groupId) =>
+        createProposal({
+          group_id: groupId,
+          title: ideaTitle.trim(),
+          description,
+          starts_at: startsAt?.toISOString(),
+          vote_window_ends_at: voteWindowEndsAt.toISOString(),
+          threshold: 2, // Default threshold for V1
+        })
+      );
+
+      await Promise.all(createPromises);
+
+      // Success! Show confetti
+      setCurrentStep("success");
+      setShowConfetti(true);
+
+      // Fire confetti
+      setTimeout(() => {
+        confettiRef.current?.start();
+      }, 100);
+
+      // Fade in success message
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+
+      // Another haptic for success
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error("Error launching idea:", error);
+      Alert.alert(
+        "Couldn't launch idea",
+        error.message || "Something went wrong. Please try again."
+      );
+
+      // Reset animation
+      launchCardScale.setValue(1);
+      launchCardTranslateY.setValue(0);
+      launchCardOpacity.setValue(1);
+    } finally {
+      setIsLaunching(false);
+    }
+  };
+
+  const resetForm = () => {
+    // Reset all state
+    setIdeaTitle("");
+    setDate(null);
+    setTime(null);
+    setLocation("");
+    setSelectedGroups([]);
+    setShowConfetti(false);
+
+    // Reset animations
+    inputOpacity.setValue(1);
+    inputScale.setValue(1);
+    stepContentOpacity.setValue(0);
+    launchCardScale.setValue(1);
+    launchCardTranslateY.setValue(0);
+    launchCardOpacity.setValue(1);
+    successOpacity.setValue(0);
+
+    // Go back to step 1
+    setCurrentStep("idea");
   };
 
   const renderGroupItem = ({ item }: { item: Group }) => {
@@ -245,29 +390,52 @@ const ProposeScreen = () => {
         <Animated.View
           style={[styles.stepContent, { opacity: stepContentOpacity }]}
         >
-          {/* Locked idea pill at top */}
-          <View style={styles.pillContainer}>
-            <IdeaPill title={ideaTitle} animateIn={false} />
-          </View>
-
-          {/* Details summary if any */}
-          {(date || time || location) && (
-            <View style={styles.detailsSummary}>
-              {date && (
-                <Text style={styles.detailsSummaryText}>
-                  📅 {date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                </Text>
-              )}
-              {time && (
-                <Text style={styles.detailsSummaryText}>
-                  🕐 {time.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                </Text>
-              )}
-              {location && (
-                <Text style={styles.detailsSummaryText}>📍 {location}</Text>
-              )}
+          {/* Animated card that flies up on launch */}
+          <Animated.View
+            style={[
+              styles.launchCard,
+              {
+                transform: [
+                  { scale: launchCardScale },
+                  { translateY: launchCardTranslateY },
+                ],
+                opacity: launchCardOpacity,
+              },
+            ]}
+          >
+            {/* Locked idea pill at top */}
+            <View style={styles.pillContainer}>
+              <IdeaPill title={ideaTitle} animateIn={false} />
             </View>
-          )}
+
+            {/* Details summary if any */}
+            {(date || time || location) && (
+              <View style={styles.detailsSummary}>
+                {date && (
+                  <Text style={styles.detailsSummaryText}>
+                    📅{" "}
+                    {date.toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </Text>
+                )}
+                {time && (
+                  <Text style={styles.detailsSummaryText}>
+                    🕐{" "}
+                    {time.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                )}
+                {location && (
+                  <Text style={styles.detailsSummaryText}>📍 {location}</Text>
+                )}
+              </View>
+            )}
+          </Animated.View>
 
           {/* Step 3 content */}
           <View style={styles.groupsContent}>
@@ -305,6 +473,7 @@ const ProposeScreen = () => {
                 style={styles.backButton}
                 onPress={() => animateToNextStep("details")}
                 activeOpacity={0.7}
+                disabled={isLaunching}
               >
                 <Text style={styles.backButtonText}>Back</Text>
               </TouchableOpacity>
@@ -312,26 +481,50 @@ const ProposeScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.launchButton,
-                  selectedGroups.length === 0 && styles.launchButtonDisabled,
+                  (selectedGroups.length === 0 || isLaunching) &&
+                    styles.launchButtonDisabled,
                 ]}
-                onPress={() => {
-                  // TODO: Implement launch in Task 3
-                  console.log("Launch idea:", {
-                    title: ideaTitle,
-                    date,
-                    time,
-                    location,
-                    groups: selectedGroups,
-                  });
-                }}
-                disabled={selectedGroups.length === 0}
+                onPress={handleLaunch}
+                disabled={selectedGroups.length === 0 || isLaunching}
                 activeOpacity={0.8}
               >
-                <Text style={styles.launchButtonText}>
-                  Launch 🚀
-                </Text>
+                {isLaunching ? (
+                  <ActivityIndicator size="small" color={colors.text.primary} />
+                ) : (
+                  <Text style={styles.launchButtonText}>Launch 🚀</Text>
+                )}
               </TouchableOpacity>
             </View>
+          </View>
+        </Animated.View>
+      );
+    }
+
+    if (currentStep === "success") {
+      return (
+        <Animated.View
+          style={[styles.successContent, { opacity: successOpacity }]}
+        >
+          <Text style={styles.successIcon}>🎉</Text>
+          <Text style={styles.successTitle}>Idea launched!</Text>
+          <Text style={styles.successSubtitle}>
+            Your idea has been sent to{" "}
+            {selectedGroups.length === 1
+              ? "1 group"
+              : `${selectedGroups.length} groups`}
+            . Group members can now vote!
+          </Text>
+
+          <View style={styles.successButtons}>
+            <TouchableOpacity
+              style={styles.primarySuccessButton}
+              onPress={resetForm}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primarySuccessButtonText}>
+                Launch another idea
+              </Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       );
@@ -348,19 +541,34 @@ const ProposeScreen = () => {
         style={styles.gradient}
       />
 
+      {/* Confetti overlay */}
+      {showConfetti && (
+        <ConfettiCannon
+          ref={confettiRef}
+          count={80}
+          origin={{ x: -10, y: 0 }}
+          autoStart={false}
+          fadeOut={true}
+          fallSpeed={2500}
+          colors={[colors.primary, colors.success, "#fff", "#ffd700"]}
+        />
+      )}
+
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         >
-          {/* Step indicator at top */}
-          <View style={styles.header}>
-            <StepIndicator
-              totalSteps={TOTAL_STEPS}
-              currentStep={getStepNumber(currentStep)}
-            />
-          </View>
+          {/* Step indicator at top (hide on success) */}
+          {currentStep !== "success" && (
+            <View style={styles.header}>
+              <StepIndicator
+                totalSteps={TOTAL_STEPS}
+                currentStep={getStepNumber(currentStep)}
+              />
+            </View>
+          )}
 
           {/* Main content area */}
           <View style={styles.content}>{renderStepContent()}</View>
@@ -468,6 +676,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
+  launchCard: {
+    // The card that animates on launch
+  },
   detailsSummary: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -567,6 +778,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     backgroundColor: colors.success,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   launchButtonDisabled: {
     backgroundColor: colors.disabled,
@@ -575,6 +788,47 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: 18,
     fontWeight: "700",
+  },
+  // Success state styles
+  successContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  successIcon: {
+    fontSize: 64,
+    marginBottom: spacing.lg,
+  },
+  successTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+    textAlign: "center",
+  },
+  successSubtitle: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: spacing.xl,
+  },
+  successButtons: {
+    width: "100%",
+    gap: spacing.md,
+  },
+  primarySuccessButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+  },
+  primarySuccessButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
