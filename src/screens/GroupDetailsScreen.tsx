@@ -16,9 +16,23 @@ import {
   View,
 } from "react-native";
 import { Button as CustomButton } from "../components/Button";
+import { ProposalCard } from "../components/ProposalCard";
+import ProposalVoteModal from "../components/ProposalVoteModal";
 import { GroupAIAnalysisSection } from "../components/profile/GroupAIAnalysisSection";
 import { RootStackParamList } from "../navigation/AppNavigator";
+import {
+  ProposalWithVotes,
+  VoteValue,
+  castVote,
+  getGroupProposals,
+  subscribeToGroupProposals,
+} from "../services/proposalService";
+import {
+  EventRoomWithDetails,
+  getGroupEventRooms,
+} from "../services/eventRoomService";
 import { supabase } from "../supabase";
+import { colors } from "../theme/theme";
 
 // Define types for route and navigation
 type GroupDetailsScreenRouteProp = RouteProp<
@@ -84,6 +98,14 @@ const GroupDetailsScreen = () => {
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
   const [groupMessageCount, setGroupMessageCount] = useState(0);
   const [hasGroupMessages, setHasGroupMessages] = useState(false);
+
+  // Proposals and Event Rooms state
+  const [proposals, setProposals] = useState<ProposalWithVotes[]>([]);
+  const [eventRooms, setEventRooms] = useState<EventRoomWithDetails[]>([]);
+  const [loadingProposals, setLoadingProposals] = useState(false);
+  const [selectedProposal, setSelectedProposal] =
+    useState<ProposalWithVotes | null>(null);
+  const [showVoteModal, setShowVoteModal] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -236,6 +258,79 @@ const GroupDetailsScreen = () => {
       fetchGroupData();
     }
   }, [groupId, fetchGroupData]);
+
+  // Fetch proposals for the group
+  const fetchProposals = useCallback(async () => {
+    setLoadingProposals(true);
+    try {
+      const data = await getGroupProposals(groupId);
+      setProposals(data);
+    } catch (error) {
+      console.error("Error fetching proposals:", error);
+    } finally {
+      setLoadingProposals(false);
+    }
+  }, [groupId]);
+
+  // Fetch event rooms for the group
+  const fetchEventRooms = useCallback(async () => {
+    try {
+      const data = await getGroupEventRooms(groupId);
+      setEventRooms(data.filter((room) => !room.is_expired));
+    } catch (error) {
+      console.error("Error fetching event rooms:", error);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    if (groupId) {
+      fetchProposals();
+      fetchEventRooms();
+    }
+  }, [groupId, fetchProposals, fetchEventRooms]);
+
+  // Subscribe to proposal updates
+  useEffect(() => {
+    if (!groupId) return;
+    const unsubscribe = subscribeToGroupProposals(groupId, () => {
+      fetchProposals();
+      fetchEventRooms();
+    });
+    return unsubscribe;
+  }, [groupId, fetchProposals, fetchEventRooms]);
+
+  const handleVoteOnProposal = async (
+    proposal: ProposalWithVotes,
+    vote: VoteValue
+  ) => {
+    try {
+      const result = await castVote(proposal.proposal.id, vote);
+      if (result.threshold_met && result.event_room_id) {
+        Alert.alert(
+          "Event Created!",
+          "The proposal reached its threshold. An event room has been created!",
+          [{ text: "OK" }]
+        );
+      }
+      fetchProposals();
+      fetchEventRooms();
+    } catch (error) {
+      console.error("Error voting:", error);
+      Alert.alert("Error", "Failed to submit vote");
+    }
+  };
+
+  const handleOpenProposal = (proposal: ProposalWithVotes) => {
+    setSelectedProposal(proposal);
+    setShowVoteModal(true);
+  };
+
+  const handleNavigateToEventRoom = (eventRoom: EventRoomWithDetails) => {
+    navigation.navigate("EventRoom", {
+      eventRoomId: eventRoom.event_room.id,
+      title: eventRoom.event_room.title,
+    });
+  };
 
   const handleChoosePrimaryPicture = async () => {
     console.log("[handleChoosePrimaryPicture] Initiated.");
@@ -1116,6 +1211,80 @@ const GroupDetailsScreen = () => {
         )}
       </View> */}
 
+      {/* Event Rooms Section */}
+      {eventRooms.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Active Event Rooms</Text>
+          {eventRooms.map((room) => (
+            <TouchableOpacity
+              key={room.event_room.id}
+              style={styles.eventRoomCard}
+              onPress={() => handleNavigateToEventRoom(room)}
+            >
+              <View style={styles.eventRoomHeader}>
+                <Text style={styles.eventRoomTitle}>
+                  {room.event_room.title}
+                </Text>
+                <View style={styles.eventRoomBadge}>
+                  <Text style={styles.eventRoomBadgeText}>
+                    {room.participant_count} joined
+                  </Text>
+                </View>
+              </View>
+              {room.event_room.starts_at && (
+                <Text style={styles.eventRoomDate}>
+                  {new Date(room.event_room.starts_at).toLocaleDateString(
+                    "en-US",
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }
+                  )}
+                </Text>
+              )}
+              <Text style={styles.eventRoomTapText}>Tap to open chat</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Proposals Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Proposals</Text>
+          <TouchableOpacity
+            style={styles.createProposalButton}
+            onPress={() =>
+              navigation.navigate("CreateProposal", {
+                groupId,
+                groupName: groupDetails?.name || initialGroupName,
+              })
+            }
+          >
+            <Text style={styles.createProposalButtonText}>+ New</Text>
+          </TouchableOpacity>
+        </View>
+        {loadingProposals ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : proposals.length > 0 ? (
+          proposals.map((proposal) => (
+            <ProposalCard
+              key={proposal.proposal.id}
+              proposal={proposal}
+              onPress={() => handleOpenProposal(proposal)}
+              onVote={(vote) => handleVoteOnProposal(proposal, vote)}
+            />
+          ))
+        ) : (
+          <Text style={styles.emptyProposalsText}>
+            No proposals yet. Create one to suggest an activity!
+          </Text>
+        )}
+      </View>
+
       <View style={styles.section}>
         <GroupAIAnalysisSection
           enabled={enableAIAnalysis}
@@ -1184,6 +1353,20 @@ const GroupDetailsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Proposal Vote Modal */}
+      <ProposalVoteModal
+        visible={showVoteModal}
+        onClose={() => {
+          setShowVoteModal(false);
+          setSelectedProposal(null);
+        }}
+        proposal={selectedProposal}
+        onVoteSuccess={() => {
+          fetchProposals();
+          fetchEventRooms();
+        }}
+      />
     </ScrollView>
   );
 };
@@ -1452,6 +1635,67 @@ const styles = StyleSheet.create({
     color: "#b0b0b0", // Medium grey
     fontStyle: "italic",
     marginTop: 10,
+  },
+  // Event Rooms styles
+  eventRoomCard: {
+    backgroundColor: "#3a3a3a",
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#10b981", // Success green
+  },
+  eventRoomHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  eventRoomTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#ffffff",
+    flex: 1,
+  },
+  eventRoomBadge: {
+    backgroundColor: "#10b981",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  eventRoomBadgeText: {
+    fontSize: 12,
+    color: "#ffffff",
+    fontWeight: "600",
+  },
+  eventRoomDate: {
+    fontSize: 13,
+    color: "#b0b0b0",
+    marginBottom: 4,
+  },
+  eventRoomTapText: {
+    fontSize: 12,
+    color: "#5762b7",
+    fontStyle: "italic",
+  },
+  // Proposals styles
+  emptyProposalsText: {
+    fontSize: 14,
+    color: "#b0b0b0",
+    textAlign: "center",
+    paddingVertical: 20,
+    fontStyle: "italic",
+  },
+  createProposalButton: {
+    backgroundColor: "#5762b7",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+  },
+  createProposalButtonText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });
 

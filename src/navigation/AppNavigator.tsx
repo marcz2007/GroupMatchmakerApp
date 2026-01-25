@@ -3,22 +3,20 @@ import React from "react";
 
 // Import screens
 import AddUserToGroupScreen from "../screens/AddUserToGroupScreen";
-import ChatScreen from "../screens/ChatScreen";
 import CreateGroupScreen from "../screens/CreateGroupScreen";
+import CreateProposalScreen from "../screens/CreateProposalScreen";
+import EventRoomScreen from "../screens/EventRoomScreen";
 import GroupActionsScreen from "../screens/GroupActionsScreen";
 import GroupDetailsScreen from "../screens/GroupDetailsScreen";
 import GroupsScreen from "../screens/GroupsScreen";
 import LoginScreen from "../screens/LoginScreen";
-import MatchingScreen from "../screens/MatchingScreen";
-import MatchResultsScreen from "../screens/MatchResultsScreen";
-import MessagesListScreen from "../screens/MessagesListScreen";
 import PublicProfileScreen from "../screens/PublicProfileScreen";
 import SignupScreen from "../screens/SignupScreen";
 
 // Import the bottom tab navigator
 import BottomTabNavigator from "./BottomTabNavigator";
 
-// Define updated param list
+// Define updated param list for Grapple Lite
 export type RootStackParamList = {
   AuthLoading: undefined;
   Login: undefined;
@@ -26,19 +24,13 @@ export type RootStackParamList = {
   Main: undefined;
   EditProfile: undefined;
   PublicProfile: { userId: string };
-  Chat: { groupId: string; groupName: string };
-  MessagesList: undefined;
   Groups: undefined;
   CreateGroup: undefined;
   GroupDetails: { groupId: string; groupName: string };
   AddUserToGroup: { groupId: string; groupName: string };
-  Matching: { currentGroupId: string; currentGroupName: string };
-  MatchResults: {
-    type: "activity" | "event";
-    query: string;
-    currentGroupId?: string;
-  };
   GroupActions: { groupId: string; groupName: string };
+  EventRoom: { eventRoomId: string; title?: string };
+  CreateProposal: { groupId: string; groupName: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -58,28 +50,6 @@ const AppStack = () => (
       name="Main"
       component={BottomTabNavigator}
       options={{ headerShown: false }}
-    />
-    <Stack.Screen
-      name="Chat"
-      component={ChatScreen}
-      options={({ route }) => ({ title: route.params.groupName })}
-    />
-    <Stack.Screen
-      name="Matching"
-      component={MatchingScreen}
-      options={({ route }) => ({
-        title: `Match: ${route.params.currentGroupName}`,
-      })}
-    />
-    <Stack.Screen
-      name="MatchResults"
-      component={MatchResultsScreen}
-      options={{ title: "Match Results" }}
-    />
-    <Stack.Screen
-      name="MessagesList"
-      component={MessagesListScreen}
-      options={{ title: "Messages List" }}
     />
     <Stack.Screen
       name="CreateGroup"
@@ -114,6 +84,18 @@ const AppStack = () => (
       name="PublicProfile"
       component={PublicProfileScreen}
       options={{ title: "Profile" }}
+    />
+    <Stack.Screen
+      name="EventRoom"
+      component={EventRoomScreen}
+      options={({ route }) => ({
+        title: route.params.title || "Event Room",
+      })}
+    />
+    <Stack.Screen
+      name="CreateProposal"
+      component={CreateProposalScreen}
+      options={{ title: "New Proposal" }}
     />
   </Stack.Navigator>
 );

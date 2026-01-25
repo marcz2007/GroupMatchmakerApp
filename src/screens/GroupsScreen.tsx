@@ -113,24 +113,6 @@ const GroupsScreen = () => {
         }}
       >
         <Button
-          title="Find Matches"
-          onPress={() =>
-            navigation.navigate("Matching", {
-              currentGroupId: item.id,
-              currentGroupName: item.name,
-            })
-          }
-        />
-        <Button
-          title="Chat"
-          onPress={() =>
-            navigation.navigate("Chat", {
-              groupId: item.id,
-              groupName: item.name,
-            })
-          }
-        />
-        <Button
           title="Add User"
           onPress={() =>
             navigation.navigate("AddUserToGroup", {

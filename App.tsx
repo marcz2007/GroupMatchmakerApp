@@ -20,15 +20,14 @@ const linking: LinkingOptions<RootStackParamList> = {
   ],
   config: {
     screens: {
-      // When a link like groupmatchmakerapp://group/invite/123 is opened,
-      // navigate to the Chat screen with groupId: '123'.
-      Chat: {
+      // Group invite deep link - navigates to group details
+      GroupDetails: {
         path: "group/invite/:groupId",
         parse: {
           groupId: (groupId: string) => groupId,
         },
       },
-      // Add Spotify callback handler
+      // Spotify callback handler
       PublicProfile: {
         path: "functions/v1/spotify-callback",
         parse: {
