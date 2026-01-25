@@ -249,10 +249,14 @@ const ProposeScreen = () => {
       // Another haptic for success
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      console.error("Error launching idea:", error);
+      console.error("Error launching idea:", {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+      });
       Alert.alert(
         "Couldn't launch idea",
-        error.message || "Something went wrong. Please try again."
+        error?.message || "Something went wrong. Please try again."
       );
 
       // Reset animation

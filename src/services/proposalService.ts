@@ -91,34 +91,30 @@ export async function getProposalWithVotes(
 }
 
 /**
- * Create a new proposal
+ * Create a new proposal using SECURITY DEFINER function
+ * This bypasses RLS while validating group membership server-side
  */
 export async function createProposal(
   input: CreateProposalInput
 ): Promise<Proposal> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) {
-    throw new Error("Not authenticated");
-  }
-
-  const { data, error } = await supabase
-    .from("proposals")
-    .insert({
-      group_id: input.group_id,
-      created_by: user.user.id,
-      title: input.title,
-      description: input.description || null,
-      starts_at: input.starts_at || null,
-      ends_at: input.ends_at || null,
-      vote_window_ends_at: input.vote_window_ends_at,
-      threshold: input.threshold || 3,
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("create_proposal_rpc", {
+    p_group_id: input.group_id,
+    p_title: input.title,
+    p_description: input.description || null,
+    p_starts_at: input.starts_at || null,
+    p_ends_at: input.ends_at || null,
+    p_vote_window_ends_at: input.vote_window_ends_at,
+    p_threshold: input.threshold || 3,
+  });
 
   if (error) {
-    console.error("Error creating proposal:", error);
-    throw error;
+    console.error("Error creating proposal:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(error.message || "Failed to create proposal");
   }
 
   return data;
