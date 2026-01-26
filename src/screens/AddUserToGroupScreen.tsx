@@ -11,9 +11,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
 } from "react-native";
-import { RootStackParamList } from "../navigation/AppNavigator"; // Adjust path if needed
-import { supabase } from "../supabase"; // Adjust path if needed
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { RootStackParamList } from "../navigation/AppNavigator";
+import { supabase } from "../supabase";
+import { colors, spacing, borderRadius, typography } from "../theme";
 
 // Define the type for the route parameters
 type AddUserToGroupScreenRouteProp = RouteProp<
@@ -75,33 +79,18 @@ const AddUserToGroupScreen = () => {
   };
 
   const handleAddUserToGroup = async (userId: string, username: string) => {
-    setIsAddingUser(userId); // Show loading for this specific user
+    setIsAddingUser(userId);
     try {
-      // Check if user is already a member (optional but good practice)
-      const { data: existingMember, error: checkError } = await supabase
-        .from("group_members")
-        .select("id")
-        .eq("group_id", groupId)
-        .eq("user_id", userId)
-        .maybeSingle(); // Returns one row or null, doesn't error if not found
+      const { data, error } = await supabase.rpc("add_user_to_group", {
+        p_group_id: groupId,
+        p_user_id: userId,
+      });
 
-      if (checkError) throw checkError;
-
-      if (existingMember) {
-        Alert.alert("Already Member", `${username} is already in this group.`);
-        return;
-      }
-
-      // Add user to group_members table
-      const { error: insertError } = await supabase
-        .from("group_members")
-        .insert({ group_id: groupId, user_id: userId });
-
-      if (insertError) throw insertError;
+      if (error) throw error;
 
       Alert.alert("Success", `${username} has been added to ${groupName}.`);
-      // Optionally, navigate back or clear search, etc.
-      // navigation.goBack();
+      // Remove user from search results
+      setSearchResults((prev) => prev.filter((u) => u.id !== userId));
     } catch (error: any) {
       console.error("Error adding user to group:", error);
       Alert.alert(
@@ -117,64 +106,95 @@ const AddUserToGroupScreen = () => {
     <TouchableOpacity
       style={styles.userItem}
       onPress={() => handleAddUserToGroup(item.id, item.username)}
-      disabled={isAddingUser === item.id} // Disable button while this user is being added
+      disabled={isAddingUser === item.id}
+      activeOpacity={0.7}
     >
       {item.avatar_url ? (
         <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
       ) : (
-        <View style={styles.avatarPlaceholder} /> // Placeholder for avatar
+        <View style={styles.avatarPlaceholder}>
+          <Text style={styles.avatarInitial}>
+            {item.username?.charAt(0).toUpperCase() || "?"}
+          </Text>
+        </View>
       )}
       <Text style={styles.username}>{item.username}</Text>
-      {isAddingUser === item.id && (
-        <ActivityIndicator size="small" color="#5762b7" />
+      {isAddingUser === item.id ? (
+        <ActivityIndicator size="small" color={colors.primary} />
+      ) : (
+        <View style={styles.addIcon}>
+          <Ionicons name="add" size={20} color={colors.text.primary} />
+        </View>
       )}
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder={`Search users to add to "${groupName}"`}
-        placeholderTextColor="#b0b0b0"
-        value={searchTerm}
-        onChangeText={setSearchTerm}
-        onSubmitEditing={handleSearchUsers} // Search when user presses return/submit
-        returnKeyType="search"
-        autoCapitalize="none"
+      <LinearGradient
+        colors={colors.backgroundGradient}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFillObject}
       />
-      <TouchableOpacity
-        style={styles.searchButton}
-        onPress={handleSearchUsers}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Text style={styles.searchButtonText}>Search</Text>
-        )}
-      </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color={colors.text.tertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by username..."
+                placeholderTextColor={colors.text.tertiary}
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+                onSubmitEditing={handleSearchUsers}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.searchButton, isLoading && styles.searchButtonDisabled]}
+              onPress={handleSearchUsers}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.text.primary} />
+              ) : (
+                <Text style={styles.searchButtonText}>Search</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
-      {searchResults.length === 0 && !isLoading && searchTerm.length > 1 && (
-        <Text style={styles.emptyResultsText}>
-          No users found matching "{searchTerm}".
-        </Text>
-      )}
-
-      <FlatList
-        data={searchResults}
-        renderItem={renderUserItem}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          !isLoading &&
-          searchTerm.length > 1 &&
-          searchResults.length === 0 ? null : (
-            <Text style={styles.infoText}>
-              Enter a username to search for users.
-            </Text>
-          )
-        }
-      />
+          <FlatList
+            data={searchResults}
+            renderItem={renderUserItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                {searchTerm.length > 1 && !isLoading ? (
+                  <>
+                    <Ionicons name="person-outline" size={48} color={colors.text.tertiary} />
+                    <Text style={styles.emptyText}>
+                      No users found matching "{searchTerm}"
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="search-outline" size={48} color={colors.text.tertiary} />
+                    <Text style={styles.emptyText}>
+                      Search for users to add to this group
+                    </Text>
+                  </>
+                )}
+              </View>
+            }
+          />
+        </View>
+      </SafeAreaView>
     </View>
   );
 };
@@ -182,72 +202,108 @@ const AddUserToGroupScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: "#1a1a1a", // Anthracite grey background
+    backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
   },
   searchInput: {
-    height: 50,
-    borderColor: "#404040", // Dark border
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 10,
-    backgroundColor: "#3a3a3a", // Dark surface background
-    fontSize: 16,
-    color: "#ffffff", // White text
+    flex: 1,
+    height: 48,
+    ...typography.body,
+    color: colors.text.primary,
   },
   searchButton: {
-    backgroundColor: "#5762b7", // Primary color
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
     alignItems: "center",
-    marginBottom: 20,
+    justifyContent: "center",
+  },
+  searchButtonDisabled: {
+    backgroundColor: colors.disabled,
   },
   searchButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+    color: colors.text.primary,
+    fontWeight: "600",
+  },
+  listContent: {
+    flexGrow: 1,
   },
   userItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 15,
-    backgroundColor: "#2a2a2a", // Dark surface
-    borderBottomWidth: 1,
-    borderBottomColor: "#333333", // Dark divider
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 15,
-    backgroundColor: "#3a3a3a", // Dark surface light
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: spacing.md,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 15,
-    backgroundColor: "#404040", // Dark grey
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: spacing.md,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    ...typography.subtitle,
+    color: colors.text.primary,
   },
   username: {
-    fontSize: 16,
-    flex: 1, // Allow username to take remaining space
-    color: "#ffffff", // White text
+    ...typography.body,
+    flex: 1,
+    color: colors.text.primary,
   },
-  infoText: {
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 16,
-    color: "#b0b0b0", // Medium grey
+  addIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primaryMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  emptyResultsText: {
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: spacing.xl * 2,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.text.tertiary,
     textAlign: "center",
-    marginTop: 20,
-    fontSize: 16,
-    color: "#b0b0b0", // Medium grey
+    marginTop: spacing.md,
   },
 });
 

@@ -118,7 +118,8 @@ export async function sendEventMessage(
       created_at,
       profiles!event_messages_user_id_fkey (
         id,
-        display_name,
+        username,
+        first_name,
         avatar_url
       )
     `
@@ -133,7 +134,8 @@ export async function sendEventMessage(
   // Transform the response to match EventMessage interface
   const profiles = data.profiles as unknown as {
     id: string;
-    display_name: string;
+    username: string | null;
+    first_name: string | null;
     avatar_url: string | null;
   };
 
@@ -143,7 +145,7 @@ export async function sendEventMessage(
     created_at: data.created_at,
     user: {
       id: profiles.id,
-      display_name: profiles.display_name,
+      display_name: profiles.username || profiles.first_name || "Unknown",
       avatar_url: profiles.avatar_url,
     },
   };
@@ -192,7 +194,8 @@ export async function getEventRoomParticipants(
       joined_at,
       profiles!event_room_participants_user_id_fkey (
         id,
-        display_name,
+        username,
+        first_name,
         avatar_url
       )
     `
@@ -208,12 +211,13 @@ export async function getEventRoomParticipants(
     data?.map((item) => {
       const profile = item.profiles as unknown as {
         id: string;
-        display_name: string;
+        username: string | null;
+        first_name: string | null;
         avatar_url: string | null;
       };
       return {
         id: profile.id,
-        display_name: profile.display_name,
+        display_name: profile.username || profile.first_name || "Unknown",
         avatar_url: profile.avatar_url,
         joined_at: item.joined_at,
       };
@@ -299,7 +303,8 @@ export function subscribeToEventRoomMessages(
             created_at,
             profiles!event_messages_user_id_fkey (
               id,
-              display_name,
+              username,
+              first_name,
               avatar_url
             )
           `
@@ -310,7 +315,8 @@ export function subscribeToEventRoomMessages(
         if (data) {
           const profiles = data.profiles as unknown as {
             id: string;
-            display_name: string;
+            username: string | null;
+            first_name: string | null;
             avatar_url: string | null;
           };
 
@@ -320,7 +326,7 @@ export function subscribeToEventRoomMessages(
             created_at: data.created_at,
             user: {
               id: profiles.id,
-              display_name: profiles.display_name,
+              display_name: profiles.username || profiles.first_name || "Unknown",
               avatar_url: profiles.avatar_url,
             },
           });

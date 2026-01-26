@@ -1,21 +1,42 @@
 export const colors = {
+  // Core palette - Deep space aesthetic
   primary: "#5762b7",
+  primaryMuted: "rgba(87, 98, 183, 0.2)",
+  primaryBorder: "rgba(87, 98, 183, 0.4)",
   secondary: "#7c3aed",
-  background: "#1a1a1a", // Anthracite grey
-  surface: "#2a2a2a", // Slightly lighter anthracite
-  surfaceLight: "#3a3a3a", // Even lighter for elevated surfaces
+
+  // Backgrounds - True blacks for depth
+  background: "#0a0a0f", // Deep black (matches ProposeScreen)
+  backgroundGradient: ["#1a1a2e", "#0a0a0f", "#0a0a0f"] as const, // Gradient colors
+  surface: "#141419", // Slightly elevated surface
+  surfaceLight: "#1e1e26", // Cards and elevated elements
+  surfaceGlass: "rgba(255, 255, 255, 0.05)", // Glassmorphic surfaces
+
+  // Text hierarchy
   text: {
-    primary: "#ffffff", // White for primary text
-    secondary: "#e0e0e0", // Light grey for secondary text
-    tertiary: "#b0b0b0", // Medium grey for tertiary text
+    primary: "#ffffff",
+    secondary: "#e0e0e0",
+    tertiary: "#6b7280", // Muted gray for hints
   },
-  border: "#404040",
-  divider: "#333333",
-  disabled: "#555555",
+
+  // Borders - Subtle and minimal
+  border: "rgba(255, 255, 255, 0.1)",
+  borderLight: "rgba(255, 255, 255, 0.05)",
+  divider: "rgba(255, 255, 255, 0.08)",
+
+  // States
+  disabled: "#3a3a4a",
   error: "#ef4444",
   success: "#10b981",
   warning: "#f59e0b",
   accent: "#8b5cf6",
+
+  // Event-specific
+  eventActive: "#10b981",
+  eventBadge: "#ef4444",
+
+  // Alias for backwards compatibility
+  white: "#ffffff",
 };
 
 export const typography = {
@@ -30,6 +51,15 @@ export const typography = {
   h3: {
     fontSize: 22,
     fontWeight: "600" as const,
+  },
+  // Aliases for backwards compatibility with theme.ts
+  title: {
+    fontSize: 28,
+    fontWeight: "700" as const,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "700" as const,
   },
   subtitle: {
     fontSize: 17,

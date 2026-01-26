@@ -1,4 +1,4 @@
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
 import React, { useCallback, useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Button as CustomButton } from "../components/Button";
 import { ProposalCard } from "../components/ProposalCard";
 import ProposalVoteModal from "../components/ProposalVoteModal";
@@ -168,53 +169,26 @@ const GroupDetailsScreen = () => {
       setPrimaryImage(primaryImageData as GroupImageRecord | null);
       // Later: Fetch otherImages here as well
 
-      // Fetch group members
-      const { data: memberData, error: memberError } = await supabase
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", groupId);
+      // Fetch group members using RPC function
+      const { data: memberData, error: memberError } = await supabase.rpc(
+        "get_group_members",
+        { p_group_id: groupId }
+      );
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error("Error fetching members:", memberError);
+        throw memberError;
+      }
 
-      console.log("Member data from group_members:", memberData);
+      console.log("Member data from get_group_members:", memberData);
 
-      // Fetch profiles for the member user IDs
-      if (memberData && memberData.length > 0) {
-        const userIds = memberData.map((m) => m.user_id);
-        console.log("User IDs to fetch profiles for:", userIds);
-
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, username, first_name, last_name, avatar_url")
-          .in("id", userIds);
-
-        console.log("Profile data fetched:", profileData);
-        console.log("Profile error:", profileError);
-
-        if (profileError) throw profileError;
-
-        const mappedMembers =
-          profileData?.map((profile) => {
-            console.log("Processing profile:", profile);
-            // Create a display name using username, first_name, last_name, or fallback
-            let displayName = profile.username;
-            if (!displayName && (profile.first_name || profile.last_name)) {
-              displayName = `${profile.first_name || ""} ${
-                profile.last_name || ""
-              }`.trim();
-            }
-            if (!displayName) {
-              displayName = "Unknown User";
-            }
-            console.log("Final display name:", displayName);
-
-            return {
-              id: profile.id,
-              username: displayName,
-              first_name: profile.first_name,
-              avatar_url: profile.avatar_url,
-            } as GroupMember;
-          }) || [];
+      if (memberData && Array.isArray(memberData) && memberData.length > 0) {
+        const mappedMembers = memberData.map((profile: any) => ({
+          id: profile.id,
+          username: profile.username || "Unknown User",
+          first_name: profile.first_name,
+          avatar_url: profile.avatar_url,
+        })) as GroupMember[];
 
         console.log("Fetched members:", mappedMembers);
         setMembers(mappedMembers);
@@ -258,6 +232,15 @@ const GroupDetailsScreen = () => {
       fetchGroupData();
     }
   }, [groupId, fetchGroupData]);
+
+  // Refresh data when screen comes into focus (e.g., after adding a member)
+  useFocusEffect(
+    useCallback(() => {
+      if (groupId) {
+        fetchGroupData();
+      }
+    }, [groupId, fetchGroupData])
+  );
 
   // Fetch proposals for the group
   const fetchProposals = useCallback(async () => {
@@ -1132,12 +1115,25 @@ const GroupDetailsScreen = () => {
       <View style={styles.membersSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-          <TouchableOpacity
-            onPress={handleShareInvite}
-            style={styles.shareButton}
-          >
-            <Text style={styles.shareButtonText}>Share Invite</Text>
-          </TouchableOpacity>
+          <View style={styles.memberActions}>
+            <TouchableOpacity
+              style={styles.addMemberButton}
+              onPress={() =>
+                navigation.navigate("AddUserToGroup", {
+                  groupId,
+                  groupName: groupDetails?.name || initialGroupName,
+                })
+              }
+            >
+              <Ionicons name="person-add" size={18} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleShareInvite}
+              style={styles.shareButton}
+            >
+              <Text style={styles.shareButtonText}>Share Invite</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         {members.length > 0 ? (
           <FlatList
@@ -1545,6 +1541,19 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 14,
     color: "#b0b0b0", // Medium grey
+  },
+  memberActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  addMemberButton: {
+    backgroundColor: "#5762b7",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   shareButton: {
     backgroundColor: "#5762b7", // Primary color

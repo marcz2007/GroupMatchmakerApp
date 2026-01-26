@@ -6,6 +6,8 @@ import AddUserToGroupScreen from "../screens/AddUserToGroupScreen";
 import CreateGroupScreen from "../screens/CreateGroupScreen";
 import CreateProposalScreen from "../screens/CreateProposalScreen";
 import EventRoomScreen from "../screens/EventRoomScreen";
+import EventChatScreen from "../screens/EventChatScreen";
+import EventDetailScreen from "../screens/EventDetailScreen";
 import GroupActionsScreen from "../screens/GroupActionsScreen";
 import GroupDetailsScreen from "../screens/GroupDetailsScreen";
 import GroupsScreen from "../screens/GroupsScreen";
@@ -16,6 +18,9 @@ import SignupScreen from "../screens/SignupScreen";
 
 // Import the bottom tab navigator
 import BottomTabNavigator from "./BottomTabNavigator";
+
+// Import theme
+import { colors } from "../theme";
 
 // Define updated param list for Grapple Lite
 export type RootStackParamList = {
@@ -32,6 +37,8 @@ export type RootStackParamList = {
   AddUserToGroup: { groupId: string; groupName: string };
   GroupActions: { groupId: string; groupName: string };
   EventRoom: { eventRoomId: string; title?: string };
+  EventChat: { eventRoomId: string };
+  EventDetail: { eventRoomId: string; eventDetails: any };
   CreateProposal: { groupId: string; groupName: string };
 };
 
@@ -46,9 +53,27 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
+// Shared screen options for futuristic dark theme
+const screenOptions = {
+  headerStyle: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  headerTintColor: colors.text.primary,
+  headerTitleStyle: {
+    fontWeight: "600" as const,
+  },
+  cardStyle: {
+    backgroundColor: colors.background,
+  },
+};
+
 // Main app stack that includes the bottom tab navigator and other screens
 const AppStack = () => (
-  <Stack.Navigator>
+  <Stack.Navigator screenOptions={screenOptions}>
     <Stack.Screen
       name="Main"
       component={BottomTabNavigator}
@@ -94,6 +119,16 @@ const AppStack = () => (
       options={({ route }) => ({
         title: route.params.title || "Event Room",
       })}
+    />
+    <Stack.Screen
+      name="EventChat"
+      component={EventChatScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="EventDetail"
+      component={EventDetailScreen}
+      options={{ headerShown: false }}
     />
     <Stack.Screen
       name="CreateProposal"

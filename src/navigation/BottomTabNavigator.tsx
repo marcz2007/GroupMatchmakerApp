@@ -1,39 +1,71 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
-import { StyleSheet } from "react-native";
-import Ionicons from "react-native-vector-icons/Ionicons";
+import { StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 // Import screens
 import EditProfileScreen from "../screens/EditProfileScreen";
 import GroupsScreen from "../screens/GroupsScreen";
 import ProposeScreen from "../screens/ProposeScreen";
+import EventsListScreen from "../screens/EventsListScreen";
+
+// Import context
+import { useEvents } from "../contexts/EventsContext";
+import { colors } from "../theme";
 
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = () => {
+  const { hasEvents } = useEvents();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName: string;
 
-          if (route.name === "Groups") {
+          if (route.name === "Events") {
+            iconName = focused ? "calendar" : "calendar-outline";
+          } else if (route.name === "Groups") {
             iconName = focused ? "grid" : "grid-outline";
           } else if (route.name === "Propose") {
             iconName = focused ? "rocket" : "rocket-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
+          } else {
+            iconName = "ellipse";
           }
 
-          return <Ionicons name={iconName as any} size={size} color={color} />;
+          // Add active indicator dot for Events tab
+          if (route.name === "Events" && hasEvents) {
+            return (
+              <View>
+                <Ionicons name={iconName} size={size} color={color} />
+                <View style={styles.activeDot} />
+              </View>
+            );
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#ffffff",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarActiveTintColor: colors.text.primary,
+        tabBarInactiveTintColor: colors.text.tertiary,
         tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
         headerShown: false,
       })}
     >
+      {/* Events tab - only show when there are active events */}
+      {hasEvents && (
+        <Tab.Screen
+          name="Events"
+          component={EventsListScreen}
+          options={{
+            title: "Events",
+          }}
+        />
+      )}
       <Tab.Screen
         name="Groups"
         component={GroupsScreen}
@@ -48,18 +80,41 @@ const BottomTabNavigator = () => {
           title: "Propose",
         }}
       />
-      <Tab.Screen name="Profile" component={EditProfileScreen} />
+      <Tab.Screen
+        name="Profile"
+        component={EditProfileScreen}
+        options={{
+          title: "Profile",
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#1a1a1a",
-    borderTopWidth: 0,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
     elevation: 0,
-    height: 60,
-    paddingBottom: 8,
+    height: 65,
+    paddingBottom: 10,
+    paddingTop: 5,
+  },
+  tabBarLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  activeDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.eventActive,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
   },
 });
 

@@ -5,9 +5,11 @@ import React from "react";
 import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
+import { EventsProvider } from "./src/contexts/EventsContext";
 import AppNavigator, {
   RootStackParamList,
 } from "./src/navigation/AppNavigator";
+import { colors } from "./src/theme";
 
 // Export the navigation prop type for reuse in components
 export type RootStackNavigationProp<T extends keyof RootStackParamList> =
@@ -68,23 +70,54 @@ function AppContent() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <KeyboardProvider>
-      <NavigationContainer
-        linking={linking}
-        fallback={<ActivityIndicator color="blue" size="large" />}
-      >
-        <View style={styles.container}>
-          <AppNavigator isAuthenticated={!!user} />
-        </View>
-      </NavigationContainer>
-    </KeyboardProvider>
+    <EventsProvider>
+      <KeyboardProvider>
+        <NavigationContainer
+          linking={linking}
+          fallback={<ActivityIndicator color={colors.primary} size="large" />}
+          theme={{
+            dark: true,
+            colors: {
+              primary: colors.primary,
+              background: colors.background,
+              card: colors.surface,
+              text: colors.text.primary,
+              border: colors.divider,
+              notification: colors.eventBadge,
+            },
+            fonts: {
+              regular: {
+                fontFamily: "System",
+                fontWeight: "400" as const,
+              },
+              medium: {
+                fontFamily: "System",
+                fontWeight: "500" as const,
+              },
+              bold: {
+                fontFamily: "System",
+                fontWeight: "700" as const,
+              },
+              heavy: {
+                fontFamily: "System",
+                fontWeight: "900" as const,
+              },
+            },
+          }}
+        >
+          <View style={styles.container}>
+            <AppNavigator isAuthenticated={!!user} />
+          </View>
+        </NavigationContainer>
+      </KeyboardProvider>
+    </EventsProvider>
   );
 }
 
@@ -99,6 +132,12 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a1a", // Anthracite grey background
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
   },
 });

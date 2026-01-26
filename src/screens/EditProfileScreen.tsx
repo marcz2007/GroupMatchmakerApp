@@ -15,13 +15,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { AIAnalysisSection } from "../components/profile/AIAnalysisSection";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { supabase } from "../supabase";
+import { colors, spacing, borderRadius, typography } from "../theme";
 import { commonStyles } from "../theme/commonStyles";
-import { borderRadius, colors, spacing, typography } from "../theme/theme";
 
 type RootStackParamList = {
   PublicProfile: { userId: string };
@@ -423,34 +425,44 @@ const EditProfileScreen = () => {
 
   if (loading) {
     return (
-      <View style={commonStyles.centeredContainer}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <LinearGradient
+          colors={colors.backgroundGradient}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={commonStyles.container}>
-      <View style={styles.editHeader}>
-        <Text style={commonStyles.title}>Edit Profile</Text>
-      </View>
+    <View style={styles.mainContainer}>
+      <LinearGradient
+        colors={colors.backgroundGradient}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.editHeader}>
+            <Text style={styles.headerTitle}>Profile</Text>
+          </View>
 
-      <TouchableOpacity
-        style={[
-          commonStyles.button,
-          {
-            backgroundColor: colors.primary,
-            marginHorizontal: spacing.md,
-            marginBottom: spacing.lg,
-          },
-        ]}
-        onPress={() =>
-          profile?.id &&
-          navigation.navigate("PublicProfile", { userId: profile.id })
-        }
-      >
-        <Text style={commonStyles.buttonText}>View Public Profile</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.viewProfileButton}
+            onPress={() =>
+              profile?.id &&
+              navigation.navigate("PublicProfile", { userId: profile.id })
+            }
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewProfileButtonText}>View Public Profile</Text>
+          </TouchableOpacity>
 
       {profile?.word_patterns &&
         profile.word_patterns.topWords &&
@@ -849,27 +861,44 @@ const EditProfileScreen = () => {
         </View>
       </Modal>
 
-      <TouchableOpacity
-        onPress={handleLogout}
-        style={{
-          marginTop: 20,
-          marginBottom: 60,
-          backgroundColor: "red",
-          padding: 12,
-          borderRadius: 8,
-        }}
-      >
-        <Text
-          style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
-        >
-          Log Out
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={styles.logoutButton}
+          >
+            <Ionicons name="log-out-outline" size={20} color={colors.text.primary} />
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl * 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.text.primary,
+  },
   avatarContainer: {
     alignItems: "center",
     marginBottom: spacing.xl,
@@ -884,7 +913,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: colors.border,
+    backgroundColor: colors.surfaceGlass,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.sm,
@@ -896,8 +925,38 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   uploadButtonText: {
-    color: colors.white,
+    color: colors.text.primary,
     fontWeight: "bold",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.error,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  logoutButtonText: {
+    color: colors.text.primary,
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  viewProfileButton: {
+    backgroundColor: colors.surfaceGlass,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.lg,
+    alignItems: "center",
+  },
+  viewProfileButtonText: {
+    color: colors.primary,
+    fontWeight: "600",
+    fontSize: 16,
   },
   photoGallerySection: {
     width: "100%",
@@ -931,7 +990,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   removePhotoButtonText: {
-    color: colors.white,
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -951,10 +1010,12 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   inputGroup: {
     marginBottom: spacing.md,
@@ -993,7 +1054,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   addInterestButtonText: {
-    color: colors.white,
+    color: colors.text.primary,
     ...typography.body,
   },
   interestsContainer: {
