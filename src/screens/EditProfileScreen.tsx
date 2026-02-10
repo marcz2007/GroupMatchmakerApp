@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,8 @@ import {
   TouchableOpacity,
   View,
   SafeAreaView,
+  Dimensions,
+  FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AIAnalysisSection } from "../components/profile/AIAnalysisSection";
@@ -24,6 +26,9 @@ import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { supabase } from "../supabase";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { commonStyles } from "../theme/commonStyles";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PROFILE_IMAGE_SIZE = SCREEN_WIDTH * 0.7;
 
 type RootStackParamList = {
   PublicProfile: { userId: string };
@@ -80,6 +85,8 @@ const EditProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
   const [visibilitySettings, setVisibilitySettings] = useState({
     photos: true,
     bio: true,
@@ -102,13 +109,7 @@ const EditProfileScreen = () => {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
   const [newInterest, setNewInterest] = useState("");
-  const [editingBasicInfo, setEditingBasicInfo] = useState(false);
-  const [basicInfoForm, setBasicInfoForm] = useState({
-    first_name: "",
-    last_name: "",
-    username: "",
-  });
-  const [savingBasicInfo, setSavingBasicInfo] = useState(false);
+  const [savingField, setSavingField] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -135,11 +136,6 @@ const EditProfileScreen = () => {
 
       if (data) {
         setProfile(data);
-        setBasicInfoForm({
-          first_name: data.first_name || "",
-          last_name: data.last_name || "",
-          username: data.username || "",
-        });
         setVisibilitySettings(
           data.visibility_settings || {
             photos: true,
@@ -154,11 +150,8 @@ const EditProfileScreen = () => {
             },
           }
         );
-
-        // Check if user has AI analysis data
         setHasAnalysis(!!data.word_patterns?.topWords?.length);
 
-        // Fetch message count
         try {
           const { count, error: messageError } = await supabase
             .from("messages")
@@ -176,6 +169,35 @@ const EditProfileScreen = () => {
       console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getInitials = () => {
+    const first = profile?.first_name?.[0] || "";
+    const last = profile?.last_name?.[0] || "";
+    return (first + last).toUpperCase() || "?";
+  };
+
+  const saveField = async (field: string, value: any) => {
+    try {
+      setSavingField(field);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ [field]: value })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      setProfile((prev) => (prev ? { ...prev, [field]: value } : null));
+    } catch (error) {
+      console.error(`Error saving ${field}:`, error);
+      Alert.alert("Error", `Failed to save ${field}`);
+    } finally {
+      setSavingField(null);
     }
   };
 
@@ -255,9 +277,7 @@ const EditProfileScreen = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("No user found");
-      }
+      if (!user) throw new Error("No user found");
 
       const { error } = await supabase
         .from("profiles")
@@ -265,8 +285,6 @@ const EditProfileScreen = () => {
         .eq("id", user.id);
 
       if (error) throw error;
-
-      // Update local profile state
       setProfile((prev) =>
         prev ? { ...prev, enable_ai_analysis: enabled } : null
       );
@@ -334,28 +352,23 @@ const EditProfileScreen = () => {
     }
   };
 
-  const handleAddInterest = () => {
+  const handleAddInterest = async () => {
     if (newInterest.trim() && profile) {
-      setProfile({
-        ...profile,
-        interests: [...(profile.interests || []), newInterest.trim()],
-      });
+      const newInterests = [...(profile.interests || []), newInterest.trim()];
+      await saveField("interests", newInterests);
       setNewInterest("");
     }
   };
 
-  const handleRemoveInterest = (index: number) => {
+  const handleRemoveInterest = async (index: number) => {
     if (profile) {
       const newInterests = [...(profile.interests || [])];
       newInterests.splice(index, 1);
-      setProfile({
-        ...profile,
-        interests: newInterests,
-      });
+      await saveField("interests", newInterests);
     }
   };
 
-  const pickMultipleImages = async () => {
+  const pickImages = async () => {
     try {
       setUploadingPhotos(true);
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -370,14 +383,8 @@ const EditProfileScreen = () => {
           id: Math.random().toString(),
         }));
 
-        setProfile((prev) =>
-          prev
-            ? {
-                ...prev,
-                photos: [...(prev.photos || []), ...newPhotos].slice(0, 6),
-              }
-            : null
-        );
+        const updatedPhotos = [...(profile?.photos || []), ...newPhotos].slice(0, 6);
+        await saveField("photos", updatedPhotos);
       }
     } catch (error) {
       console.error("Error picking images:", error);
@@ -386,41 +393,33 @@ const EditProfileScreen = () => {
     }
   };
 
-  const handleSaveBasicInfo = async () => {
-    try {
-      setSavingBasicInfo(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("No user found");
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: basicInfoForm.first_name,
-          last_name: basicInfoForm.last_name,
-          username: basicInfoForm.username,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
-
-      // Update local profile state
-      setProfile((prev) => (prev ? { ...prev, ...basicInfoForm } : null));
-      setEditingBasicInfo(false);
-    } catch (error) {
-      console.error("Error updating basic info:", error);
-      Alert.alert("Error", "Failed to update basic information");
-    } finally {
-      setSavingBasicInfo(false);
-    }
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // Optionally, navigate to the login screen or reset navigation here
+  };
+
+  const renderPhotoItem = ({ item, index }: { item: Photo; index: number }) => (
+    <View style={styles.photoSlide}>
+      <Image source={{ uri: item.url }} style={styles.profileImage} />
+    </View>
+  );
+
+  const renderPhotoIndicators = () => {
+    const photos = profile?.photos || [];
+    if (photos.length <= 1) return null;
+
+    return (
+      <View style={styles.photoIndicators}>
+        {photos.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.photoIndicator,
+              index === currentPhotoIndex && styles.photoIndicatorActive,
+            ]}
+          />
+        ))}
+      </View>
+    );
   };
 
   if (loading) {
@@ -436,6 +435,8 @@ const EditProfileScreen = () => {
     );
   }
 
+  const hasPhotos = profile?.photos && profile.photos.length > 0;
+
   return (
     <View style={styles.mainContainer}>
       <LinearGradient
@@ -449,10 +450,63 @@ const EditProfileScreen = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.editHeader}>
-            <Text style={styles.headerTitle}>Profile</Text>
+          {/* Profile Header - Top Third */}
+          <View style={styles.profileHeader}>
+            <View style={styles.profileImageContainer}>
+              {hasPhotos ? (
+                <>
+                  <FlatList
+                    ref={flatListRef}
+                    data={profile.photos}
+                    renderItem={renderPhotoItem}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={(e) => {
+                      const index = Math.round(
+                        e.nativeEvent.contentOffset.x / PROFILE_IMAGE_SIZE
+                      );
+                      setCurrentPhotoIndex(index);
+                    }}
+                    style={styles.photoCarousel}
+                  />
+                  {renderPhotoIndicators()}
+                </>
+              ) : (
+                <View style={styles.initialsContainer}>
+                  <Text style={styles.initialsText}>{getInitials()}</Text>
+                </View>
+              )}
+
+              {/* Edit Photos Button */}
+              <TouchableOpacity
+                style={styles.editPhotosButton}
+                onPress={pickImages}
+                disabled={uploadingPhotos}
+              >
+                {uploadingPhotos ? (
+                  <ActivityIndicator size="small" color={colors.text.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="camera" size={18} color={colors.text.primary} />
+                    <Text style={styles.editPhotosText}>
+                      {hasPhotos ? "Edit Photos" : "Add Photos"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Name */}
+            <Text style={styles.profileName}>
+              {profile?.first_name} {profile?.last_name}
+            </Text>
+            {profile?.username && (
+              <Text style={styles.profileUsername}>@{profile.username}</Text>
+            )}
           </View>
 
+          {/* View Public Profile Button */}
           <TouchableOpacity
             style={styles.viewProfileButton}
             onPress={() =>
@@ -461,410 +515,313 @@ const EditProfileScreen = () => {
             }
             activeOpacity={0.8}
           >
+            <Ionicons name="eye-outline" size={20} color={colors.primary} />
             <Text style={styles.viewProfileButtonText}>View Public Profile</Text>
           </TouchableOpacity>
 
-      {profile?.word_patterns &&
-        profile.word_patterns.topWords &&
-        profile.word_patterns.topWords.length > 0 && (
+          {/* Interests Section */}
           <View style={styles.section}>
             <SectionHeader
-              title={`${profile.first_name}'s Signature Words`}
-              isVisible={visibilitySettings.ai_analysis}
-              onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
+              title="Interests"
+              isVisible={visibilitySettings.interests}
+              onToggleVisibility={() => handleVisibilityChange("interests")}
             />
-            <View style={styles.wordPatternsContainer}>
-              <Text style={styles.signatureWords}>
-                {profile.word_patterns.topWords
-                  .slice(0, 3)
-                  .map((word, index) => {
-                    if (index === 0) return word.word;
-                    if (index === 2) return ` and ${word.word}`;
-                    return `, ${word.word}`;
-                  })}
-              </Text>
-            </View>
-          </View>
-        )}
-
-      <View style={styles.section}>
-        <SectionHeader
-          title="About"
-          isVisible={visibilitySettings.bio}
-          onToggleVisibility={() => handleVisibilityChange("bio")}
-        />
-        <TextInput
-          style={[styles.input, styles.bioInput]}
-          value={profile?.bio}
-          onChangeText={(text) =>
-            setProfile((prev) => (prev ? { ...prev, bio: text } : null))
-          }
-          placeholder="Tell us about yourself..."
-          multiline
-          numberOfLines={4}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader
-          title="Interests"
-          isVisible={visibilitySettings.interests}
-          onToggleVisibility={() => handleVisibilityChange("interests")}
-        />
-        <View style={styles.interestsInputContainer}>
-          <TextInput
-            style={[styles.input, styles.interestsInput]}
-            value={newInterest}
-            onChangeText={setNewInterest}
-            placeholder="Add an interest..."
-            onSubmitEditing={handleAddInterest}
-          />
-          <TouchableOpacity
-            style={styles.addInterestButton}
-            onPress={handleAddInterest}
-          >
-            <Text style={styles.addInterestButtonText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.interestsContainer}>
-          {profile?.interests?.map((interest, index) => (
-            <View key={index} style={styles.interestTag}>
-              <Text style={styles.interestText}>{interest}</Text>
+            <View style={styles.interestsInputContainer}>
+              <TextInput
+                style={[styles.input, styles.interestsInput]}
+                value={newInterest}
+                onChangeText={setNewInterest}
+                placeholder="Add an interest..."
+                placeholderTextColor={colors.text.secondary}
+                onSubmitEditing={handleAddInterest}
+              />
               <TouchableOpacity
-                onPress={() => handleRemoveInterest(index)}
-                style={styles.removeInterestButton}
+                style={styles.addInterestButton}
+                onPress={handleAddInterest}
               >
-                <Text style={styles.removeInterestButtonText}>×</Text>
+                <Text style={styles.addInterestButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.photoGallerySection}>
-        <SectionHeader
-          title="Profile Photos"
-          isVisible={visibilitySettings.photos}
-          onToggleVisibility={() => handleVisibilityChange("photos")}
-        />
-        <View style={styles.photoGrid}>
-          {profile?.photos?.map((photo, index) => (
-            <View key={index} style={styles.photoContainer}>
-              <Image source={{ uri: photo.url }} style={styles.photo} />
-              <TouchableOpacity
-                style={styles.removePhotoButton}
-                onPress={() => {
-                  const newPhotos = [...(profile.photos || [])];
-                  newPhotos.splice(index, 1);
-                  setProfile((prev) =>
-                    prev ? { ...prev, photos: newPhotos } : null
-                  );
-                }}
-              >
-                <Text style={styles.removePhotoButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-          {(!profile?.photos || profile.photos.length < 6) && (
-            <TouchableOpacity
-              style={styles.addPhotoButton}
-              onPress={pickMultipleImages}
-              disabled={uploadingPhotos}
-            >
-              <Text style={styles.addPhotoButtonText}>+</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.spotifySection}>
-        <SectionHeader
-          title="Music Taste"
-          isVisible={
-            visibilitySettings.spotify.top_artists ||
-            visibilitySettings.spotify.top_genres ||
-            visibilitySettings.spotify.selected_playlist
-          }
-          onToggleVisibility={() => handleVisibilityChange("spotify")}
-        />
-        <View style={commonStyles.container}>
-          {!profile?.spotify_connected ? (
-            <SpotifyConnect
-              onConnect={handleConnectSpotify}
-              onDisconnect={handleDisconnectSpotify}
-              isConnected={profile?.spotify_connected || false}
-              isConnecting={connectingSpotify}
-            />
-          ) : (
-            <>
-              {profile.spotify_top_genres && (
-                <View style={styles.spotifySubsection}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Top Genres</Text>
-                    <VisibilityToggle
-                      isVisible={visibilitySettings.spotify.top_genres}
-                      onToggle={() =>
-                        handleVisibilityChange("spotify", "top_genres")
-                      }
-                      label="Genres"
-                    />
-                  </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.genresContainer}
+            <View style={styles.interestsContainer}>
+              {profile?.interests?.map((interest, index) => (
+                <View key={index} style={styles.interestTag}>
+                  <Text style={styles.interestText}>{interest}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveInterest(index)}
+                    style={styles.removeInterestButton}
                   >
-                    {profile.spotify_top_genres.map((genre, index) => (
-                      <View key={index} style={styles.genreTag}>
-                        <Text style={styles.genreText}>{genre}</Text>
-                      </View>
-                    ))}
-                  </ScrollView>
+                    <Text style={styles.removeInterestButtonText}>×</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
-
-              {profile.spotify_top_artists && (
-                <View style={styles.spotifySubsection}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Top Artists</Text>
-                    <VisibilityToggle
-                      isVisible={visibilitySettings.spotify.top_artists}
-                      onToggle={() =>
-                        handleVisibilityChange("spotify", "top_artists")
-                      }
-                      label="Artists"
-                    />
-                  </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.artistsContainer}
-                  >
-                    {profile.spotify_top_artists.map((artist, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.artistCard}
-                        onPress={() => Linking.openURL(artist.spotify_url)}
-                      >
-                        <Image
-                          source={{ uri: artist.image }}
-                          style={styles.artistImage}
-                        />
-                        <Text style={styles.artistName} numberOfLines={1}>
-                          {artist.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              <View style={styles.spotifySubsection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Featured Playlist</Text>
-                  <VisibilityToggle
-                    isVisible={visibilitySettings.spotify.selected_playlist}
-                    onToggle={() =>
-                      handleVisibilityChange("spotify", "selected_playlist")
-                    }
-                    label="Playlist"
-                  />
-                </View>
-                <PlaylistSelector
-                  onSelect={handleSelectPlaylist}
-                  isLoading={loadingPlaylists}
-                  selectedPlaylist={profile.spotify_selected_playlist}
-                />
-              </View>
-
-              <Text
-                style={[
-                  typography.caption,
-                  { color: colors.text.secondary, marginTop: spacing.sm },
-                ]}
-              >
-                Toggle visibility to control what others see in your public
-                profile
-              </Text>
-            </>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <AIAnalysisSection
-          enabled={profile?.enable_ai_analysis || false}
-          onToggle={handleAIAnalysisToggle}
-          hasBio={!!profile?.bio}
-          bioLength={profile?.bio?.length || 0}
-          hasMessages={messageCount > 0}
-          messageCount={messageCount}
-          hasAnalysis={hasAnalysis}
-        />
-      </View>
-
-      <View style={[styles.section, { marginBottom: spacing.xl }]}>
-        <Text style={styles.sectionTitle}>Basic Information</Text>
-
-        {/* Check if any basic info fields are empty */}
-        {(!profile?.first_name ||
-          !profile?.last_name ||
-          !profile?.username) && (
-          <Text style={styles.helpText}>
-            Complete your basic information to help others identify you
-          </Text>
-        )}
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>First Name</Text>
-          <TextInput
-            style={[
-              styles.input,
-              { backgroundColor: colors.background },
-              editingBasicInfo && styles.editableInput,
-              !editingBasicInfo && styles.readOnlyInput,
-            ]}
-            value={
-              editingBasicInfo ? basicInfoForm.first_name : profile?.first_name
-            }
-            onChangeText={(text) =>
-              setBasicInfoForm((prev) => ({ ...prev, first_name: text }))
-            }
-            editable={editingBasicInfo}
-            placeholder="Enter your first name"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Last Name</Text>
-          <TextInput
-            style={[
-              styles.input,
-              { backgroundColor: colors.background },
-              editingBasicInfo && styles.editableInput,
-              !editingBasicInfo && styles.readOnlyInput,
-            ]}
-            value={
-              editingBasicInfo ? basicInfoForm.last_name : profile?.last_name
-            }
-            onChangeText={(text) =>
-              setBasicInfoForm((prev) => ({ ...prev, last_name: text }))
-            }
-            editable={editingBasicInfo}
-            placeholder="Enter your last name"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={[
-              styles.input,
-              { backgroundColor: colors.background },
-              editingBasicInfo && styles.editableInput,
-              !editingBasicInfo && styles.readOnlyInput,
-            ]}
-            value={
-              editingBasicInfo ? basicInfoForm.username : profile?.username
-            }
-            onChangeText={(text) =>
-              setBasicInfoForm((prev) => ({ ...prev, username: text }))
-            }
-            editable={editingBasicInfo}
-            placeholder="Choose a username"
-          />
-        </View>
-
-        {/* Show edit button when not editing, save/cancel when editing */}
-        <View style={styles.basicInfoActions}>
-          {!editingBasicInfo ? (
-            <TouchableOpacity
-              style={[commonStyles.button, { backgroundColor: colors.primary }]}
-              onPress={() => setEditingBasicInfo(true)}
-            >
-              <Text style={commonStyles.buttonText}>Edit Basic Info</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.basicInfoActionButtons}>
-              <TouchableOpacity
-                style={[
-                  commonStyles.button,
-                  { backgroundColor: colors.secondary, marginRight: 10 },
-                ]}
-                onPress={() => {
-                  setEditingBasicInfo(false);
-                  setBasicInfoForm({
-                    first_name: profile?.first_name || "",
-                    last_name: profile?.last_name || "",
-                    username: profile?.username || "",
-                  });
-                }}
-                disabled={savingBasicInfo}
-              >
-                <Text style={commonStyles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  commonStyles.button,
-                  { backgroundColor: colors.primary },
-                ]}
-                onPress={handleSaveBasicInfo}
-                disabled={savingBasicInfo}
-              >
-                <Text style={commonStyles.buttonText}>
-                  {savingBasicInfo ? "Saving..." : "Save"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <Modal
-        visible={showPlaylistModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPlaylistModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select a Playlist</Text>
-              <TouchableOpacity
-                onPress={() => setShowPlaylistModal(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.playlistList}>
-              {availablePlaylists.map((playlist) => (
-                <TouchableOpacity
-                  key={playlist.id}
-                  style={styles.playlistItem}
-                  onPress={() => handlePlaylistSelect(playlist)}
-                >
-                  <Image
-                    source={{ uri: playlist.image }}
-                    style={styles.playlistItemImage}
-                  />
-                  <View style={styles.playlistItemInfo}>
-                    <Text style={styles.playlistItemName}>{playlist.name}</Text>
-                    <Text style={styles.playlistItemStats}>
-                      {playlist.tracks_count} tracks • By {playlist.owner}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
 
-          <TouchableOpacity
-            onPress={handleLogout}
-            style={styles.logoutButton}
+          {/* About Section */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="About"
+              isVisible={visibilitySettings.bio}
+              onToggleVisibility={() => handleVisibilityChange("bio")}
+            />
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              value={profile?.bio}
+              onChangeText={(text) =>
+                setProfile((prev) => (prev ? { ...prev, bio: text } : null))
+              }
+              onBlur={() => profile?.bio && saveField("bio", profile.bio)}
+              placeholder="Tell us about yourself..."
+              placeholderTextColor={colors.text.secondary}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          {/* Signature Words */}
+          {profile?.word_patterns &&
+            profile.word_patterns.topWords &&
+            profile.word_patterns.topWords.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeader
+                  title={`${profile.first_name}'s Signature Words`}
+                  isVisible={visibilitySettings.ai_analysis}
+                  onToggleVisibility={() => handleVisibilityChange("ai_analysis")}
+                />
+                <View style={styles.wordPatternsContainer}>
+                  <Text style={styles.signatureWords}>
+                    {profile.word_patterns.topWords
+                      .slice(0, 3)
+                      .map((word, index) => {
+                        if (index === 0) return word.word;
+                        if (index === 2) return ` and ${word.word}`;
+                        return `, ${word.word}`;
+                      })}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+          {/* Music Taste Section */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Music Taste"
+              isVisible={
+                visibilitySettings.spotify.top_artists ||
+                visibilitySettings.spotify.top_genres ||
+                visibilitySettings.spotify.selected_playlist
+              }
+              onToggleVisibility={() => handleVisibilityChange("spotify")}
+            />
+            <View style={commonStyles.container}>
+              {!profile?.spotify_connected ? (
+                <SpotifyConnect
+                  onConnect={handleConnectSpotify}
+                  onDisconnect={handleDisconnectSpotify}
+                  isConnected={profile?.spotify_connected || false}
+                  isConnecting={connectingSpotify}
+                />
+              ) : (
+                <>
+                  {profile.spotify_top_genres && (
+                    <View style={styles.spotifySubsection}>
+                      <View style={styles.subsectionHeader}>
+                        <Text style={styles.subsectionTitle}>Top Genres</Text>
+                        <VisibilityToggle
+                          isVisible={visibilitySettings.spotify.top_genres}
+                          onToggle={() =>
+                            handleVisibilityChange("spotify", "top_genres")
+                          }
+                          label="Genres"
+                        />
+                      </View>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.genresContainer}
+                      >
+                        {profile.spotify_top_genres.map((genre, index) => (
+                          <View key={index} style={styles.genreTag}>
+                            <Text style={styles.genreText}>{genre}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {profile.spotify_top_artists && (
+                    <View style={styles.spotifySubsection}>
+                      <View style={styles.subsectionHeader}>
+                        <Text style={styles.subsectionTitle}>Top Artists</Text>
+                        <VisibilityToggle
+                          isVisible={visibilitySettings.spotify.top_artists}
+                          onToggle={() =>
+                            handleVisibilityChange("spotify", "top_artists")
+                          }
+                          label="Artists"
+                        />
+                      </View>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.artistsContainer}
+                      >
+                        {profile.spotify_top_artists.map((artist, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.artistCard}
+                            onPress={() => Linking.openURL(artist.spotify_url)}
+                          >
+                            <Image
+                              source={{ uri: artist.image }}
+                              style={styles.artistImage}
+                            />
+                            <Text style={styles.artistName} numberOfLines={1}>
+                              {artist.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  <View style={styles.spotifySubsection}>
+                    <View style={styles.subsectionHeader}>
+                      <Text style={styles.subsectionTitle}>Featured Playlist</Text>
+                      <VisibilityToggle
+                        isVisible={visibilitySettings.spotify.selected_playlist}
+                        onToggle={() =>
+                          handleVisibilityChange("spotify", "selected_playlist")
+                        }
+                        label="Playlist"
+                      />
+                    </View>
+                    <PlaylistSelector
+                      onSelect={handleSelectPlaylist}
+                      isLoading={loadingPlaylists}
+                      selectedPlaylist={profile.spotify_selected_playlist}
+                    />
+                  </View>
+
+                  <Text style={styles.visibilityHelpText}>
+                    Toggle visibility to control what others see in your public
+                    profile
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+
+          {/* AI Analysis Section */}
+          <View style={styles.section}>
+            <AIAnalysisSection
+              enabled={profile?.enable_ai_analysis || false}
+              onToggle={handleAIAnalysisToggle}
+              hasBio={!!profile?.bio}
+              bioLength={profile?.bio?.length || 0}
+              hasMessages={messageCount > 0}
+              messageCount={messageCount}
+              hasAnalysis={hasAnalysis}
+            />
+          </View>
+
+          {/* Basic Information Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Basic Information</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>First Name</Text>
+              <TextInput
+                style={styles.input}
+                value={profile?.first_name}
+                onChangeText={(text) =>
+                  setProfile((prev) => (prev ? { ...prev, first_name: text } : null))
+                }
+                onBlur={() =>
+                  profile?.first_name && saveField("first_name", profile.first_name)
+                }
+                placeholder="Enter your first name"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Last Name</Text>
+              <TextInput
+                style={styles.input}
+                value={profile?.last_name}
+                onChangeText={(text) =>
+                  setProfile((prev) => (prev ? { ...prev, last_name: text } : null))
+                }
+                onBlur={() =>
+                  profile?.last_name && saveField("last_name", profile.last_name)
+                }
+                placeholder="Enter your last name"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                style={styles.input}
+                value={profile?.username}
+                onChangeText={(text) =>
+                  setProfile((prev) => (prev ? { ...prev, username: text } : null))
+                }
+                onBlur={() =>
+                  profile?.username && saveField("username", profile.username)
+                }
+                placeholder="Choose a username"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+          </View>
+
+          {/* Playlist Modal */}
+          <Modal
+            visible={showPlaylistModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowPlaylistModal(false)}
           >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select a Playlist</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowPlaylistModal(false)}
+                    style={styles.closeButton}
+                  >
+                    <Text style={styles.closeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.playlistList}>
+                  {availablePlaylists.map((playlist) => (
+                    <TouchableOpacity
+                      key={playlist.id}
+                      style={styles.playlistItem}
+                      onPress={() => handlePlaylistSelect(playlist)}
+                    >
+                      <Image
+                        source={{ uri: playlist.image }}
+                        style={styles.playlistItemImage}
+                      />
+                      <View style={styles.playlistItemInfo}>
+                        <Text style={styles.playlistItemName}>{playlist.name}</Text>
+                        <Text style={styles.playlistItemStats}>
+                          {playlist.tracks_count} tracks • By {playlist.owner}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Logout Button */}
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <Ionicons name="log-out-outline" size={20} color={colors.text.primary} />
             <Text style={styles.logoutButtonText}>Log Out</Text>
           </TouchableOpacity>
@@ -886,7 +843,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 2,
   },
   loadingContainer: {
@@ -895,121 +851,109 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.background,
   },
-  headerTitle: {
-    ...typography.h2,
-    color: colors.text.primary,
-  },
-  avatarContainer: {
+  // Profile Header Styles
+  profileHeader: {
     alignItems: "center",
-    marginBottom: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
-  avatar: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    marginBottom: spacing.sm,
+  profileImageContainer: {
+    alignItems: "center",
+    marginBottom: spacing.md,
   },
-  avatarPlaceholder: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: colors.surfaceGlass,
+  photoCarousel: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
+    overflow: "hidden",
+  },
+  photoSlide: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+  },
+  profileImage: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
+  },
+  initialsContainer: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: spacing.sm,
   },
-  uploadButton: {
+  initialsText: {
+    fontSize: 72,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  photoIndicators: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  photoIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
+  },
+  photoIndicatorActive: {
     backgroundColor: colors.primary,
+    width: 24,
+  },
+  editPhotosButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceGlass,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.md,
+    gap: spacing.xs,
   },
-  uploadButtonText: {
+  editPhotosText: {
     color: colors.text.primary,
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontSize: 14,
   },
-  logoutButton: {
+  profileName: {
+    ...typography.h1,
+    color: colors.text.primary,
+    textAlign: "center",
+    marginTop: spacing.sm,
+  },
+  profileUsername: {
+    ...typography.body,
+    color: colors.text.secondary,
+    textAlign: "center",
+  },
+  // View Profile Button
+  viewProfileButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.error,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
-    gap: spacing.sm,
-  },
-  logoutButtonText: {
-    color: colors.text.primary,
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  viewProfileButton: {
     backgroundColor: colors.surfaceGlass,
     borderWidth: 1,
     borderColor: colors.primaryBorder,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
-    alignItems: "center",
+    gap: spacing.sm,
   },
   viewProfileButtonText: {
     color: colors.primary,
     fontWeight: "600",
     fontSize: 16,
   },
-  photoGallerySection: {
-    width: "100%",
-    marginBottom: spacing.xl,
-  },
-  photoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  photoContainer: {
-    width: "30%",
-    aspectRatio: 1,
-    position: "relative",
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
-    borderRadius: borderRadius.md,
-  },
-  removePhotoButton: {
-    position: "absolute",
-    top: -10,
-    right: -10,
-    backgroundColor: "#dc3545",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  removePhotoButtonText: {
-    color: colors.text.primary,
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  addPhotoButton: {
-    width: "30%",
-    aspectRatio: 1,
-    backgroundColor: colors.border,
-    borderRadius: borderRadius.md,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: "dashed",
-  },
-  addPhotoButtonText: {
-    fontSize: 32,
-    color: colors.text.secondary,
-  },
+  // Section Styles
   section: {
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
     padding: spacing.md,
     backgroundColor: colors.surfaceGlass,
@@ -1017,6 +961,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  sectionTitle: {
+    ...typography.sectionTitle,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  subsectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  subsectionTitle: {
+    ...typography.body,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  // Input Styles
   inputGroup: {
     marginBottom: spacing.md,
   },
@@ -1038,6 +1005,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: "top",
   },
+  // Interests Styles
   interestsInputContainer: {
     flexDirection: "row",
     marginBottom: spacing.sm,
@@ -1055,7 +1023,7 @@ const styles = StyleSheet.create({
   },
   addInterestButtonText: {
     color: colors.text.primary,
-    ...typography.body,
+    fontWeight: "600",
   },
   interestsContainer: {
     flexDirection: "row",
@@ -1082,40 +1050,11 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: 16,
   },
-  editHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  spotifySection: {
-    width: "100%",
-    marginBottom: spacing.xl,
-  },
-  headerButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  playlistSelector: {
-    width: "100%",
-  },
+  // Spotify Styles
   spotifySubsection: {
     marginBottom: spacing.lg,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-    width: "100%",
-  },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.text.primary,
-  },
   genresContainer: {
-    paddingHorizontal: spacing.sm,
     gap: spacing.xs,
   },
   genreTag: {
@@ -1130,16 +1069,15 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   artistsContainer: {
-    paddingHorizontal: spacing.sm,
     gap: spacing.sm,
   },
   artistCard: {
-    width: 120,
+    width: 100,
     marginRight: spacing.sm,
   },
   artistImage: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: borderRadius.md,
     marginBottom: spacing.xs,
   },
@@ -1148,6 +1086,22 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: "center",
   },
+  visibilityHelpText: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+  },
+  // Word Patterns
+  wordPatternsContainer: {
+    marginTop: spacing.sm,
+  },
+  signatureWords: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontStyle: "italic",
+    textAlign: "center",
+  },
+  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1206,42 +1160,30 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.text.secondary,
   },
+  // Visibility Toggle
   visibilityToggle: {
     flexDirection: "row",
     alignItems: "center",
     padding: spacing.xs,
     borderRadius: borderRadius.sm,
   },
-  wordPatternsContainer: {
-    marginTop: spacing.sm,
-  },
-  signatureWords: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontStyle: "italic",
-    textAlign: "center",
-    marginTop: spacing.sm,
-  },
-  helpText: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginBottom: spacing.sm,
-    fontStyle: "italic",
-  },
-  editableInput: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
-  readOnlyInput: {
-    backgroundColor: colors.surface,
-    opacity: 0.7,
-  },
-  basicInfoActions: {
-    marginTop: spacing.md,
-  },
-  basicInfoActionButtons: {
+  // Logout Button
+  logoutButton: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.error,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  logoutButtonText: {
+    color: colors.text.primary,
+    fontWeight: "600",
+    fontSize: 16,
   },
 });
 
@@ -1273,6 +1215,7 @@ const VisibilityToggle = ({
     </Text>
   </TouchableOpacity>
 );
+
 const SectionHeader = ({
   title,
   isVisible,
@@ -1283,7 +1226,7 @@ const SectionHeader = ({
   onToggleVisibility: () => void;
 }) => (
   <View style={styles.sectionHeader}>
-    <Text style={typography.sectionTitle}>{title}</Text>
+    <Text style={styles.sectionTitle}>{title}</Text>
     <VisibilityToggle
       isVisible={isVisible}
       onToggle={onToggleVisibility}
@@ -1291,4 +1234,5 @@ const SectionHeader = ({
     />
   </View>
 );
+
 export default EditProfileScreen;
