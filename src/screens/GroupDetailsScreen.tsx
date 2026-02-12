@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button as CustomButton } from "../components/Button";
+import { GroupAvailabilityCalendar } from "../components/calendar/GroupAvailabilityCalendar";
 import { ProposalCard } from "../components/ProposalCard";
 import ProposalVoteModal from "../components/ProposalVoteModal";
 import { GroupAIAnalysisSection } from "../components/profile/GroupAIAnalysisSection";
@@ -1145,6 +1146,11 @@ const GroupDetailsScreen = () => {
         ) : (
           <Text>No members found.</Text>
         )}
+      </View>
+
+      {/* Group Availability Calendar */}
+      <View style={styles.section}>
+        <GroupAvailabilityCalendar groupId={groupId} />
       </View>
 
       {/* <View style={styles.section}>

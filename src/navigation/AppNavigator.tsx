@@ -3,6 +3,7 @@ import React from "react";
 
 // Import screens
 import AddUserToGroupScreen from "../screens/AddUserToGroupScreen";
+import CalendarLinkScreen from "../screens/CalendarLinkScreen";
 import CreateGroupScreen from "../screens/CreateGroupScreen";
 import CreateProposalScreen from "../screens/CreateProposalScreen";
 import EventRoomScreen from "../screens/EventRoomScreen";
@@ -19,7 +20,8 @@ import SignupScreen from "../screens/SignupScreen";
 // Import the bottom tab navigator
 import BottomTabNavigator from "./BottomTabNavigator";
 
-// Import theme
+// Import theme and auth
+import { useAuth } from "../contexts/AuthContext";
 import { colors } from "../theme";
 
 // Define updated param list for Grapple Lite
@@ -28,6 +30,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   ResetPassword: undefined;
+  CalendarLink: undefined;
   Main: undefined;
   EditProfile: undefined;
   PublicProfile: { userId: string };
@@ -40,6 +43,7 @@ export type RootStackParamList = {
   EventChat: { eventRoomId: string };
   EventDetail: { eventRoomId: string; eventDetails: any };
   CreateProposal: { groupId: string; groupName: string };
+  GroupAvailability: { groupId: string; groupName: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -50,6 +54,13 @@ const AuthStack = () => (
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Signup" component={SignupScreen} />
     <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+  </Stack.Navigator>
+);
+
+// Calendar link stack - shown when user is authenticated but hasn't connected calendar
+const CalendarLinkStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="CalendarLink" component={CalendarLinkScreen} />
   </Stack.Navigator>
 );
 
@@ -138,9 +149,23 @@ const AppStack = () => (
   </Stack.Navigator>
 );
 
-// Conditional navigator based on authentication status
+// Conditional navigator based on authentication and calendar status
 const AppNavigator = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
-  return isAuthenticated ? <AppStack /> : <AuthStack />;
+  const { calendarConnected, loading } = useAuth();
+
+  // If not authenticated, show auth screens
+  if (!isAuthenticated) {
+    return <AuthStack />;
+  }
+
+  // If authenticated but calendar not connected, show calendar link screen
+  // Skip this check while still loading to avoid flash
+  if (!loading && !calendarConnected) {
+    return <CalendarLinkStack />;
+  }
+
+  // If authenticated and calendar connected (or still loading), show main app
+  return <AppStack />;
 };
 
 export default AppNavigator;
