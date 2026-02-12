@@ -36,39 +36,63 @@ if (
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Fetch busy times from Google Calendar and store them
+// Fetch event times from Google Calendar (excluding private events) and store them
 async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Promise<void> {
   try {
-    // Get busy times for the next 30 days
     const now = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30);
+    endDate.setFullYear(endDate.getFullYear() + 1);
 
-    const response = await fetch(
-      "https://www.googleapis.com/calendar/v3/freeBusy",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          timeMin: now.toISOString(),
-          timeMax: endDate.toISOString(),
-          items: [{ id: "primary" }],
-        }),
+    const eventTimes: Array<{ start: string; end: string }> = [];
+    let pageToken: string | undefined;
+
+    // Paginate through all events for the next 12 months
+    do {
+      const params = new URLSearchParams({
+        timeMin: now.toISOString(),
+        timeMax: endDate.toISOString(),
+        singleEvents: "true",
+        orderBy: "startTime",
+        maxResults: "2500",
+        fields: "items(start,end,visibility),nextPageToken",
+      });
+      if (pageToken) {
+        params.set("pageToken", pageToken);
       }
-    );
 
-    if (!response.ok) {
-      console.error("Failed to fetch busy times:", await response.text());
-      return;
-    }
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-    const data = await response.json();
-    const busyTimes = data.calendars?.primary?.busy || [];
+      if (!response.ok) {
+        console.error("Failed to fetch events:", await response.text());
+        break;
+      }
 
-    console.log(`Found ${busyTimes.length} busy time blocks`);
+      const data = await response.json();
+      pageToken = data.nextPageToken;
+
+      for (const event of data.items || []) {
+        // Skip private events
+        if (event.visibility === "private" || event.visibility === "confidential") {
+          continue;
+        }
+
+        const start = event.start?.dateTime || event.start?.date;
+        const end = event.end?.dateTime || event.end?.date;
+
+        if (start && end) {
+          eventTimes.push({ start, end });
+        }
+      }
+    } while (pageToken);
+
+    console.log(`Found ${eventTimes.length} event time blocks`);
 
     // Clear existing busy times for this user
     await supabase
@@ -77,11 +101,11 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
       .eq("user_id", userId);
 
     // Insert new busy times
-    if (busyTimes.length > 0) {
-      const busyTimeRecords = busyTimes.map((busy: { start: string; end: string }) => ({
+    if (eventTimes.length > 0) {
+      const busyTimeRecords = eventTimes.map((event) => ({
         user_id: userId,
-        start_time: busy.start,
-        end_time: busy.end,
+        start_time: event.start,
+        end_time: event.end,
         fetched_at: new Date().toISOString(),
       }));
 
@@ -94,7 +118,7 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
       }
     }
   } catch (error) {
-    console.error("Error fetching busy times:", error);
+    console.error("Error fetching events:", error);
   }
 }
 

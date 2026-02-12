@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
 } from "react-native";
+import { Calendar, DateData } from "react-native-calendars";
 import { supabase } from "../../supabase";
 import { colors, spacing } from "../../theme";
 
@@ -31,141 +30,124 @@ interface Props {
 }
 
 interface DayAvailability {
-  date: Date;
+  dateString: string;
   allFree: boolean;
   someAvailable: boolean;
   busyMembers: string[];
 }
 
+function getMonthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function getInitialMonth(): string {
+  const now = new Date();
+  return getMonthKey(now.getFullYear(), now.getMonth() + 1);
+}
+
 export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
   const [loading, setLoading] = useState(true);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
   const [busyTimes, setBusyTimes] = useState<BusyTime[]>([]);
-  const [availability, setAvailability] = useState<DayAvailability[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  const busyCache = useRef<Record<string, BusyTime[]>>({});
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch group member user_ids
-      const { data: memberRows, error: memberError } = await supabase
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", groupId);
+  // Fetch group members once on mount
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const { data: memberRows, error: memberError } = await supabase
+          .from("group_members")
+          .select("user_id")
+          .eq("group_id", groupId);
 
-      if (memberError) {
-        console.error("Error fetching members:", memberError);
-        return;
+        if (memberError) {
+          console.error("Error fetching members:", memberError);
+          return;
+        }
+
+        const ids = (memberRows || []).map((m: { user_id: string }) => m.user_id);
+
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, username, avatar_url")
+          .in("id", ids);
+
+        if (profileError) {
+          console.error("Error fetching profiles:", profileError);
+          return;
+        }
+
+        const mappedMembers: GroupMember[] = (profileData || []).map((p: any) => ({
+          user_id: p.id,
+          profiles: {
+            first_name: p.first_name,
+            last_name: p.last_name,
+            username: p.username,
+            avatar_url: p.avatar_url,
+          },
+        }));
+
+        setMembers(mappedMembers);
+        setMemberIds(ids);
+      } catch (error) {
+        console.error("Error fetching members:", error);
+      } finally {
+        setLoading(false);
       }
-
-      const memberIds = (memberRows || []).map((m: { user_id: string }) => m.user_id);
-
-      // Fetch profiles for those members
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, username, avatar_url")
-        .in("id", memberIds);
-
-      if (profileError) {
-        console.error("Error fetching profiles:", profileError);
-        return;
-      }
-
-      // Map to GroupMember format
-      const mappedMembers: GroupMember[] = (profileData || []).map((p: any) => ({
-        user_id: p.id,
-        profiles: {
-          first_name: p.first_name,
-          last_name: p.last_name,
-          username: p.username,
-          avatar_url: p.avatar_url,
-        },
-      }));
-
-      setMembers(mappedMembers);
-
-      // Fetch busy times for all members for the next 30 days
-      const now = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 30);
-
-      const { data: busyData, error: busyError } = await supabase
-        .from("calendar_busy_times")
-        .select("user_id, start_time, end_time")
-        .in("user_id", memberIds)
-        .gte("start_time", now.toISOString())
-        .lte("end_time", endDate.toISOString());
-
-      if (busyError) {
-        console.error("Error fetching busy times:", busyError);
-        return;
-      }
-
-      setBusyTimes(busyData || []);
-
-      // Calculate availability for each day
-      const days: DayAvailability[] = [];
-      for (let i = 0; i < 30; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
-        date.setHours(0, 0, 0, 0);
-
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
-
-        // Find which members are busy on this day
-        const busyMemberIds = new Set<string>();
-        (busyData || []).forEach((busy: BusyTime) => {
-          const busyStart = new Date(busy.start_time);
-          const busyEnd = new Date(busy.end_time);
-
-          // Check if busy period overlaps with this day (during working hours 9am-6pm)
-          const dayStart = new Date(date);
-          dayStart.setHours(9, 0, 0, 0);
-          const dayEnd = new Date(date);
-          dayEnd.setHours(18, 0, 0, 0);
-
-          if (busyStart < dayEnd && busyEnd > dayStart) {
-            busyMemberIds.add(busy.user_id);
-          }
-        });
-
-        days.push({
-          date,
-          allFree: busyMemberIds.size === 0,
-          someAvailable: busyMemberIds.size < memberIds.length,
-          busyMembers: Array.from(busyMemberIds),
-        });
-      }
-
-      setAvailability(days);
-    } catch (error) {
-      console.error("Error fetching availability:", error);
-    } finally {
-      setLoading(false);
-    }
+    })();
   }, [groupId]);
 
+  // Fetch busy times for the visible month
+  const fetchMonthData = useCallback(
+    async (monthKey: string) => {
+      if (memberIds.length === 0) return;
+
+      // Use cache if available
+      if (busyCache.current[monthKey]) {
+        setBusyTimes(busyCache.current[monthKey]);
+        return;
+      }
+
+      setMonthLoading(true);
+      try {
+        const [year, month] = monthKey.split("-").map(Number);
+        const startOfMonth = new Date(year, month - 1, 1);
+        const endOfMonth = new Date(year, month, 1);
+
+        // Fetch events that overlap with this month
+        const { data, error } = await supabase
+          .from("calendar_busy_times")
+          .select("user_id, start_time, end_time")
+          .in("user_id", memberIds)
+          .lt("start_time", endOfMonth.toISOString())
+          .gt("end_time", startOfMonth.toISOString());
+
+        if (error) {
+          console.error("Error fetching busy times:", error);
+          return;
+        }
+
+        const result = data || [];
+        busyCache.current[monthKey] = result;
+        setBusyTimes(result);
+      } catch (error) {
+        console.error("Error fetching month data:", error);
+      } finally {
+        setMonthLoading(false);
+      }
+    },
+    [memberIds]
+  );
+
+  // Re-fetch when month or members change
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const getDayLabel = (date: Date) => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    return days[date.getDay()];
-  };
-
-  const getDateNumber = (date: Date) => {
-    return date.getDate();
-  };
+    fetchMonthData(currentMonth);
+  }, [currentMonth, fetchMonthData]);
 
   const getMemberName = (userId: string) => {
     const member = members.find((m) => m.user_id === userId);
@@ -176,6 +158,98 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
     }
     return profile.username || "Unknown";
   };
+
+  // Calculate availability for each day in the visible month
+  const availability = useMemo(() => {
+    const [year, month] = currentMonth.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const days: DayAvailability[] = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateString = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const date = new Date(year, month - 1, d);
+
+      const busyMemberIds = new Set<string>();
+      busyTimes.forEach((busy) => {
+        const busyStart = new Date(busy.start_time);
+        const busyEnd = new Date(busy.end_time);
+
+        const dayStart = new Date(date);
+        dayStart.setHours(9, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(18, 0, 0, 0);
+
+        if (busyStart < dayEnd && busyEnd > dayStart) {
+          busyMemberIds.add(busy.user_id);
+        }
+      });
+
+      days.push({
+        dateString,
+        allFree: busyMemberIds.size === 0,
+        someAvailable: busyMemberIds.size < memberIds.length,
+        busyMembers: Array.from(busyMemberIds),
+      });
+    }
+
+    return days;
+  }, [busyTimes, memberIds, currentMonth]);
+
+  // Build markedDates object for react-native-calendars
+  const markedDates = useMemo(() => {
+    const marks: Record<string, any> = {};
+
+    availability.forEach((day) => {
+      const busyRatio = members.length > 0 ? day.busyMembers.length / members.length : 0;
+
+      let dotColor = colors.success;
+      if (busyRatio > 0.5) {
+        dotColor = colors.error;
+      } else if (busyRatio > 0) {
+        dotColor = colors.warning;
+      }
+
+      marks[day.dateString] = {
+        marked: true,
+        dotColor,
+      };
+    });
+
+    if (selectedDate && marks[selectedDate]) {
+      marks[selectedDate] = {
+        ...marks[selectedDate],
+        selected: true,
+        selectedColor: colors.primary,
+      };
+    } else if (selectedDate) {
+      marks[selectedDate] = {
+        selected: true,
+        selectedColor: colors.primary,
+      };
+    }
+
+    return marks;
+  }, [availability, members, selectedDate]);
+
+  const selectedDayInfo = useMemo(() => {
+    if (!selectedDate) return null;
+    return availability.find((d) => d.dateString === selectedDate) || null;
+  }, [availability, selectedDate]);
+
+  const formatSelectedDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const handleMonthChange = useCallback((month: DateData) => {
+    setCurrentMonth(getMonthKey(month.year, month.month));
+    setSelectedDate(null);
+  }, []);
 
   if (loading) {
     return (
@@ -193,62 +267,55 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
         Green = everyone free, Yellow = some busy, Red = most busy
       </Text>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.calendarScroll}
-      >
-        <View style={styles.daysContainer}>
-          {availability.map((day, index) => {
-            const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
-            const busyRatio = day.busyMembers.length / members.length;
+      <View>
+        <Calendar
+          onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
+          onMonthChange={handleMonthChange}
+          markedDates={markedDates}
+          theme={{
+            backgroundColor: colors.surface,
+            calendarBackground: colors.surface,
+            textSectionTitleColor: colors.text.tertiary,
+            selectedDayBackgroundColor: colors.primary,
+            selectedDayTextColor: colors.white,
+            todayTextColor: colors.primary,
+            dayTextColor: colors.text.primary,
+            textDisabledColor: colors.disabled,
+            dotColor: colors.success,
+            selectedDotColor: colors.white,
+            arrowColor: colors.primary,
+            monthTextColor: colors.text.primary,
+            textDayFontWeight: "400",
+            textMonthFontWeight: "bold",
+            textDayHeaderFontWeight: "600",
+            textDayFontSize: 14,
+            textMonthFontSize: 16,
+            textDayHeaderFontSize: 12,
+          }}
+          style={styles.calendar}
+        />
+        {monthLoading && (
+          <View style={styles.monthLoadingOverlay}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        )}
+      </View>
 
-            let bgColor = colors.success; // All free
-            if (busyRatio > 0.5) {
-              bgColor = colors.error; // Most busy
-            } else if (busyRatio > 0) {
-              bgColor = colors.warning; // Some busy
-            }
-
-            return (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.dayCell,
-                  { backgroundColor: bgColor },
-                  isWeekend && styles.weekendCell,
-                  selectedDate?.getTime() === day.date.getTime() &&
-                    styles.selectedCell,
-                ]}
-                onPress={() => setSelectedDate(day.date)}
-              >
-                <Text style={styles.dayLabel}>{getDayLabel(day.date)}</Text>
-                <Text style={styles.dateNumber}>{getDateNumber(day.date)}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      {selectedDate && (
+      {selectedDate && selectedDayInfo && (
         <View style={styles.detailsCard}>
-          <Text style={styles.detailsTitle}>{formatDate(selectedDate)}</Text>
-          {availability.find(
-            (d) => d.date.getTime() === selectedDate.getTime()
-          )?.busyMembers.length === 0 ? (
+          <Text style={styles.detailsTitle}>{formatSelectedDate(selectedDate)}</Text>
+          {selectedDayInfo.busyMembers.length === 0 ? (
             <Text style={styles.allFreeText}>
               Everyone is free on this day!
             </Text>
           ) : (
             <View>
               <Text style={styles.busyLabel}>Busy members:</Text>
-              {availability
-                .find((d) => d.date.getTime() === selectedDate.getTime())
-                ?.busyMembers.map((userId) => (
-                  <Text key={userId} style={styles.busyMemberName}>
-                    • {getMemberName(userId)}
-                  </Text>
-                ))}
+              {selectedDayInfo.busyMembers.map((userId) => (
+                <Text key={userId} style={styles.busyMemberName}>
+                  • {getMemberName(userId)}
+                </Text>
+              ))}
             </View>
           )}
         </View>
@@ -300,38 +367,20 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     marginBottom: spacing.md,
   },
-  calendarScroll: {
+  calendar: {
+    borderRadius: 12,
     marginBottom: spacing.md,
   },
-  daysContainer: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  dayCell: {
-    width: 50,
-    height: 60,
-    borderRadius: 12,
-    alignItems: "center",
+  monthLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: "center",
-    marginRight: spacing.xs,
-  },
-  weekendCell: {
-    opacity: 0.7,
-  },
-  selectedCell: {
-    borderWidth: 3,
-    borderColor: colors.white,
-  },
-  dayLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.white,
-    textTransform: "uppercase",
-  },
-  dateNumber: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.white,
+    alignItems: "center",
+    backgroundColor: "rgba(42, 42, 42, 0.5)",
+    borderRadius: 12,
   },
   detailsCard: {
     backgroundColor: colors.surfaceLight,

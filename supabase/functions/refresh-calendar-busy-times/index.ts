@@ -47,37 +47,65 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-async function fetchBusyTimes(accessToken: string): Promise<Array<{ start: string; end: string }>> {
+async function fetchEventTimes(accessToken: string): Promise<Array<{ start: string; end: string }>> {
   try {
     const now = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30);
+    endDate.setFullYear(endDate.getFullYear() + 1);
 
-    const response = await fetch(
-      "https://www.googleapis.com/calendar/v3/freeBusy",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          timeMin: now.toISOString(),
-          timeMax: endDate.toISOString(),
-          items: [{ id: "primary" }],
-        }),
+    const results: Array<{ start: string; end: string }> = [];
+    let pageToken: string | undefined;
+
+    // Paginate through all events
+    do {
+      const params = new URLSearchParams({
+        timeMin: now.toISOString(),
+        timeMax: endDate.toISOString(),
+        singleEvents: "true",
+        orderBy: "startTime",
+        maxResults: "2500",
+        fields: "items(start,end,visibility),nextPageToken",
+      });
+      if (pageToken) {
+        params.set("pageToken", pageToken);
       }
-    );
 
-    if (!response.ok) {
-      console.error("Failed to fetch busy times:", await response.text());
-      return [];
-    }
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-    const data = await response.json();
-    return data.calendars?.primary?.busy || [];
+      if (!response.ok) {
+        console.error("Failed to fetch events:", await response.text());
+        return results;
+      }
+
+      const data = await response.json();
+      pageToken = data.nextPageToken;
+
+      for (const event of data.items || []) {
+        // Skip private events
+        if (event.visibility === "private" || event.visibility === "confidential") {
+          continue;
+        }
+
+        // Use dateTime for timed events, date for all-day events
+        const start = event.start?.dateTime || event.start?.date;
+        const end = event.end?.dateTime || event.end?.date;
+
+        if (start && end) {
+          results.push({ start, end });
+        }
+      }
+    } while (pageToken);
+
+    return results;
   } catch (error) {
-    console.error("Error fetching busy times:", error);
+    console.error("Error fetching events:", error);
     return [];
   }
 }
@@ -100,7 +128,7 @@ serve(async (req) => {
     // Get user's calendar credentials
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("calendar_provider, calendar_access_token, calendar_refresh_token, calendar_token_expires_at")
+      .select("calendar_provider, calendar_connected, calendar_access_token, calendar_refresh_token, calendar_token_expires_at")
       .eq("id", userId)
       .single();
 
@@ -135,10 +163,10 @@ serve(async (req) => {
         .eq("id", userId);
     }
 
-    // Fetch busy times
-    console.log("Fetching busy times...");
-    const busyTimes = await fetchBusyTimes(accessToken);
-    console.log(`Found ${busyTimes.length} busy time blocks`);
+    // Fetch event times (excludes private events)
+    console.log("Fetching calendar events...");
+    const eventTimes = await fetchEventTimes(accessToken);
+    console.log(`Found ${eventTimes.length} event time blocks`);
 
     // Clear existing busy times for this user
     await supabase
@@ -147,11 +175,11 @@ serve(async (req) => {
       .eq("user_id", userId);
 
     // Insert new busy times
-    if (busyTimes.length > 0) {
-      const busyTimeRecords = busyTimes.map((busy) => ({
+    if (eventTimes.length > 0) {
+      const busyTimeRecords = eventTimes.map((event) => ({
         user_id: userId,
-        start_time: busy.start,
-        end_time: busy.end,
+        start_time: event.start,
+        end_time: event.end,
         fetched_at: new Date().toISOString(),
       }));
 
@@ -170,7 +198,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        busyTimeCount: busyTimes.length,
+        busyTimeCount: eventTimes.length,
       }),
       {
         status: 200,
