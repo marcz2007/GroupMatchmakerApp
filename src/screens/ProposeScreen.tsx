@@ -9,6 +9,7 @@ import {
   Text,
   Keyboard,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   FlatList,
   ActivityIndicator,
   Alert,
@@ -558,26 +559,28 @@ const ProposeScreen = () => {
         />
       )}
 
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-        >
-          {/* Step indicator at top (hide on success) */}
-          {currentStep !== "success" && (
-            <View style={styles.header}>
-              <StepIndicator
-                totalSteps={TOTAL_STEPS}
-                currentStep={getStepNumber(currentStep)}
-              />
-            </View>
-          )}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.safeArea}>
+          <KeyboardAvoidingView
+            style={styles.keyboardView}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          >
+            {/* Step indicator at top (hide on success) */}
+            {currentStep !== "success" && (
+              <View style={styles.header}>
+                <StepIndicator
+                  totalSteps={TOTAL_STEPS}
+                  currentStep={getStepNumber(currentStep)}
+                />
+              </View>
+            )}
 
-          {/* Main content area */}
-          <View style={styles.content}>{renderStepContent()}</View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+            {/* Main content area */}
+            <View style={styles.content}>{renderStepContent()}</View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </View>
   );
 };
