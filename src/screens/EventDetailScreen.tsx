@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Share,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -82,6 +84,20 @@ const EventDetailScreen = () => {
   // Parse location from description (stored as "📍 location")
   const location = event.description?.replace("📍 ", "") || null;
 
+  const handleShare = async () => {
+    const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    const dateText = eventDate ? ` on ${eventDate}` : "";
+    try {
+      await Share.share({
+        message: `Join us for ${event.title}${dateText}! ${url}`,
+      });
+    } catch (error: any) {
+      if (error.message !== "User did not share") {
+        Alert.alert("Error", "Could not share event");
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -100,7 +116,13 @@ const EventDetailScreen = () => {
             <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Event Details</Text>
-          <View style={styles.headerSpacer} />
+          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+            <Ionicons
+              name="share-outline"
+              size={24}
+              color={colors.text.primary}
+            />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -248,8 +270,10 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
     color: colors.text.primary,
   },
-  headerSpacer: {
+  shareButton: {
+    padding: spacing.xs,
     width: 44,
+    alignItems: "center",
   },
   scrollView: {
     flex: 1,

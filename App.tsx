@@ -19,6 +19,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     "groupmatchmakerapp://",
     "https://nqtycfrgzjiehatokmfn.supabase.co",
+    "https://group-matchmaker-app.vercel.app",
   ],
   config: {
     screens: {
@@ -31,6 +32,13 @@ const linking: LinkingOptions<RootStackParamList> = {
         path: "group/invite/:groupId",
         parse: {
           groupId: (groupId: string) => groupId,
+        },
+      },
+      // Event invite deep link — from shared web links
+      EventRoom: {
+        path: "event/:eventRoomId",
+        parse: {
+          eventRoomId: (eventRoomId: string) => eventRoomId,
         },
       },
       // Spotify callback handler
