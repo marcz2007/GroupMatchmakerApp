@@ -21,6 +21,7 @@ import { IdeaInput } from "../components/propose/IdeaInput";
 import { IdeaPill } from "../components/propose/IdeaPill";
 import { StepIndicator } from "../components/propose/StepIndicator";
 import { DetailChips } from "../components/propose/DetailChips";
+import Starfield from "../components/propose/Starfield";
 import { colors, spacing, borderRadius } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 import { getUserGroups } from "../services/groupService";
@@ -143,6 +144,18 @@ const ProposeScreen = () => {
       }).start();
     });
   }, [ideaTitle, inputOpacity, inputScale, stepContentOpacity]);
+
+  const handleBackToIdea = () => {
+    Animated.timing(stepContentOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep("idea");
+      inputOpacity.setValue(1);
+      inputScale.setValue(1);
+    });
+  };
 
   const handleDetailsNext = () => {
     animateToNextStep("groups");
@@ -320,6 +333,7 @@ const ProposeScreen = () => {
         <Animated.View
           style={[
             styles.stepContent,
+            styles.ideaStepContent,
             {
               opacity: inputOpacity,
               transform: [{ scale: inputScale }],
@@ -345,46 +359,41 @@ const ProposeScreen = () => {
     if (currentStep === "details") {
       return (
         <Animated.View
-          style={[styles.stepContent, { opacity: stepContentOpacity }]}
+          style={[styles.stepContent, styles.detailsStepContent, { opacity: stepContentOpacity }]}
         >
-          {/* Locked idea pill at top */}
-          <View style={styles.pillContainer}>
-            <IdeaPill title={ideaTitle} animateIn={true} />
+          {/* Locked idea pill */}
+          <View style={styles.detailsPillContainer}>
+            <IdeaPill title={ideaTitle} animateIn={true} large />
           </View>
 
-          {/* Step 2 content */}
-          <View style={styles.detailsContent}>
-            <Text style={styles.stepTitle}>Add details</Text>
-            <Text style={styles.stepSubtitle}>When and where? (optional)</Text>
+          {/* Detail chips */}
+          <View style={styles.chipsContainer}>
+            <DetailChips
+              date={date}
+              time={time}
+              location={location}
+              onDateChange={setDate}
+              onTimeChange={setTime}
+              onLocationChange={setLocation}
+            />
+          </View>
 
-            <View style={styles.chipsContainer}>
-              <DetailChips
-                date={date}
-                time={time}
-                location={location}
-                onDateChange={setDate}
-                onTimeChange={setTime}
-                onLocationChange={setLocation}
-              />
-            </View>
+          <View style={styles.detailsButtonRow}>
+            <TouchableOpacity
+              style={styles.detailsBackButton}
+              onPress={handleBackToIdea}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.detailsBackButtonText}>Back</Text>
+            </TouchableOpacity>
 
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.skipButton}
-                onPress={handleDetailsNext}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.skipButtonText}>Skip</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.nextButton}
-                onPress={handleDetailsNext}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.nextButtonText}>Next</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.detailsNextButton}
+              onPress={handleDetailsNext}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.detailsNextButtonText}>Next</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       );
@@ -545,6 +554,7 @@ const ProposeScreen = () => {
         locations={[0, 0.5, 1]}
         style={styles.gradient}
       />
+      <Starfield />
 
       {/* Confetti overlay */}
       {showConfetti && (
@@ -610,6 +620,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
   },
+  ideaStepContent: {
+    justifyContent: "center",
+    paddingBottom: "30%",
+  },
+  detailsStepContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingBottom: "10%",
+  },
   stepTitle: {
     fontSize: 28,
     fontWeight: "700",
@@ -631,13 +650,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     alignItems: "center",
   },
-  detailsContent: {
-    flex: 1,
-    justifyContent: "center",
+  detailsPillContainer: {
+    paddingBottom: spacing.xl,
+    alignItems: "center",
   },
   chipsContainer: {
-    marginTop: spacing.lg,
     marginBottom: spacing.xl,
+    width: "100%",
   },
   buttonRow: {
     flexDirection: "row",
@@ -682,6 +701,38 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: 16,
     fontWeight: "500",
+  },
+  detailsButtonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.md,
+    width: "100%",
+  },
+  detailsBackButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: borderRadius.md,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+  },
+  detailsBackButtonText: {
+    color: colors.text.secondary,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  detailsNextButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+  },
+  detailsNextButtonText: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "700",
   },
   launchCard: {
     // The card that animates on launch

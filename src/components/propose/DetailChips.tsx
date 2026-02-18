@@ -5,10 +5,13 @@ import {
   View,
   TouchableOpacity,
   Modal,
-  TextInput,
   Platform,
+  SafeAreaView,
+  KeyboardAvoidingView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+import { GOOGLE_PLACES_API_KEY } from "@env";
 import { colors, spacing, borderRadius } from "../../theme";
 
 interface DetailChipsProps {
@@ -31,7 +34,6 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [locationInput, setLocationInput] = useState(location);
 
   // Temp values for pickers - allows "Done" to work without changing value
   const [tempDate, setTempDate] = useState<Date>(new Date());
@@ -104,17 +106,9 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
     setShowTimePicker(false);
   };
 
-  const handleLocationSave = () => {
-    onLocationChange(locationInput.trim());
-    setShowLocationModal(false);
-  };
-
   const clearDate = () => onDateChange(null);
   const clearTime = () => onTimeChange(null);
-  const clearLocation = () => {
-    onLocationChange("");
-    setLocationInput("");
-  };
+  const clearLocation = () => onLocationChange("");
 
   return (
     <View style={styles.container}>
@@ -155,10 +149,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Location Chip */}
       <TouchableOpacity
         style={[styles.chip, styles.chipWide, location && styles.chipFilled]}
-        onPress={() => {
-          setLocationInput(location);
-          setShowLocationModal(true);
-        }}
+        onPress={() => setShowLocationModal(true)}
         activeOpacity={0.7}
       >
         <Text style={styles.chipIcon}>📍</Text>
@@ -252,33 +243,77 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
       {/* Location Modal */}
       <Modal
         visible={showLocationModal}
-        transparent
         animationType="slide"
         onRequestClose={() => setShowLocationModal(false)}
       >
-        <View style={styles.pickerModal}>
-          <View style={styles.locationContainer}>
-            <View style={styles.pickerHeader}>
-              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
-                <Text style={styles.pickerCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.pickerTitle}>Location</Text>
-              <TouchableOpacity onPress={handleLocationSave}>
-                <Text style={styles.pickerDone}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={styles.locationInput}
-              placeholder="Where is this happening?"
-              placeholderTextColor={colors.text.tertiary}
-              value={locationInput}
-              onChangeText={setLocationInput}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleLocationSave}
-            />
+        <SafeAreaView style={styles.locationModalContainer}>
+          <View style={styles.locationHeader}>
+            <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+              <Text style={styles.pickerCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Location</Text>
+            <View style={{ width: 50 }} />
           </View>
-        </View>
+          <KeyboardAvoidingView
+            style={styles.locationContent}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <GooglePlacesAutocomplete
+              placeholder="Search for a place..."
+              onPress={(data) => {
+                onLocationChange(data.description);
+                setShowLocationModal(false);
+              }}
+              query={{
+                key: GOOGLE_PLACES_API_KEY,
+                language: "en",
+              }}
+              fetchDetails={false}
+              enablePoweredByContainer={false}
+              debounce={300}
+              minLength={2}
+              keyboardShouldPersistTaps="handled"
+              textInputProps={{
+                autoFocus: true,
+                placeholderTextColor: colors.text.tertiary,
+              }}
+              styles={{
+                container: {
+                  flex: 1,
+                },
+                textInputContainer: {
+                  paddingHorizontal: spacing.lg,
+                  paddingTop: spacing.md,
+                },
+                textInput: {
+                  backgroundColor: colors.surfaceLight,
+                  borderRadius: borderRadius.md,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.md,
+                  fontSize: 16,
+                  color: colors.text.primary,
+                  height: 48,
+                },
+                listView: {
+                  paddingHorizontal: spacing.lg,
+                },
+                row: {
+                  backgroundColor: "transparent",
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                },
+                description: {
+                  color: colors.text.primary,
+                  fontSize: 15,
+                },
+                separator: {
+                  height: 0,
+                },
+              }}
+            />
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -288,7 +323,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
+    gap: spacing.md,
     justifyContent: "center",
   },
   chip: {
@@ -299,9 +334,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.15)",
     borderStyle: "dashed",
     borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   chipFilled: {
     backgroundColor: "rgba(87, 98, 183, 0.2)",
@@ -309,13 +344,13 @@ const styles = StyleSheet.create({
     borderStyle: "solid",
   },
   chipWide: {
-    minWidth: 150,
+    minWidth: 170,
   },
   chipIcon: {
-    fontSize: 14,
+    fontSize: 18,
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 17,
     color: colors.text.tertiary,
   },
   chipTextFilled: {
@@ -324,10 +359,10 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     marginLeft: spacing.xs,
-    padding: 2,
+    padding: 4,
   },
   clearText: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.text.tertiary,
   },
   pickerModal: {
@@ -364,20 +399,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.primary,
   },
-  locationContainer: {
+  locationModalContainer: {
+    flex: 1,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.lg,
-    borderTopRightRadius: borderRadius.lg,
-    paddingBottom: spacing.xl,
   },
-  locationInput: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
+  locationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    fontSize: 16,
-    color: colors.text.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  locationContent: {
+    flex: 1,
   },
 });

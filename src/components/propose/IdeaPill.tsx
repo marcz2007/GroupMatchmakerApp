@@ -5,11 +5,13 @@ import { colors, spacing, borderRadius } from "../../theme";
 interface IdeaPillProps {
   title: string;
   animateIn?: boolean;
+  large?: boolean;
 }
 
 export const IdeaPill: React.FC<IdeaPillProps> = ({
   title,
   animateIn = true,
+  large = false,
 }) => {
   const scaleAnim = useRef(new Animated.Value(animateIn ? 1.1 : 1)).current;
   const opacityAnim = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
@@ -36,6 +38,7 @@ export const IdeaPill: React.FC<IdeaPillProps> = ({
     <Animated.View
       style={[
         styles.container,
+        large && styles.containerLarge,
         {
           opacity: opacityAnim,
           transform: [{ scale: scaleAnim }],
@@ -43,9 +46,9 @@ export const IdeaPill: React.FC<IdeaPillProps> = ({
       ]}
     >
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>💡</Text>
+        <Text style={[styles.icon, large && styles.iconLarge]}>💡</Text>
       </View>
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={[styles.title, large && styles.titleLarge]} numberOfLines={2}>
         {title}
       </Text>
     </Animated.View>
@@ -65,16 +68,28 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
     alignSelf: "center",
   },
+  containerLarge: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
+  },
   iconContainer: {
     marginRight: spacing.sm,
   },
   icon: {
     fontSize: 16,
   },
+  iconLarge: {
+    fontSize: 22,
+  },
   title: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.text.primary,
     flexShrink: 1,
+  },
+  titleLarge: {
+    fontSize: 20,
+    fontWeight: "700",
   },
 });
