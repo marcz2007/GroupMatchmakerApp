@@ -280,8 +280,10 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
               styles={{
                 container: {
                   flex: 1,
+                  backgroundColor: colors.surface,
                 },
                 textInputContainer: {
+                  backgroundColor: colors.surface,
                   paddingHorizontal: spacing.lg,
                   paddingTop: spacing.md,
                 },
@@ -295,10 +297,11 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                   height: 48,
                 },
                 listView: {
+                  backgroundColor: colors.surface,
                   paddingHorizontal: spacing.lg,
                 },
                 row: {
-                  backgroundColor: "transparent",
+                  backgroundColor: colors.surface,
                   paddingVertical: spacing.md,
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
