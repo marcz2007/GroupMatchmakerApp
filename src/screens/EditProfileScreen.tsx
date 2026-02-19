@@ -15,10 +15,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  SafeAreaView,
   Dimensions,
   FlatList,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { AIAnalysisSection } from "../components/profile/AIAnalysisSection";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
@@ -122,6 +122,7 @@ const EditProfileScreen = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
+        console.warn("[Profile] No authenticated user found");
         setLoading(false);
         return;
       }
@@ -134,39 +135,52 @@ const EditProfileScreen = () => {
 
       if (error) throw error;
 
-      if (data) {
-        setProfile(data);
-        setVisibilitySettings(
-          data.visibility_settings || {
-            photos: true,
-            bio: true,
-            interests: true,
-            basic_info: true,
-            ai_analysis: true,
-            spotify: {
-              top_artists: true,
-              top_genres: true,
-              selected_playlist: true,
-            },
-          }
-        );
-        setHasAnalysis(!!data.word_patterns?.topWords?.length);
+      if (!data) {
+        console.warn("[Profile] No profile row found for user:", user.id);
+        return;
+      }
 
-        try {
-          const { count, error: messageError } = await supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id);
+      // Warn about invalid photo URLs (e.g. stale local file paths from another device)
+      const invalidPhotos = (data.photos || []).filter(
+        (p: Photo) => p.url && !p.url.startsWith("http://") && !p.url.startsWith("https://")
+      );
+      if (invalidPhotos.length > 0) {
+        console.warn("[Profile] Found", invalidPhotos.length, "photos with non-remote URLs (local file paths from another device) — these will be hidden");
+      }
 
-          if (!messageError && count !== null) {
-            setMessageCount(count);
-          }
-        } catch (messageCountError) {
-          console.error("Error fetching message count:", messageCountError);
+      setProfile(data);
+      setVisibilitySettings(
+        data.visibility_settings || {
+          photos: true,
+          bio: true,
+          interests: true,
+          basic_info: true,
+          ai_analysis: true,
+          spotify: {
+            top_artists: true,
+            top_genres: true,
+            selected_playlist: true,
+          },
         }
+      );
+      setHasAnalysis(!!data.word_patterns?.topWords?.length);
+
+      try {
+        const { count, error: messageError } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        if (messageError) {
+          console.warn("[Profile] Failed to fetch message count:", messageError.message);
+        } else if (count !== null) {
+          setMessageCount(count);
+        }
+      } catch (messageCountError) {
+        console.error("[Profile] Error fetching message count:", messageCountError);
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("[Profile] Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
@@ -194,7 +208,7 @@ const EditProfileScreen = () => {
       if (error) throw error;
       setProfile((prev) => (prev ? { ...prev, [field]: value } : null));
     } catch (error) {
-      console.error(`Error saving ${field}:`, error);
+      console.error(`[Profile] Error saving ${field}:`, error);
       Alert.alert("Error", `Failed to save ${field}`);
     } finally {
       setSavingField(null);
@@ -218,7 +232,8 @@ const EditProfileScreen = () => {
 
       await Linking.openURL(data.authUrl);
     } catch (error) {
-      console.error("Error connecting to Spotify:", error);
+      console.error("[Profile] Error connecting to Spotify:", error);
+      Alert.alert("Error", "Failed to connect to Spotify");
     } finally {
       setConnectingSpotify(false);
     }
@@ -247,7 +262,8 @@ const EditProfileScreen = () => {
       if (error) throw error;
       await fetchProfile();
     } catch (error) {
-      console.error("Error disconnecting Spotify:", error);
+      console.error("[Profile] Error disconnecting Spotify:", error);
+      Alert.alert("Error", "Failed to disconnect Spotify");
     }
   };
 
@@ -289,7 +305,7 @@ const EditProfileScreen = () => {
         prev ? { ...prev, enable_ai_analysis: enabled } : null
       );
     } catch (error) {
-      console.error("Error updating AI analysis setting:", error);
+      console.error("[Profile] Error updating AI analysis setting:", error);
     }
   };
 
@@ -317,7 +333,8 @@ const EditProfileScreen = () => {
       setAvailablePlaylists(data.playlists);
       setShowPlaylistModal(true);
     } catch (error) {
-      console.error("Error fetching playlists:", error);
+      console.error("[Profile] Error fetching playlists:", error);
+      Alert.alert("Error", "Failed to load playlists");
     } finally {
       setLoadingPlaylists(false);
     }
@@ -346,7 +363,8 @@ const EditProfileScreen = () => {
       );
       setShowPlaylistModal(false);
     } catch (error) {
-      console.error("Error selecting playlist:", error);
+      console.error("[Profile] Error selecting playlist:", error);
+      Alert.alert("Error", "Failed to select playlist");
     } finally {
       setLoadingPlaylists(false);
     }
@@ -387,7 +405,8 @@ const EditProfileScreen = () => {
         await saveField("photos", updatedPhotos);
       }
     } catch (error) {
-      console.error("Error picking images:", error);
+      console.error("[Profile] Error picking images:", error);
+      Alert.alert("Error", "Failed to upload photos");
     } finally {
       setUploadingPhotos(false);
     }
@@ -404,7 +423,7 @@ const EditProfileScreen = () => {
   );
 
   const renderPhotoIndicators = () => {
-    const photos = profile?.photos || [];
+    const photos = validPhotos;
     if (photos.length <= 1) return null;
 
     return (
@@ -435,7 +454,11 @@ const EditProfileScreen = () => {
     );
   }
 
-  const hasPhotos = profile?.photos && profile.photos.length > 0;
+  // Only treat photos as valid if they're remote URLs (not stale local file paths from another device)
+  const validPhotos = (profile?.photos || []).filter(
+    (p) => p.url && (p.url.startsWith("http://") || p.url.startsWith("https://"))
+  );
+  const hasPhotos = validPhotos.length > 0;
 
   return (
     <View style={styles.mainContainer}>
@@ -457,7 +480,7 @@ const EditProfileScreen = () => {
                 <>
                   <FlatList
                     ref={flatListRef}
-                    data={profile.photos}
+                    data={validPhotos}
                     renderItem={renderPhotoItem}
                     horizontal
                     pagingEnabled

@@ -4,12 +4,14 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -53,8 +55,27 @@ const EventRoomScreen: React.FC = () => {
 
   const flatListRef = useRef<FlatList>(null);
 
+  const handleShare = async () => {
+    const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    try {
+      await Share.share({
+        message: `Join us for ${title || "this event"}! ${url}`,
+      });
+    } catch (_) {}
+  };
+
   useEffect(() => {
-    navigation.setOptions({ title: title || "Event Room" });
+    navigation.setOptions({
+      title: title || "Event Room",
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleShare}
+          style={{ paddingRight: spacing.md }}
+        >
+          <Ionicons name="share-outline" size={22} color={colors.text.primary} />
+        </TouchableOpacity>
+      ),
+    });
   }, [navigation, title]);
 
   const loadEventRoom = useCallback(async () => {
