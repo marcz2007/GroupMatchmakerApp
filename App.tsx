@@ -6,6 +6,8 @@ import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { EventsProvider } from "./src/contexts/EventsContext";
+import { PendingProposalsProvider } from "./src/contexts/PendingProposalsContext";
+import PendingProposalModal from "./src/components/PendingProposalModal";
 import AppNavigator, {
   RootStackParamList,
 } from "./src/navigation/AppNavigator";
@@ -86,45 +88,48 @@ function AppContent() {
 
   return (
     <EventsProvider>
-      <KeyboardProvider>
-        <NavigationContainer
-          linking={linking}
-          fallback={<ActivityIndicator color={colors.primary} size="large" />}
-          theme={{
-            dark: true,
-            colors: {
-              primary: colors.primary,
-              background: colors.background,
-              card: colors.surface,
-              text: colors.text.primary,
-              border: colors.divider,
-              notification: colors.eventBadge,
-            },
-            fonts: {
-              regular: {
-                fontFamily: "System",
-                fontWeight: "400" as const,
+      <PendingProposalsProvider>
+        <KeyboardProvider>
+          <NavigationContainer
+            linking={linking}
+            fallback={<ActivityIndicator color={colors.primary} size="large" />}
+            theme={{
+              dark: true,
+              colors: {
+                primary: colors.primary,
+                background: colors.background,
+                card: colors.surface,
+                text: colors.text.primary,
+                border: colors.divider,
+                notification: colors.eventBadge,
               },
-              medium: {
-                fontFamily: "System",
-                fontWeight: "500" as const,
+              fonts: {
+                regular: {
+                  fontFamily: "System",
+                  fontWeight: "400" as const,
+                },
+                medium: {
+                  fontFamily: "System",
+                  fontWeight: "500" as const,
+                },
+                bold: {
+                  fontFamily: "System",
+                  fontWeight: "700" as const,
+                },
+                heavy: {
+                  fontFamily: "System",
+                  fontWeight: "900" as const,
+                },
               },
-              bold: {
-                fontFamily: "System",
-                fontWeight: "700" as const,
-              },
-              heavy: {
-                fontFamily: "System",
-                fontWeight: "900" as const,
-              },
-            },
-          }}
-        >
-          <View style={styles.container}>
-            <AppNavigator isAuthenticated={!!user} />
-          </View>
-        </NavigationContainer>
-      </KeyboardProvider>
+            }}
+          >
+            <View style={styles.container}>
+              <AppNavigator isAuthenticated={!!user} />
+            </View>
+          </NavigationContainer>
+        </KeyboardProvider>
+        <PendingProposalModal />
+      </PendingProposalsProvider>
     </EventsProvider>
   );
 }

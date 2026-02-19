@@ -60,6 +60,10 @@ BEGIN
     )
     RETURNING * INTO v_proposal;
 
+    -- Auto-vote YES for the proposal creator
+    INSERT INTO votes (proposal_id, user_id, vote)
+    VALUES (v_proposal.id, v_user_id, 'YES');
+
     RETURN row_to_json(v_proposal);
 END;
 $$;

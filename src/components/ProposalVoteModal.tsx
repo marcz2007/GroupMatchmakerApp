@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import ConfettiCannon from "react-native-confetti-cannon";
+import * as Haptics from "expo-haptics";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import {
   ProposalWithVotes,
@@ -31,6 +34,11 @@ const ProposalVoteModal: React.FC<ProposalVoteModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [selectedVote, setSelectedVote] = useState<VoteValue | null>(null);
+  const [celebrationState, setCelebrationState] = useState<
+    "none" | "voted" | "threshold"
+  >("none");
+  const celebrationOpacity = useRef(new Animated.Value(0)).current;
+  const confettiRef = useRef<ConfettiCannon | null>(null);
 
   if (!proposal) return null;
 
@@ -38,23 +46,45 @@ const ProposalVoteModal: React.FC<ProposalVoteModalProps> = ({
   const isVotingOpen =
     p.status === "open" && !isPast(new Date(p.vote_window_ends_at));
 
+  const handleClose = () => {
+    setCelebrationState("none");
+    celebrationOpacity.setValue(0);
+    onClose();
+  };
+
   const handleVote = async (vote: VoteValue) => {
     setSelectedVote(vote);
     setLoading(true);
     try {
       const result = await castVote(p.id, vote);
 
-      if (result.threshold_met && result.event_room_id) {
-        Alert.alert(
-          "Event Created!",
-          "The proposal reached its threshold. An event room has been created for all YES and MAYBE voters.",
-          [{ text: "OK", onPress: onClose }]
+      if (vote === "YES") {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
         );
-      } else {
-        onClose();
-      }
+        confettiRef.current?.start();
 
-      onVoteSuccess();
+        if (result.threshold_met && result.event_room_id) {
+          setCelebrationState("threshold");
+        } else {
+          setCelebrationState("voted");
+        }
+
+        Animated.timing(celebrationOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+
+        onVoteSuccess();
+
+        setTimeout(() => {
+          handleClose();
+        }, 2500);
+      } else {
+        onVoteSuccess();
+        handleClose();
+      }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to submit vote";
@@ -112,163 +142,204 @@ const ProposalVoteModal: React.FC<ProposalVoteModalProps> = ({
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
-          <Text style={styles.modalTitle}>{p.title}</Text>
-
-          {p.description && (
-            <Text style={styles.description}>{p.description}</Text>
-          )}
-
-          <View style={styles.detailsContainer}>
-            {p.starts_at && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Starts:</Text>
-                <Text style={styles.detailValue}>{formatDate(p.starts_at)}</Text>
-              </View>
-            )}
-
-            {p.ends_at && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Ends:</Text>
-                <Text style={styles.detailValue}>{formatDate(p.ends_at)}</Text>
-              </View>
-            )}
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Threshold:</Text>
-              <Text style={styles.detailValue}>
-                {p.threshold} YES votes needed
+          {celebrationState !== "none" ? (
+            <Animated.View
+              style={[styles.celebrationContainer, { opacity: celebrationOpacity }]}
+            >
+              <Text style={styles.celebrationEmoji}>
+                {celebrationState === "threshold" ? "🎉" : "🙌"}
               </Text>
-            </View>
-          </View>
-
-          <View style={styles.voteCounts}>
-            <View style={styles.voteCountItem}>
-              <Text style={[styles.voteCountNumber, styles.yesText]}>
-                {vote_counts.yes_count}
+              <Text style={styles.celebrationTitle}>
+                {celebrationState === "threshold"
+                  ? "It's happening!"
+                  : "You're in!"}
               </Text>
-              <Text style={styles.voteCountLabel}>Yes</Text>
-            </View>
-            <View style={styles.voteCountItem}>
-              <Text style={[styles.voteCountNumber, styles.maybeText]}>
-                {vote_counts.maybe_count}
+              <Text style={styles.celebrationSubtitle}>
+                {celebrationState === "threshold"
+                  ? "The threshold has been met — event created!"
+                  : "Your YES vote has been recorded"}
               </Text>
-              <Text style={styles.voteCountLabel}>Maybe</Text>
-            </View>
-            <View style={styles.voteCountItem}>
-              <Text style={[styles.voteCountNumber, styles.noText]}>
-                {vote_counts.no_count}
-              </Text>
-              <Text style={styles.voteCountLabel}>No</Text>
-            </View>
-          </View>
-
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.min(
-                      (vote_counts.yes_count / p.threshold) * 100,
-                      100
-                    )}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {vote_counts.yes_count}/{p.threshold} YES votes
-            </Text>
-          </View>
-
-          {isVotingOpen ? (
-            <>
-              <Text style={styles.votePrompt}>Cast your vote:</Text>
-
-              <View style={styles.voteButtons}>
-                <TouchableOpacity
-                  style={getVoteButtonStyle("YES")}
-                  onPress={() => handleVote("YES")}
-                  disabled={loading}
-                >
-                  {loading && selectedVote === "YES" ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.buttonText,
-                        my_vote === "YES" && styles.buttonTextSelected,
-                      ]}
-                    >
-                      Yes
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={getVoteButtonStyle("MAYBE")}
-                  onPress={() => handleVote("MAYBE")}
-                  disabled={loading}
-                >
-                  {loading && selectedVote === "MAYBE" ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.buttonText,
-                        my_vote === "MAYBE" && styles.buttonTextSelected,
-                      ]}
-                    >
-                      Maybe
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={getVoteButtonStyle("NO")}
-                  onPress={() => handleVote("NO")}
-                  disabled={loading}
-                >
-                  {loading && selectedVote === "NO" ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.buttonText,
-                        my_vote === "NO" && styles.buttonTextSelected,
-                      ]}
-                    >
-                      No
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {my_vote && (
-                <Text style={styles.currentVote}>
-                  Your current vote: {my_vote}
-                </Text>
-              )}
-
-              <Text style={styles.timeRemaining}>{getTimeRemaining()}</Text>
-            </>
+            </Animated.View>
           ) : (
-            <View style={styles.closedContainer}>
-              <Text style={styles.closedText}>Voting has ended</Text>
-              {my_vote && (
-                <Text style={styles.yourVoteText}>You voted: {my_vote}</Text>
+            <>
+              <Text style={styles.modalTitle}>{p.title}</Text>
+
+              {p.description && (
+                <Text style={styles.description}>{p.description}</Text>
               )}
-            </View>
+
+              <View style={styles.detailsContainer}>
+                {p.starts_at && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Starts:</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDate(p.starts_at)}
+                    </Text>
+                  </View>
+                )}
+
+                {p.ends_at && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Ends:</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDate(p.ends_at)}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Threshold:</Text>
+                  <Text style={styles.detailValue}>
+                    {p.threshold} YES votes needed
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.voteCounts}>
+                <View style={styles.voteCountItem}>
+                  <Text style={[styles.voteCountNumber, styles.yesText]}>
+                    {vote_counts.yes_count}
+                  </Text>
+                  <Text style={styles.voteCountLabel}>Yes</Text>
+                </View>
+                <View style={styles.voteCountItem}>
+                  <Text style={[styles.voteCountNumber, styles.maybeText]}>
+                    {vote_counts.maybe_count}
+                  </Text>
+                  <Text style={styles.voteCountLabel}>Maybe</Text>
+                </View>
+                <View style={styles.voteCountItem}>
+                  <Text style={[styles.voteCountNumber, styles.noText]}>
+                    {vote_counts.no_count}
+                  </Text>
+                  <Text style={styles.voteCountLabel}>No</Text>
+                </View>
+              </View>
+
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(
+                          (vote_counts.yes_count / p.threshold) * 100,
+                          100
+                        )}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressText}>
+                  {vote_counts.yes_count}/{p.threshold} YES votes
+                </Text>
+              </View>
+
+              {isVotingOpen ? (
+                <>
+                  <Text style={styles.votePrompt}>Cast your vote:</Text>
+
+                  <View style={styles.voteButtons}>
+                    <TouchableOpacity
+                      style={getVoteButtonStyle("YES")}
+                      onPress={() => handleVote("YES")}
+                      disabled={loading}
+                    >
+                      {loading && selectedVote === "YES" ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            my_vote === "YES" && styles.buttonTextSelected,
+                          ]}
+                        >
+                          Yes
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={getVoteButtonStyle("MAYBE")}
+                      onPress={() => handleVote("MAYBE")}
+                      disabled={loading}
+                    >
+                      {loading && selectedVote === "MAYBE" ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            my_vote === "MAYBE" && styles.buttonTextSelected,
+                          ]}
+                        >
+                          Maybe
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={getVoteButtonStyle("NO")}
+                      onPress={() => handleVote("NO")}
+                      disabled={loading}
+                    >
+                      {loading && selectedVote === "NO" ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            my_vote === "NO" && styles.buttonTextSelected,
+                          ]}
+                        >
+                          No
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {my_vote && (
+                    <Text style={styles.currentVote}>
+                      Your current vote: {my_vote}
+                    </Text>
+                  )}
+
+                  <Text style={styles.timeRemaining}>
+                    {getTimeRemaining()}
+                  </Text>
+                </>
+              ) : (
+                <View style={styles.closedContainer}>
+                  <Text style={styles.closedText}>Voting has ended</Text>
+                  {my_vote && (
+                    <Text style={styles.yourVoteText}>
+                      You voted: {my_vote}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </>
           )}
         </View>
+
+        {/* Confetti layer */}
+        <ConfettiCannon
+          ref={confettiRef}
+          count={80}
+          origin={{ x: -10, y: 0 }}
+          autoStart={false}
+          fadeOut={true}
+          fallSpeed={2500}
+          colors={[colors.primary, colors.success, "#fff", "#ffd700"]}
+        />
       </View>
     </Modal>
   );
@@ -457,6 +528,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     marginTop: spacing.xs,
+  },
+  celebrationContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.xl,
+    minHeight: 200,
+  },
+  celebrationEmoji: {
+    fontSize: 56,
+    marginBottom: spacing.md,
+  },
+  celebrationTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.text.primary,
+    textAlign: "center",
+    marginBottom: spacing.sm,
+  },
+  celebrationSubtitle: {
+    fontSize: 15,
+    color: colors.text.secondary,
+    textAlign: "center",
   },
 });
 

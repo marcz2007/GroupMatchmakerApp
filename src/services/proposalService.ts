@@ -35,6 +35,10 @@ export interface ProposalWithVotes {
   };
 }
 
+export interface PendingProposal extends ProposalWithVotes {
+  group_name: string;
+}
+
 export interface CastVoteResult {
   success: boolean;
   vote: VoteValue;
@@ -223,6 +227,48 @@ export function subscribeToGroupProposals(
       () => {
         onUpdate();
       }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Get all pending (unvoted) proposals for the current user across all groups
+ */
+export async function getPendingProposals(): Promise<PendingProposal[]> {
+  const { data, error } = await supabase.rpc("get_pending_proposals_for_user");
+
+  if (error) {
+    console.error("Error fetching pending proposals:", error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Subscribe to new proposals and votes across all tables (for pending proposals refresh)
+ */
+export function subscribeToPendingProposals(onUpdate: () => void) {
+  const channel = supabase
+    .channel("pending-proposals-global")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "proposals" },
+      () => onUpdate()
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "votes" },
+      () => onUpdate()
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "votes" },
+      () => onUpdate()
     )
     .subscribe();
 
