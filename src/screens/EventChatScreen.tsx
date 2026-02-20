@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  Share,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,9 +23,15 @@ import {
   getEventMessages,
   sendEventMessage,
   subscribeToEventMessages,
+  getChatExtensionStatus,
+  voteToChatExtend,
   EventMessage,
   EventWithDetails,
+  ChatExtensionStatus,
 } from "../services/eventService";
+
+const INVITE_LINK_REGEX = /https:\/\/group-matchmaker-app\.vercel\.app\/event\/[a-f0-9-]+/;
+const EXTENSION_MESSAGE_ID = "00000000-0000-0000-0000-000000000001";
 
 const EventChatScreen = () => {
   const navigation = useNavigation<any>();
@@ -37,6 +44,9 @@ const EventChatScreen = () => {
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [extensionStatus, setExtensionStatus] = useState<ChatExtensionStatus | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -48,6 +58,14 @@ const EventChatScreen = () => {
       ]);
       setEventDetails(details);
       setMessages(msgs);
+
+      // Load extension status
+      try {
+        const status = await getChatExtensionStatus(eventRoomId);
+        setExtensionStatus(status);
+      } catch {
+        // Extension status may fail if migration hasn't run yet
+      }
     } catch (error) {
       console.error("Error loading event data:", error);
     } finally {
@@ -98,6 +116,41 @@ const EventChatScreen = () => {
     }
   };
 
+  const handleCopyLink = async () => {
+    const link = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({ message: link });
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // User cancelled share
+    }
+  };
+
+  const handleVote = async (vote: boolean) => {
+    if (voting) return;
+    setVoting(true);
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const result = await voteToChatExtend(eventRoomId, vote);
+
+      if (result.extended) {
+        // Chat was extended — reload messages and status
+        await loadData();
+      } else {
+        // Refresh extension status
+        const status = await getChatExtensionStatus(eventRoomId);
+        setExtensionStatus(status);
+      }
+    } catch (error) {
+      console.error("Error voting:", error);
+    } finally {
+      setVoting(false);
+    }
+  };
+
   const openEventDetails = () => {
     if (eventDetails) {
       navigation.navigate("EventDetail", {
@@ -120,6 +173,93 @@ const EventChatScreen = () => {
     }
   };
 
+  const renderSystemMessageContent = (content: string, messageId: string) => {
+    const hasInviteLink = INVITE_LINK_REGEX.test(content);
+    const isExtensionMessage = messageId === EXTENSION_MESSAGE_ID;
+
+    if (hasInviteLink) {
+      // Split content around the invite link line
+      const parts = content.split(INVITE_LINK_REGEX);
+      const linkMatch = content.match(INVITE_LINK_REGEX);
+
+      return (
+        <View>
+          <Text style={styles.systemMessageText}>{parts[0]}</Text>
+          {linkMatch && (
+            <TouchableOpacity onPress={handleCopyLink} activeOpacity={0.7}>
+              <Text style={[styles.systemMessageText, styles.inviteLink]}>
+                {linkMatch[0]}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {parts[1] && (
+            <Text style={styles.systemMessageText}>{parts[1]}</Text>
+          )}
+          {linkCopied && (
+            <View style={styles.copiedBadge}>
+              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+              <Text style={styles.copiedText}>Link copied!</Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    if (isExtensionMessage && extensionStatus?.voting_active) {
+      return (
+        <View>
+          <Text style={styles.systemMessageText}>{content}</Text>
+          <View style={styles.voteButtonsContainer}>
+            {extensionStatus.my_vote === null ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.voteButton, styles.voteButtonYes]}
+                  onPress={() => handleVote(true)}
+                  disabled={voting}
+                  activeOpacity={0.7}
+                >
+                  {voting ? (
+                    <ActivityIndicator size="small" color={colors.text.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="hand-left-outline" size={16} color={colors.text.primary} />
+                      <Text style={styles.voteButtonText}>I'm staying</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.voteButton, styles.voteButtonNo]}
+                  onPress={() => handleVote(false)}
+                  disabled={voting}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="exit-outline" size={16} color={colors.text.secondary} />
+                  <Text style={styles.voteButtonTextNo}>I'm out</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.votedContainer}>
+                <Ionicons
+                  name={extensionStatus.my_vote ? "checkmark-circle" : "close-circle"}
+                  size={16}
+                  color={extensionStatus.my_vote ? colors.success : colors.text.tertiary}
+                />
+                <Text style={styles.votedText}>
+                  {extensionStatus.my_vote ? "You're staying" : "You're leaving when it closes"}
+                </Text>
+                <Text style={styles.voteCount}>
+                  {extensionStatus.total_votes}/{extensionStatus.total_participants} voted · {extensionStatus.yes_count} staying
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    return <Text style={styles.systemMessageText}>{content}</Text>;
+  };
+
   const renderMessage = ({ item, index }: { item: EventMessage; index: number }) => {
     const isOwnMessage = item.user.id === user?.id;
     const isSystem = item.is_system;
@@ -133,7 +273,7 @@ const EventChatScreen = () => {
             end={{ x: 1, y: 1 }}
             style={styles.systemMessageBubble}
           >
-            <Text style={styles.systemMessageText}>{item.content}</Text>
+            {renderSystemMessageContent(item.content, item.id)}
           </LinearGradient>
         </View>
       );
@@ -402,6 +542,70 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 14,
     lineHeight: 20,
+  },
+  inviteLink: {
+    color: colors.primary,
+    textDecorationLine: "underline",
+    marginVertical: 4,
+  },
+  copiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xs,
+    gap: 4,
+  },
+  copiedText: {
+    ...typography.caption,
+    color: colors.success,
+    fontSize: 12,
+  },
+  voteButtonsContainer: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  voteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: 6,
+  },
+  voteButtonYes: {
+    backgroundColor: colors.primary,
+  },
+  voteButtonNo: {
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  voteButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  voteButtonTextNo: {
+    ...typography.body,
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  votedContainer: {
+    alignItems: "center",
+    gap: 4,
+  },
+  votedText: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    fontSize: 13,
+  },
+  voteCount: {
+    ...typography.caption,
+    color: colors.text.tertiary,
+    fontSize: 12,
   },
   inputBar: {
     flexDirection: "row",

@@ -15,10 +15,7 @@ BEGIN
     FROM event_room_participants erp
     JOIN event_rooms er ON er.id = erp.event_room_id
     WHERE erp.user_id = auth.uid()
-    AND (
-        (er.ends_at IS NOT NULL AND er.ends_at + INTERVAL '12 hours' > NOW())
-        OR (er.ends_at IS NULL AND er.created_at + INTERVAL '72 hours' > NOW())
-    );
+    AND (er.chat_expires_at IS NULL OR er.chat_expires_at > NOW());
 
     RETURN v_count;
 END;
@@ -66,10 +63,7 @@ BEGIN
                     LIMIT 1
                 ),
                 'unread_count', 0,
-                'is_expired', (
-                    (er.ends_at IS NOT NULL AND er.ends_at + INTERVAL '12 hours' <= NOW())
-                    OR (er.ends_at IS NULL AND er.created_at + INTERVAL '72 hours' <= NOW())
-                )
+                'is_expired', (er.chat_expires_at IS NOT NULL AND er.chat_expires_at <= NOW())
             ) as event_data,
             COALESCE(
                 (SELECT MAX(created_at) FROM event_messages WHERE event_room_id = er.id),
@@ -79,10 +73,7 @@ BEGIN
         JOIN event_room_participants erp ON erp.event_room_id = er.id
         JOIN groups g ON g.id = er.group_id
         WHERE erp.user_id = auth.uid()
-        AND (
-            (er.ends_at IS NOT NULL AND er.ends_at + INTERVAL '12 hours' > NOW())
-            OR (er.ends_at IS NULL AND er.created_at + INTERVAL '72 hours' > NOW())
-        )
+        AND (er.chat_expires_at IS NULL OR er.chat_expires_at > NOW())
     ) subquery;
 
     RETURN v_result;
@@ -137,10 +128,7 @@ BEGIN
         ),
         'last_message', NULL,
         'unread_count', 0,
-        'is_expired', (
-            (er.ends_at IS NOT NULL AND er.ends_at + INTERVAL '12 hours' <= NOW())
-            OR (er.ends_at IS NULL AND er.created_at + INTERVAL '72 hours' <= NOW())
-        )
+        'is_expired', (er.chat_expires_at IS NOT NULL AND er.chat_expires_at <= NOW())
     )
     INTO v_result
     FROM event_rooms er
@@ -182,11 +170,11 @@ BEGIN
         'messages', COALESCE((
             SELECT json_agg(msg ORDER BY created_at ASC)
             FROM (
-                -- System message (event details) as first message
+                -- Welcome system message
                 SELECT
                     v_event_room.id as id,
                     CONCAT(
-                        'Event created! ',
+                        'Welcome to the chat for ', v_event_room.title, '! 🎉',
                         CASE WHEN v_event_room.starts_at IS NOT NULL
                             THEN CONCAT(E'\n', '📅 ', to_char(v_event_room.starts_at, 'Dy, Mon DD at HH12:MI AM'))
                             ELSE ''
@@ -194,15 +182,36 @@ BEGIN
                         CASE WHEN v_event_room.description IS NOT NULL AND v_event_room.description != ''
                             THEN CONCAT(E'\n', v_event_room.description)
                             ELSE ''
-                        END
+                        END,
+                        E'\n\n', 'This chat is temporary — it''ll close 48 hours after the event ends. No endless group chats here, just real plans with real people.',
+                        E'\n\n', 'Want to keep chatting? When the time comes, you can vote to stay. Anyone who doesn''t vote to stay gets removed.',
+                        E'\n\n', 'Share this event: https://group-matchmaker-app.vercel.app/event/', v_event_room.id,
+                        E'\n', 'Tap the link above to copy it!'
                     ) as content,
                     v_event_room.created_at as created_at,
                     json_build_object(
                         'id', '00000000-0000-0000-0000-000000000000',
                         'display_name', 'Grapple',
                         'avatar_url', NULL
-                    ) as user,
+                    ) as "user",
                     true as is_system
+
+                UNION ALL
+
+                -- Extension vote system message (only when within 24h of expiry)
+                SELECT
+                    ('00000000-0000-0000-0000-000000000001')::UUID as id,
+                    '⏳ This chat closes in 24 hours.' || E'\n\n' || 'Vote to stay! Only those who vote to keep it open will remain. Everyone else gets removed.' as content,
+                    (v_event_room.chat_expires_at - INTERVAL '24 hours') as created_at,
+                    json_build_object(
+                        'id', '00000000-0000-0000-0000-000000000000',
+                        'display_name', 'Grapple',
+                        'avatar_url', NULL
+                    ) as "user",
+                    true as is_system
+                WHERE v_event_room.chat_expires_at IS NOT NULL
+                    AND v_event_room.chat_expires_at - INTERVAL '24 hours' <= NOW()
+                    AND v_event_room.chat_expires_at > NOW()
 
                 UNION ALL
 
@@ -215,7 +224,7 @@ BEGIN
                         'id', pr.id,
                         'display_name', pr.display_name,
                         'avatar_url', pr.avatar_url
-                    ) as user,
+                    ) as "user",
                     false as is_system
                 FROM event_messages em
                 JOIN profiles pr ON pr.id = em.user_id
@@ -225,10 +234,7 @@ BEGIN
                 OFFSET p_offset
             ) msg
         ), '[]'::json),
-        'is_expired', (
-            (v_event_room.ends_at IS NOT NULL AND v_event_room.ends_at + INTERVAL '12 hours' <= NOW())
-            OR (v_event_room.ends_at IS NULL AND v_event_room.created_at + INTERVAL '72 hours' <= NOW())
-        )
+        'is_expired', (v_event_room.chat_expires_at IS NOT NULL AND v_event_room.chat_expires_at <= NOW())
     ) INTO v_result;
 
     RETURN v_result;

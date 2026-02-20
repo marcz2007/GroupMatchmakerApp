@@ -263,3 +263,63 @@ export async function hasActiveEvents(): Promise<boolean> {
 
   return (data || 0) > 0;
 }
+
+// ============================================
+// Chat Extension Voting
+// ============================================
+
+export interface ChatExtensionStatus {
+  voting_active: boolean;
+  my_vote: boolean | null;
+  yes_count: number;
+  total_votes: number;
+  total_participants: number;
+  expires_at: string | null;
+}
+
+export interface ChatExtensionVoteResult {
+  success: boolean;
+  extended: boolean;
+  new_expires_at: string;
+  yes_count: number;
+  total_participants: number;
+  all_voted: boolean;
+}
+
+/**
+ * Vote to extend or close event chat
+ */
+export async function voteToChatExtend(
+  eventRoomId: string,
+  vote: boolean
+): Promise<ChatExtensionVoteResult> {
+  const { data, error } = await supabase.rpc("vote_to_extend_chat", {
+    p_event_room_id: eventRoomId,
+    p_vote: vote,
+  });
+
+  if (error) {
+    console.error("Error voting to extend chat:", error);
+    throw new Error(error.message || "Failed to vote");
+  }
+
+  return data;
+}
+
+/**
+ * Get chat extension voting status
+ */
+export async function getChatExtensionStatus(
+  eventRoomId: string
+): Promise<ChatExtensionStatus> {
+  const { data, error } = await supabase.rpc("get_chat_extension_status", {
+    p_event_room_id: eventRoomId,
+  });
+
+  if (error) {
+    console.error("Error fetching chat extension status:", error);
+    throw new Error(error.message || "Failed to fetch extension status");
+  }
+
+  return data;
+}

@@ -407,8 +407,9 @@ BEGIN
 
         IF v_event_room_id IS NULL THEN
             -- Create event room
-            INSERT INTO event_rooms (proposal_id, group_id, title, description, starts_at, ends_at)
-            SELECT p_proposal_id, group_id, title, description, starts_at, ends_at
+            INSERT INTO event_rooms (proposal_id, group_id, title, description, starts_at, ends_at, chat_expires_at)
+            SELECT p_proposal_id, group_id, title, description, starts_at, ends_at,
+                   COALESCE(ends_at + INTERVAL '48 hours', NOW() + INTERVAL '72 hours')
             FROM proposals
             WHERE id = p_proposal_id
             RETURNING id INTO v_event_room_id;
