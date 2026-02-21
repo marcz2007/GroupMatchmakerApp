@@ -336,7 +336,7 @@ BEGIN
                 AND user_id = auth.uid()
             ),
             'created_by_profile', (
-                SELECT json_build_object('id', id, 'display_name', display_name, 'avatar_url', avatar_url)
+                SELECT json_build_object('id', id, 'display_name', COALESCE(first_name, username, 'Someone'), 'avatar_url', avatar_url)
                 FROM profiles WHERE id = p.created_by
             )
         )
@@ -523,7 +523,7 @@ BEGIN
                     'created_at', em.created_at,
                     'user', json_build_object(
                         'id', pr.id,
-                        'display_name', pr.display_name,
+                        'display_name', COALESCE(pr.first_name, pr.username, 'Someone'),
                         'avatar_url', pr.avatar_url
                     )
                 )

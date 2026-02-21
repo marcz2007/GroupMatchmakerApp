@@ -54,7 +54,7 @@ BEGIN
                     SELECT json_build_object(
                         'content', em.content,
                         'created_at', em.created_at,
-                        'sender_name', pr.display_name
+                        'sender_name', COALESCE(pr.first_name, pr.username, 'Someone')
                     )
                     FROM event_messages em
                     JOIN profiles pr ON pr.id = em.user_id
@@ -118,7 +118,7 @@ BEGIN
             SELECT json_agg(
                 json_build_object(
                     'id', pr.id,
-                    'display_name', pr.display_name,
+                    'display_name', COALESCE(pr.first_name, pr.username, 'Someone'),
                     'avatar_url', pr.avatar_url
                 )
             )
@@ -222,7 +222,7 @@ BEGIN
                     em.created_at,
                     json_build_object(
                         'id', pr.id,
-                        'display_name', pr.display_name,
+                        'display_name', COALESCE(pr.first_name, pr.username, 'Someone'),
                         'avatar_url', pr.avatar_url
                     ) as "user",
                     false as is_system
