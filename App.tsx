@@ -1,5 +1,5 @@
 // App.tsx
-import { LinkingOptions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+import { LinkingOptions, NavigationContainer, useNavigationContainerRef, CommonActions } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, Linking, Platform, StyleSheet, View } from "react-native";
@@ -133,16 +133,23 @@ function AppContent() {
     const eventRoomId = pendingEventRef.current;
     pendingEventRef.current = null; // consume it once
 
-    // Wait until the navigator is ready (AppStack needs to be mounted)
+    // Wait until the navigator is ready, then set the stack to [Main, EventRoom]
+    // so the guest can press back to reach the full app with bottom tabs.
     const tryNavigate = () => {
       if (navigationRef.isReady()) {
-        navigationRef.navigate("EventRoom", { eventRoomId });
+        navigationRef.dispatch(
+          CommonActions.reset({
+            index: 1,
+            routes: [
+              { name: "Main" },
+              { name: "EventRoom", params: { eventRoomId } },
+            ],
+          })
+        );
       } else {
-        // Retry shortly — AppStack may still be mounting
         setTimeout(tryNavigate, 100);
       }
     };
-    // Small delay to let AppStack mount after auth state change
     setTimeout(tryNavigate, 50);
   }, [user, navigationRef]);
 
