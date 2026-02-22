@@ -33,11 +33,16 @@ import {
 const INVITE_LINK_REGEX = /https:\/\/group-matchmaker-app\.vercel\.app\/event\/[a-f0-9-]+/;
 const EXTENSION_MESSAGE_ID = "00000000-0000-0000-0000-000000000001";
 
-const EventChatScreen = () => {
+interface EventChatScreenProps {
+  eventRoomIdProp?: string;
+  isDesktopPane?: boolean;
+}
+
+const EventChatScreen = ({ eventRoomIdProp, isDesktopPane }: EventChatScreenProps = {}) => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
-  const { eventRoomId } = route.params;
+  const eventRoomId = eventRoomIdProp || route.params?.eventRoomId;
 
   const [eventDetails, setEventDetails] = useState<EventWithDetails | null>(null);
   const [messages, setMessages] = useState<EventMessage[]>([]);
@@ -344,12 +349,14 @@ const EventChatScreen = () => {
           onPress={openEventDetails}
           activeOpacity={0.7}
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
-          </TouchableOpacity>
+          {!isDesktopPane && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
 
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle} numberOfLines={1}>

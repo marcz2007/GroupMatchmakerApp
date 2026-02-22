@@ -70,8 +70,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user?.id, fetchProfile]);
 
   useEffect(() => {
+    let resolved = false;
+
+    // Safety timeout — if getSession() hangs, unblock after 5s
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        console.warn("[Auth] getSession() timed out after 5s, unblocking app");
+        resolved = true;
+        setLoading(false);
+      }
+    }, 5000);
+
     // Get initial session
+    console.log("[Auth] Calling getSession()...");
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log("[Auth] getSession() resolved, session:", !!session);
+      if (resolved) return; // timeout already fired
+      resolved = true;
+      clearTimeout(timeout);
+
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -81,12 +98,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setLoading(false);
+    }).catch((error) => {
+      console.error("[Auth] getSession() error:", error);
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      setLoading(false);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("[Auth] onAuthStateChange:", _event);
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -97,10 +121,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setProfile(null);
       }
 
+      // If getSession() hung but auth state change came through, unblock
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+      }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const calendarConnected = profile?.calendar_connected ?? false;

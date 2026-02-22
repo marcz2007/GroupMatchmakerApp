@@ -18,7 +18,12 @@ import {
   EventWithDetails,
 } from "../services/eventService";
 
-const EventsListScreen = () => {
+interface EventsListScreenProps {
+  onSelectEvent?: (eventRoomId: string) => void;
+  selectedEventId?: string;
+}
+
+const EventsListScreen = ({ onSelectEvent, selectedEventId }: EventsListScreenProps = {}) => {
   const navigation = useNavigation<any>();
   const [events, setEvents] = useState<EventWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,12 +83,18 @@ const EventsListScreen = () => {
 
     const eventDate = formatEventDate(item.event_room.starts_at);
 
+    const isSelected = selectedEventId === item.event_room.id;
+
     return (
       <TouchableOpacity
-        style={styles.eventRow}
-        onPress={() =>
-          navigation.navigate("EventChat", { eventRoomId: item.event_room.id })
-        }
+        style={[styles.eventRow, isSelected && styles.eventRowSelected]}
+        onPress={() => {
+          if (onSelectEvent) {
+            onSelectEvent(item.event_room.id);
+          } else {
+            navigation.navigate("EventChat", { eventRoomId: item.event_room.id });
+          }
+        }}
         activeOpacity={0.7}
       >
         {/* Event Avatar/Icon */}
@@ -227,6 +238,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+  },
+  eventRowSelected: {
+    backgroundColor: colors.surfaceGlass,
   },
   avatarContainer: {
     position: "relative",

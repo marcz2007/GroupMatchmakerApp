@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { createGroup, getUserGroups, Group } from "../services/groupService";
-import { supabase } from "../supabase";
+import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, borderRadius, typography } from "../theme";
 
 type GroupsScreenNavigationProp = StackNavigationProp<
@@ -24,8 +24,14 @@ type GroupsScreenNavigationProp = StackNavigationProp<
   "Groups"
 >;
 
-const GroupsScreen = () => {
+interface GroupsScreenProps {
+  onSelectGroup?: (group: { id: string; name: string }) => void;
+  selectedGroupId?: string;
+}
+
+const GroupsScreen = ({ onSelectGroup, selectedGroupId }: GroupsScreenProps = {}) => {
   const navigation = useNavigation<GroupsScreenNavigationProp>();
+  const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,20 +42,23 @@ const GroupsScreen = () => {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      console.log("[Groups] fetchGroups called, user:", user?.id ?? "null");
+      if (!user) {
+        console.log("[Groups] No user, skipping fetch");
+        return;
+      }
 
+      console.log("[Groups] Calling getUserGroups...");
       const userGroups = await getUserGroups(user.id);
+      console.log("[Groups] Got groups:", userGroups.length);
       setGroups(userGroups);
     } catch (error) {
-      console.error("Error fetching groups:", error);
+      console.error("[Groups] Error fetching groups:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchGroups();
@@ -61,15 +70,10 @@ const GroupsScreen = () => {
   };
 
   const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) return;
+    if (!newGroupName.trim() || !user) return;
 
     setIsCreating(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
       await createGroup({
         name: newGroupName.trim(),
         description: newGroupDescription.trim(),
@@ -87,15 +91,22 @@ const GroupsScreen = () => {
     }
   };
 
-  const renderGroupItem = ({ item }: { item: Group }) => (
+  const renderGroupItem = ({ item }: { item: Group }) => {
+    const isSelected = selectedGroupId === item.id;
+
+    return (
     <TouchableOpacity
-      style={styles.groupCard}
-      onPress={() =>
-        navigation.navigate("GroupDetails", {
-          groupId: item.id,
-          groupName: item.name,
-        })
-      }
+      style={[styles.groupCard, isSelected && styles.groupCardSelected]}
+      onPress={() => {
+        if (onSelectGroup) {
+          onSelectGroup({ id: item.id, name: item.name });
+        } else {
+          navigation.navigate("GroupDetails", {
+            groupId: item.id,
+            groupName: item.name,
+          });
+        }
+      }}
       activeOpacity={0.7}
     >
       <View style={styles.groupIconContainer}>
@@ -126,6 +137,7 @@ const GroupsScreen = () => {
       <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
     </TouchableOpacity>
   );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -297,6 +309,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  groupCardSelected: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primaryBorder,
   },
   groupIconContainer: {
     marginRight: spacing.md,

@@ -17,11 +17,14 @@ interface GroupMemberData {
  * @returns Promise with array of groups
  */
 export async function getUserGroups(userId: string): Promise<Group[]> {
+  console.log("[groupService] getUserGroups called for:", userId);
   const { data: membershipData, error: fetchError } = await supabase
     .from("group_members")
     .select(`groups ( id, name, description, created_at )`)
     .eq("user_id", userId)
     .returns<{ groups: Group }[]>();
+
+  console.log("[groupService] Query returned, error:", fetchError, "data count:", membershipData?.length);
 
   if (fetchError) {
     console.error("Error fetching groups:", fetchError);

@@ -34,6 +34,7 @@ import {
   getGroupEventRooms,
 } from "../services/eventRoomService";
 import { supabase } from "../supabase";
+import { useAuth } from "../contexts/AuthContext";
 import { colors } from "../theme/theme";
 
 // Define types for route and navigation
@@ -70,10 +71,18 @@ interface GroupMember {
   avatar_url?: string | null;
 }
 
-const GroupDetailsScreen = () => {
+interface GroupDetailsScreenExternalProps {
+  groupIdProp?: string;
+  groupNameProp?: string;
+  isDesktopPane?: boolean;
+}
+
+const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: GroupDetailsScreenExternalProps = {}) => {
   const route = useRoute<GroupDetailsScreenRouteProp>();
   const navigation = useNavigation<GroupDetailsScreenNavigationProp>();
-  const { groupId, groupName: initialGroupName } = route.params;
+  const { user: authUser } = useAuth();
+  const groupId = groupIdProp || route.params?.groupId;
+  const initialGroupName = groupNameProp || route.params?.groupName;
 
   const [groupDetails, setGroupDetails] = useState<GroupDetailsData | null>(
     null
@@ -442,20 +451,13 @@ const GroupDetailsScreen = () => {
     setShowImagePreview(false);
 
     // Check if user is authenticated
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.error(
-        "[handleConfirmImageUpload] Authentication error:",
-        authError
-      );
+    if (!authUser) {
+      console.error("[handleConfirmImageUpload] No authenticated user");
       Alert.alert("Error", "Please log in to upload images.");
       setIsUploadingPicture(false);
       return;
     }
-    console.log("[handleConfirmImageUpload] User authenticated:", user.id);
+    console.log("[handleConfirmImageUpload] User authenticated:", authUser.id);
 
     // Debug Supabase configuration
     console.log(
@@ -878,10 +880,7 @@ const GroupDetailsScreen = () => {
 
       // Update database (group_images table)
       console.log("[handleConfirmImageUpload] Updating database records...");
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser();
-      const uploaderUserId = currentUser?.id;
+      const uploaderUserId = authUser?.id;
 
       const { error: demoteError } = await supabase
         .from("group_images") // Underscore for table

@@ -85,7 +85,7 @@ interface Profile {
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { isGuest, refreshProfile: refreshAuthProfile } = useAuth();
+  const { user: authUser, isGuest, refreshProfile: refreshAuthProfile } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -122,10 +122,7 @@ const EditProfileScreen = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      if (!authUser) {
         console.warn("[Profile] No authenticated user found");
         setLoading(false);
         return;
@@ -134,7 +131,7 @@ const EditProfileScreen = () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", authUser.id)
         .single();
 
       if (error) throw error;
@@ -173,7 +170,7 @@ const EditProfileScreen = () => {
         const { count, error: messageError } = await supabase
           .from("messages")
           .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
+          .eq("user_id", authUser.id);
 
         if (messageError) {
           console.warn("[Profile] Failed to fetch message count:", messageError.message);
@@ -199,15 +196,12 @@ const EditProfileScreen = () => {
   const saveField = async (field: string, value: any) => {
     try {
       setSavingField(field);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      if (!authUser) throw new Error("No user found");
 
       const { error } = await supabase
         .from("profiles")
         .update({ [field]: value })
-        .eq("id", user.id);
+        .eq("id", authUser.id);
 
       if (error) throw error;
       setProfile((prev) => (prev ? { ...prev, [field]: value } : null));
@@ -222,13 +216,10 @@ const EditProfileScreen = () => {
   const handleConnectSpotify = async () => {
     try {
       setConnectingSpotify(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      if (!authUser) throw new Error("No user found");
 
       const { data, error } = await supabase.functions.invoke("spotify-auth", {
-        body: { userId: user.id },
+        body: { userId: authUser.id },
       });
 
       if (error) throw error;
@@ -245,10 +236,7 @@ const EditProfileScreen = () => {
 
   const handleDisconnectSpotify = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      if (!authUser) throw new Error("No user found");
 
       const { error } = await supabase
         .from("profiles")
@@ -261,7 +249,7 @@ const EditProfileScreen = () => {
           spotify_access_token: null,
           spotify_token_expires_at: null,
         })
-        .eq("id", user.id);
+        .eq("id", authUser.id);
 
       if (error) throw error;
       await fetchProfile();
@@ -294,15 +282,12 @@ const EditProfileScreen = () => {
 
   const handleAIAnalysisToggle = async (enabled: boolean) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      if (!authUser) throw new Error("No user found");
 
       const { error } = await supabase
         .from("profiles")
         .update({ enable_ai_analysis: enabled })
-        .eq("id", user.id);
+        .eq("id", authUser.id);
 
       if (error) throw error;
       setProfile((prev) =>
@@ -316,17 +301,14 @@ const EditProfileScreen = () => {
   const handleSelectPlaylist = async () => {
     try {
       setLoadingPlaylists(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!authUser) return;
 
       const { data, error } = await supabase.functions.invoke(
         "spotify-playlists",
         {
           body: {
             action: "get_playlists",
-            userId: user.id,
+            userId: authUser.id,
           },
         }
       );
@@ -347,15 +329,12 @@ const EditProfileScreen = () => {
   const handlePlaylistSelect = async (playlist: SpotifyPlaylist) => {
     try {
       setLoadingPlaylists(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!authUser) return;
 
       const { error } = await supabase.functions.invoke("spotify-playlists", {
         body: {
           action: "select_playlist",
-          userId: user.id,
+          userId: authUser.id,
           playlistId: playlist.id,
         },
       });
