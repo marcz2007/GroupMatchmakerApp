@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import {
   Alert,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   View,
   ActivityIndicator,
-  // Platform, // Uncomment when enabling Apple auth
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Button } from "./Button";
@@ -32,45 +32,57 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ visible, onDismiss }
   const handleGoogleUpgrade = async () => {
     setLoading(true);
     try {
-      const { GoogleSignin } = require("@react-native-google-signin/google-signin");
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
+      if (Platform.OS === "web") {
+        // Web: Use Supabase OAuth redirect (redirects to Google, then back)
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) Alert.alert("Error", error.message);
+      } else {
+        // Native: Use native Google Sign-In module
+        const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+        const idToken = userInfo.data?.idToken;
 
-      if (!idToken) {
-        Alert.alert("Error", "Failed to get Google ID token.");
-        return;
-      }
-
-      // Link Google identity to the anonymous user
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: "google",
-        token: idToken,
-      });
-
-      if (error) {
-        if (error.message.includes("already")) {
-          Alert.alert(
-            "Email Already Registered",
-            "This Google account is already linked to an existing account. Please sign in instead."
-          );
-        } else {
-          Alert.alert("Error", error.message);
+        if (!idToken) {
+          Alert.alert("Error", "Failed to get Google ID token.");
+          return;
         }
-        return;
-      }
 
-      // Mark as non-guest
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from("profiles")
-          .update({ is_guest: false })
-          .eq("id", user.id);
-      }
+        // Link Google identity to the anonymous user
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: "google",
+          token: idToken,
+        });
 
-      await refreshProfile();
-      onDismiss();
+        if (error) {
+          if (error.message.includes("already")) {
+            Alert.alert(
+              "Email Already Registered",
+              "This Google account is already linked to an existing account. Please sign in instead."
+            );
+          } else {
+            Alert.alert("Error", error.message);
+          }
+          return;
+        }
+
+        // Mark as non-guest
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ is_guest: false })
+            .eq("id", user.id);
+        }
+
+        await refreshProfile();
+        onDismiss();
+      }
     } catch (error: any) {
       if (error?.code !== "SIGN_IN_CANCELLED") {
         Alert.alert("Error", error.message || "Google sign-in failed.");

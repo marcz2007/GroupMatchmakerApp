@@ -254,6 +254,7 @@ const EventRoomScreen: React.FC = () => {
         style={styles.keyboardAvoid}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        enabled={Platform.OS !== "web"}
       >
         <FlatList
           ref={flatListRef}

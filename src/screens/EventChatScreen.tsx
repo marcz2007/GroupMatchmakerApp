@@ -368,6 +368,7 @@ const EventChatScreen = () => {
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
+          enabled={Platform.OS !== "web"}
         >
           <FlatList
             ref={flatListRef}
@@ -621,7 +622,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceLight,
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === "ios" ? spacing.sm : 0,
+    paddingVertical: Platform.OS === "ios" ? spacing.sm : spacing.sm,
     marginRight: spacing.sm,
     maxHeight: 100,
   },

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
+  TextInput,
   View,
   TouchableOpacity,
   Modal,
@@ -9,10 +10,16 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 import { colors, spacing, borderRadius } from "../../theme";
+
+// Native-only imports — conditionally loaded at runtime
+const DateTimePicker = Platform.OS !== "web"
+  ? require("@react-native-community/datetimepicker").default
+  : null;
+const GooglePlacesAutocomplete = Platform.OS !== "web"
+  ? require("react-native-google-places-autocomplete").GooglePlacesAutocomplete
+  : null;
 
 interface DetailChipsProps {
   date: Date | null;
@@ -67,13 +74,21 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   };
 
   const openDatePicker = () => {
-    setTempDate(date || new Date());
-    setShowDatePicker(true);
+    if (Platform.OS === "web") {
+      setShowDatePicker(true);
+    } else {
+      setTempDate(date || new Date());
+      setShowDatePicker(true);
+    }
   };
 
   const openTimePicker = () => {
-    setTempTime(time || new Date());
-    setShowTimePicker(true);
+    if (Platform.OS === "web") {
+      setShowTimePicker(true);
+    } else {
+      setTempTime(time || new Date());
+      setShowTimePicker(true);
+    }
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -168,6 +183,45 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
         )}
       </TouchableOpacity>
 
+      {/* Web Date Picker */}
+      {Platform.OS === "web" && showDatePicker && (
+        <Modal transparent animationType="fade">
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Date</Text>
+                <View style={{ width: 50 }} />
+              </View>
+              <View style={styles.webPickerContent}>
+                <input
+                  type="date"
+                  defaultValue={date ? date.toISOString().split("T")[0] : ""}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e: any) => {
+                    if (e.target.value) {
+                      onDateChange(new Date(e.target.value + "T00:00:00"));
+                      setShowDatePicker(false);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    fontSize: 18,
+                    backgroundColor: "#2a2a3e",
+                    color: "#ffffff",
+                    border: "1px solid #404060",
+                    borderRadius: 8,
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* iOS Date Picker Modal */}
       {Platform.OS === "ios" && showDatePicker && (
         <Modal transparent animationType="slide">
@@ -204,6 +258,47 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
           onChange={handleDateChange}
           minimumDate={new Date()}
         />
+      )}
+
+      {/* Web Time Picker */}
+      {Platform.OS === "web" && showTimePicker && (
+        <Modal transparent animationType="fade">
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Time</Text>
+                <View style={{ width: 50 }} />
+              </View>
+              <View style={styles.webPickerContent}>
+                <input
+                  type="time"
+                  defaultValue={time ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : ""}
+                  onChange={(e: any) => {
+                    if (e.target.value) {
+                      const [hours, minutes] = e.target.value.split(":").map(Number);
+                      const newTime = new Date();
+                      newTime.setHours(hours, minutes, 0, 0);
+                      onTimeChange(newTime);
+                      setShowTimePicker(false);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    fontSize: 18,
+                    backgroundColor: "#2a2a3e",
+                    color: "#ffffff",
+                    border: "1px solid #404060",
+                    borderRadius: 8,
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
 
       {/* iOS Time Picker Modal */}
@@ -260,63 +355,84 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
             style={styles.locationContent}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
-            <GooglePlacesAutocomplete
-              placeholder="Search for a place..."
-              onPress={(data) => {
-                onLocationChange(data.description);
-                setShowLocationModal(false);
-              }}
-              query={{
-                key: GOOGLE_PLACES_API_KEY,
-                language: "en",
-              }}
-              fetchDetails={false}
-              enablePoweredByContainer={false}
-              debounce={300}
-              minLength={2}
-              keyboardShouldPersistTaps="handled"
-              textInputProps={{
-                autoFocus: true,
-                placeholderTextColor: colors.text.tertiary,
-              }}
-              styles={{
-                container: {
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                },
-                textInputContainer: {
-                  backgroundColor: colors.surface,
-                  paddingHorizontal: spacing.lg,
-                  paddingTop: spacing.md,
-                },
-                textInput: {
-                  backgroundColor: colors.surfaceLight,
-                  borderRadius: borderRadius.md,
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.md,
-                  fontSize: 16,
-                  color: colors.text.primary,
-                  height: 48,
-                },
-                listView: {
-                  backgroundColor: colors.surface,
-                  paddingHorizontal: spacing.lg,
-                },
-                row: {
-                  backgroundColor: colors.surface,
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border,
-                },
-                description: {
-                  color: colors.text.primary,
-                  fontSize: 15,
-                },
-                separator: {
-                  height: 0,
-                },
-              }}
-            />
+            {Platform.OS === "web" ? (
+              <View style={styles.webLocationContainer}>
+                <TextInput
+                  style={styles.webLocationInput}
+                  placeholder="Enter location..."
+                  placeholderTextColor={colors.text.tertiary}
+                  value={location}
+                  onChangeText={onLocationChange}
+                  autoFocus
+                  onSubmitEditing={() => setShowLocationModal(false)}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.webLocationDone}
+                  onPress={() => setShowLocationModal(false)}
+                >
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <GooglePlacesAutocomplete
+                placeholder="Search for a place..."
+                onPress={(data: any) => {
+                  onLocationChange(data.description);
+                  setShowLocationModal(false);
+                }}
+                query={{
+                  key: GOOGLE_PLACES_API_KEY,
+                  language: "en",
+                }}
+                fetchDetails={false}
+                enablePoweredByContainer={false}
+                debounce={300}
+                minLength={2}
+                keyboardShouldPersistTaps="handled"
+                textInputProps={{
+                  autoFocus: true,
+                  placeholderTextColor: colors.text.tertiary,
+                }}
+                styles={{
+                  container: {
+                    flex: 1,
+                    backgroundColor: colors.surface,
+                  },
+                  textInputContainer: {
+                    backgroundColor: colors.surface,
+                    paddingHorizontal: spacing.lg,
+                    paddingTop: spacing.md,
+                  },
+                  textInput: {
+                    backgroundColor: colors.surfaceLight,
+                    borderRadius: borderRadius.md,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.md,
+                    fontSize: 16,
+                    color: colors.text.primary,
+                    height: 48,
+                  },
+                  listView: {
+                    backgroundColor: colors.surface,
+                    paddingHorizontal: spacing.lg,
+                  },
+                  row: {
+                    backgroundColor: colors.surface,
+                    paddingVertical: spacing.md,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  },
+                  description: {
+                    color: colors.text.primary,
+                    fontSize: 15,
+                  },
+                  separator: {
+                    height: 0,
+                  },
+                }}
+              />
+            )}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
@@ -419,5 +535,25 @@ const styles = StyleSheet.create({
   },
   locationContent: {
     flex: 1,
+  },
+  webPickerContent: {
+    padding: spacing.lg,
+  },
+  webLocationContainer: {
+    padding: spacing.lg,
+  },
+  webLocationInput: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: 16,
+    color: colors.text.primary,
+    height: 48,
+    marginBottom: spacing.md,
+  },
+  webLocationDone: {
+    alignItems: "center",
+    paddingVertical: spacing.md,
   },
 });

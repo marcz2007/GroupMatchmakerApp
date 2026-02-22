@@ -19,9 +19,13 @@ import {
   Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import DateTimePicker from "@react-native-community/datetimepicker";
+const DateTimePicker = Platform.OS !== "web"
+  ? require("@react-native-community/datetimepicker").default
+  : null;
 import * as Haptics from "expo-haptics";
-import ConfettiCannon from "react-native-confetti-cannon";
+const ConfettiCannon = Platform.OS !== "web"
+  ? require("react-native-confetti-cannon").default
+  : (() => null) as any;
 import { IdeaInput } from "../components/propose/IdeaInput";
 import { IdeaPill } from "../components/propose/IdeaPill";
 import { StepIndicator } from "../components/propose/StepIndicator";
@@ -580,6 +584,47 @@ const ProposeScreen = () => {
             )}
           </ScrollView>
 
+          {/* Web Deadline Picker */}
+          {Platform.OS === "web" && showDeadlinePicker && (
+            <Modal transparent animationType="fade">
+              <View style={styles.pickerModal}>
+                <View style={styles.pickerContainer}>
+                  <View style={styles.pickerHeader}>
+                    <TouchableOpacity
+                      onPress={() => setShowDeadlinePicker(false)}
+                    >
+                      <Text style={styles.pickerCancel}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.pickerTitle}>Voting Deadline</Text>
+                    <View style={{ width: 50 }} />
+                  </View>
+                  <View style={{ padding: 20 }}>
+                    <input
+                      type="datetime-local"
+                      defaultValue={votingDeadline ? votingDeadline.toISOString().slice(0, 16) : ""}
+                      min={new Date().toISOString().slice(0, 16)}
+                      onChange={(e: any) => {
+                        if (e.target.value) {
+                          setVotingDeadline(new Date(e.target.value));
+                          setShowDeadlinePicker(false);
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: 12,
+                        fontSize: 18,
+                        backgroundColor: "#2a2a3e",
+                        color: "#ffffff",
+                        border: "1px solid #404060",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          )}
+
           {/* iOS Deadline Picker Modal */}
           {Platform.OS === "ios" && showDeadlinePicker && (
             <Modal transparent animationType="slide">
@@ -846,6 +891,7 @@ const ProposeScreen = () => {
             style={styles.keyboardView}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+            enabled={Platform.OS !== "web"}
           >
             {/* Step indicator at top (hide on success) */}
             {currentStep !== "success" && (

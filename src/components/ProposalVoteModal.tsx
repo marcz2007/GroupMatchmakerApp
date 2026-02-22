@@ -4,12 +4,15 @@ import {
   Alert,
   Animated,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import ConfettiCannon from "react-native-confetti-cannon";
+const ConfettiCannon = Platform.OS !== "web"
+  ? require("react-native-confetti-cannon").default
+  : (() => null) as any;
 import * as Haptics from "expo-haptics";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import {

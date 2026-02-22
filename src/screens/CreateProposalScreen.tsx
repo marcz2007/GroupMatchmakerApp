@@ -16,7 +16,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import DateTimePicker from "@react-native-community/datetimepicker";
+const DateTimePicker = Platform.OS !== "web"
+  ? require("@react-native-community/datetimepicker").default
+  : null;
 import { addHours } from "date-fns";
 import { createProposal } from "../services/proposalService";
 import { getGroupMemberCount } from "../services/groupService";
@@ -168,6 +170,7 @@ const CreateProposalScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={Platform.OS !== "web"}
       >
         <ScrollView
           style={styles.scrollView}
@@ -336,6 +339,47 @@ const CreateProposalScreen: React.FC = () => {
             </View>
           </View>
         </ScrollView>
+
+        {/* Web Deadline Picker */}
+        {Platform.OS === "web" && showDeadlinePicker && (
+          <Modal transparent animationType="fade">
+            <View style={styles.pickerModal}>
+              <View style={styles.pickerContainer}>
+                <View style={styles.pickerHeader}>
+                  <TouchableOpacity
+                    onPress={() => setShowDeadlinePicker(false)}
+                  >
+                    <Text style={styles.pickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pickerTitle}>Voting Deadline</Text>
+                  <View style={{ width: 50 }} />
+                </View>
+                <View style={{ padding: 20 }}>
+                  <input
+                    type="datetime-local"
+                    defaultValue={votingDeadline ? votingDeadline.toISOString().slice(0, 16) : ""}
+                    min={new Date().toISOString().slice(0, 16)}
+                    onChange={(e: any) => {
+                      if (e.target.value) {
+                        setVotingDeadline(new Date(e.target.value));
+                        setShowDeadlinePicker(false);
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: 12,
+                      fontSize: 18,
+                      backgroundColor: "#2a2a3e",
+                      color: "#ffffff",
+                      border: "1px solid #404060",
+                      borderRadius: 8,
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
 
         {/* iOS Deadline Picker Modal */}
         {Platform.OS === "ios" && showDeadlinePicker && (

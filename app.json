@@ -30,7 +30,8 @@
       "package": "com.marcz2007.GroupMatchmakerApp"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "extra": {
       "eas": {

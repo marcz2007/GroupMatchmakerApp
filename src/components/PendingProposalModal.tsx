@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +11,9 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import ConfettiCannon from "react-native-confetti-cannon";
+const ConfettiCannon = Platform.OS !== "web"
+  ? require("react-native-confetti-cannon").default
+  : (() => null) as any;
 import * as Haptics from "expo-haptics";
 import { format, formatDistanceToNow } from "date-fns";
 import { usePendingProposals } from "../contexts/PendingProposalsContext";

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grapple - Auth</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: #2a2a2a;
+      padding: 40px;
+      border-radius: 12px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 { margin-bottom: 10px; font-size: 24px; }
+    .subtitle { color: #b0b0b0; margin-bottom: 30px; }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+    .loading { color: #3b82f6; }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      margin-bottom: 15px;
+      border: 1px solid #404040;
+      border-radius: 8px;
+      background: #3a3a3a;
+      color: #fff;
+      font-size: 16px;
+    }
+    input::placeholder { color: #808080; }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #5762b7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 15px;
+    }
+    button:hover { background: #4752a7; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    .app-link {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #10b981;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .message { margin: 20px 0; line-height: 1.6; }
+    #password-form { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading">
+      <h1>Processing...</h1>
+      <p class="subtitle loading">Please wait</p>
+    </div>
+
+    <div id="email-verified" style="display: none;">
+      <h1>Email Verified!</h1>
+      <p class="message success">Your email has been confirmed successfully.</p>
+      <a href="groupmatchmakerapp://" class="app-link">Open Grapple App</a>
+      <p class="subtitle" style="margin-top: 20px;">Or go back to the app and login.</p>
+    </div>
+
+    <div id="password-form" style="display: none;">
+      <h1>Reset Password</h1>
+      <p class="subtitle">Enter your new password below</p>
+      <input type="password" id="new-password" placeholder="New password (min 6 characters)" />
+      <input type="password" id="confirm-password" placeholder="Confirm new password" />
+      <button id="reset-btn" onclick="resetPassword()">Set New Password</button>
+      <p id="reset-message" class="message"></p>
+    </div>
+
+    <div id="password-success" style="display: none;">
+      <h1>Password Updated!</h1>
+      <p class="message success">Your password has been reset successfully.</p>
+      <a href="groupmatchmakerapp://" class="app-link">Open Grapple App</a>
+      <p class="subtitle" style="margin-top: 20px;">Go back to the app and login with your new password.</p>
+    </div>
+
+    <div id="error-state" style="display: none;">
+      <h1>Something went wrong</h1>
+      <p id="error-message" class="message error"></p>
+      <a href="groupmatchmakerapp://" class="app-link" style="background: #5762b7;">Open Grapple App</a>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Supabase - REPLACE WITH YOUR CREDENTIALS
+    const SUPABASE_URL = 'https://nqtycfrgzjiehatokmfn.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHljZnJnemppZWhhdG9rbWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMyNDU5MDcsImV4cCI6MjA1ODgyMTkwN30.QVuNoevXuJ9rTBAOe_yObjVLdqT-FqwsRw__3HeYDDQ'; // Get from Supabase Dashboard
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function showSection(id) {
+      ['loading', 'email-verified', 'password-form', 'password-success', 'error-state'].forEach(s => {
+        document.getElementById(s).style.display = 'none';
+      });
+      document.getElementById(id).style.display = 'block';
+    }
+
+    function showError(message) {
+      document.getElementById('error-message').textContent = message;
+      showSection('error-state');
+    }
+
+    async function resetPassword() {
+      const newPassword = document.getElementById('new-password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      const btn = document.getElementById('reset-btn');
+      const msg = document.getElementById('reset-message');
+
+      if (!newPassword || newPassword.length < 6) {
+        msg.textContent = 'Password must be at least 6 characters';
+        msg.className = 'message error';
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        msg.textContent = 'Passwords do not match';
+        msg.className = 'message error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+      msg.textContent = '';
+
+      try {
+        const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+        if (error) {
+          msg.textContent = error.message;
+          msg.className = 'message error';
+          btn.disabled = false;
+          btn.textContent = 'Set New Password';
+        } else {
+          showSection('password-success');
+        }
+      } catch (e) {
+        msg.textContent = 'An error occurred. Please try again.';
+        msg.className = 'message error';
+        btn.disabled = false;
+        btn.textContent = 'Set New Password';
+      }
+    }
+
+    async function handleAuth() {
+      try {
+        // Get the hash fragment (Supabase puts tokens here)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
+
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type') || queryParams.get('type');
+        const error = hashParams.get('error') || queryParams.get('error');
+        const errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
+
+        console.log('Auth params:', { type, accessToken: !!accessToken, error });
+        console.log('Full URL:', window.location.href);
+        console.log('Hash:', window.location.hash);
+
+        if (error) {
+          showError(errorDescription || error);
+          return;
+        }
+
+        // No parameters at all - user accessed page directly
+        if (!accessToken && !type && !error) {
+          showError('No authentication parameters found. Please use a link from your email.');
+          return;
+        }
+
+        if (accessToken) {
+          // Set the session in Supabase
+          const { data, error: sessionError } = await supabaseClient.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            showError(sessionError.message);
+            return;
+          }
+
+          // Check what type of auth this is
+          if (type === 'recovery') {
+            // Password recovery - show the reset form
+            showSection('password-form');
+          } else if (type === 'signup' || type === 'email') {
+            // Email confirmation
+            showSection('email-verified');
+          } else {
+            // Default to email verified
+            showSection('email-verified');
+          }
+        } else {
+          // No token - check if just a type parameter
+          if (type === 'recovery') {
+            showError('Invalid or expired reset link. Please request a new one.');
+          } else {
+            showError('Invalid link. Please try again from the app.');
+          }
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+        showError('An error occurred: ' + (err.message || 'Unknown error'));
+      }
+    }
+
+    // Run on page load
+    handleAuth();
+  </script>
+</body>
+</html>

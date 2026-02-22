@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd web && npm install && npm run build",
-  "outputDirectory": "web/dist",
+  "buildCommand": "yarn install --ignore-engines && npx expo export --platform web",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/auth", "destination": "/auth/index.html" },
     { "source": "/auth/(.*)", "destination": "/auth/index.html" },

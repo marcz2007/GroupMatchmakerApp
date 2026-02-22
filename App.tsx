@@ -2,8 +2,12 @@
 import { LinkingOptions, NavigationContainer } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React from "react";
-import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
-import { KeyboardProvider } from "react-native-keyboard-controller";
+import { ActivityIndicator, Linking, Platform, StyleSheet, View } from "react-native";
+
+// KeyboardProvider is native-only — on web, render children directly
+const KeyboardWrapper = Platform.OS === 'web'
+  ? ({ children }: { children: React.ReactNode }) => <>{children}</>
+  : require('react-native-keyboard-controller').KeyboardProvider;
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { EventsProvider } from "./src/contexts/EventsContext";
 import { PendingProposalsProvider } from "./src/contexts/PendingProposalsContext";
@@ -100,7 +104,7 @@ function AppContent() {
   return (
     <EventsProvider>
       <PendingProposalsProvider>
-        <KeyboardProvider>
+        <KeyboardWrapper>
           <NavigationContainer
             linking={linking}
             fallback={<ActivityIndicator color={colors.primary} size="large" />}
@@ -138,7 +142,7 @@ function AppContent() {
               <AppNavigator isAuthenticated={!!user} />
             </View>
           </NavigationContainer>
-        </KeyboardProvider>
+        </KeyboardWrapper>
         <PendingProposalModal />
       </PendingProposalsProvider>
     </EventsProvider>

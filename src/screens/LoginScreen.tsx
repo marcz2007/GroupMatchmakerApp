@@ -3,12 +3,12 @@ import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   View,
   ActivityIndicator,
-  // Platform, // Uncomment when enabling Apple auth
 } from "react-native";
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
@@ -105,23 +105,35 @@ const LoginScreen = () => {
   const handleGoogleSignIn = async () => {
     setOauthLoading(true);
     try {
-      const { GoogleSignin } = require("@react-native-google-signin/google-signin");
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
+      if (Platform.OS === "web") {
+        // Web: Use Supabase OAuth redirect (redirects to Google, then back)
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) Alert.alert("Error", error.message);
+      } else {
+        // Native: Use native Google Sign-In module
+        const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+        const idToken = userInfo.data?.idToken;
 
-      if (!idToken) {
-        Alert.alert("Error", "Failed to get Google ID token.");
-        return;
-      }
+        if (!idToken) {
+          Alert.alert("Error", "Failed to get Google ID token.");
+          return;
+        }
 
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: "google",
-        token: idToken,
-      });
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: "google",
+          token: idToken,
+        });
 
-      if (error) {
-        Alert.alert("Google Sign-In Error", error.message);
+        if (error) {
+          Alert.alert("Google Sign-In Error", error.message);
+        }
       }
     } catch (error: any) {
       if (error?.code !== "SIGN_IN_CANCELLED") {
