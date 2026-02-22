@@ -116,8 +116,10 @@ const EditProfileScreen = () => {
   const [savingField, setSavingField] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (authUser) {
+      fetchProfile();
+    }
+  }, [authUser]);
 
   const fetchProfile = async () => {
     try {

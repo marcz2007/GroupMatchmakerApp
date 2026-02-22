@@ -54,9 +54,20 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
   const busyCache = useRef<Record<string, BusyTime[]>>({});
+  const fetchVersionRef = useRef(0);
 
-  // Fetch group members once on mount
+  // Clear cache and reset when groupId changes
   useEffect(() => {
+    busyCache.current = {};
+    setMembers([]);
+    setMemberIds([]);
+    setBusyTimes([]);
+    setSelectedDate(null);
+  }, [groupId]);
+
+  // Fetch group members when groupId changes
+  useEffect(() => {
+    const version = ++fetchVersionRef.current;
     (async () => {
       setLoading(true);
       try {
@@ -65,6 +76,8 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
           .select("user_id")
           .eq("group_id", groupId);
 
+        if (fetchVersionRef.current !== version) return;
+
         if (memberError) {
           console.error("Error fetching members:", memberError);
           return;
@@ -72,10 +85,18 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
 
         const ids = (memberRows || []).map((m: { user_id: string }) => m.user_id);
 
+        if (ids.length === 0) {
+          setMembers([]);
+          setMemberIds([]);
+          return;
+        }
+
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("id, first_name, last_name, username, avatar_url")
           .in("id", ids);
+
+        if (fetchVersionRef.current !== version) return;
 
         if (profileError) {
           console.error("Error fetching profiles:", profileError);
@@ -95,9 +116,12 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
         setMembers(mappedMembers);
         setMemberIds(ids);
       } catch (error) {
+        if (fetchVersionRef.current !== version) return;
         console.error("Error fetching members:", error);
       } finally {
-        setLoading(false);
+        if (fetchVersionRef.current === version) {
+          setLoading(false);
+        }
       }
     })();
   }, [groupId]);
@@ -113,19 +137,21 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
         return;
       }
 
+      const version = fetchVersionRef.current;
       setMonthLoading(true);
       try {
         const [year, month] = monthKey.split("-").map(Number);
         const startOfMonth = new Date(year, month - 1, 1);
         const endOfMonth = new Date(year, month, 1);
 
-        // Fetch events that overlap with this month
         const { data, error } = await supabase
           .from("calendar_busy_times")
           .select("user_id, start_time, end_time")
           .in("user_id", memberIds)
           .lt("start_time", endOfMonth.toISOString())
           .gt("end_time", startOfMonth.toISOString());
+
+        if (fetchVersionRef.current !== version) return;
 
         if (error) {
           console.error("Error fetching busy times:", error);
@@ -136,9 +162,12 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
         busyCache.current[monthKey] = result;
         setBusyTimes(result);
       } catch (error) {
+        if (fetchVersionRef.current !== version) return;
         console.error("Error fetching month data:", error);
       } finally {
-        setMonthLoading(false);
+        if (fetchVersionRef.current === version) {
+          setMonthLoading(false);
+        }
       }
     },
     [memberIds]

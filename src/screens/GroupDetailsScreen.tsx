@@ -1,7 +1,7 @@
-import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -110,6 +110,9 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
   const [groupMessageCount, setGroupMessageCount] = useState(0);
   const [hasGroupMessages, setHasGroupMessages] = useState(false);
 
+  // Version counter to cancel stale fetches when rapidly switching groups
+  const fetchVersionRef = useRef(0);
+
   // Proposals and Event Rooms state
   const [proposals, setProposals] = useState<ProposalWithVotes[]>([]);
   const [eventRooms, setEventRooms] = useState<EventRoomWithDetails[]>([]);
@@ -173,15 +176,22 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
   };
 
   const fetchGroupData = useCallback(async () => {
+    // Increment version so any in-flight fetch for a previous group bails out
+    const version = ++fetchVersionRef.current;
+    console.log("[GroupDetails] fetchGroupData called, groupId:", groupId, "version:", version);
     setIsLoading(true);
     setError(null);
     try {
       // Fetch group-specific details (name, description)
+      console.log("[GroupDetails] Fetching group data...");
       const { data: groupData, error: groupError } = await supabase
         .from("groups")
-        .select("id, name, description, owner_id") // Removed picture_url from here
+        .select("id, name, description, owner_id")
         .eq("id", groupId)
         .single();
+
+      if (fetchVersionRef.current !== version) return; // Stale fetch, bail out
+      console.log("[GroupDetails] Group data returned, error:", groupError);
 
       if (groupError) throw groupError;
       if (!groupData) throw new Error("Group not found.");
@@ -198,11 +208,12 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
           .select("id, image_url, is_primary, image_storage_path")
           .eq("group_id", groupId)
           .eq("is_primary", true)
-          .maybeSingle(); // Use maybeSingle as there might be no primary image
+          .maybeSingle();
+
+      if (fetchVersionRef.current !== version) return; // Stale fetch, bail out
 
       if (primaryImageError) throw primaryImageError;
       setPrimaryImage(primaryImageData as GroupImageRecord | null);
-      // Later: Fetch otherImages here as well
 
       // Fetch group members using RPC function
       const { data: memberData, error: memberError } = await supabase.rpc(
@@ -210,12 +221,12 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
         { p_group_id: groupId }
       );
 
+      if (fetchVersionRef.current !== version) return; // Stale fetch, bail out
+
       if (memberError) {
         console.error("Error fetching members:", memberError);
         throw memberError;
       }
-
-      console.log("Member data from get_group_members:", memberData);
 
       if (memberData && Array.isArray(memberData) && memberData.length > 0) {
         const mappedMembers = memberData.map((profile: any) => ({
@@ -224,21 +235,12 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
           first_name: profile.first_name,
           avatar_url: profile.avatar_url,
         })) as GroupMember[];
-
-        console.log("Fetched members:", mappedMembers);
         setMembers(mappedMembers);
       } else {
         setMembers([]);
       }
 
-      // Add this after fetching group details
-      const { data: groupSettings } = await supabase
-        .from("groups")
-        .select("enable_ai_analysis")
-        .eq("id", groupId)
-        .single();
-
-      setEnableAIAnalysis(groupSettings?.enable_ai_analysis || false);
+      if (fetchVersionRef.current !== version) return;
 
       // Fetch group message count for AI analysis
       try {
@@ -247,6 +249,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
           .select("*", { count: "exact", head: true })
           .eq("group_id", groupId);
 
+        if (fetchVersionRef.current !== version) return;
         if (!messageError && count !== null) {
           setGroupMessageCount(count);
           setHasGroupMessages(count > 0);
@@ -255,10 +258,13 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
         console.error("Error fetching group message count:", messageCountError);
       }
     } catch (err: any) {
+      if (fetchVersionRef.current !== version) return; // Don't set error for stale fetch
       console.error("Failed to fetch group details:", err);
       setError(err.message || "Could not load group information.");
     } finally {
-      setIsLoading(false);
+      if (fetchVersionRef.current === version) {
+        setIsLoading(false);
+      }
     }
   }, [groupId, navigation, initialGroupName]);
 
@@ -268,34 +274,33 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
     }
   }, [groupId, fetchGroupData]);
 
-  // Refresh data when screen comes into focus (e.g., after adding a member)
-  useFocusEffect(
-    useCallback(() => {
-      if (groupId) {
-        fetchGroupData();
-      }
-    }, [groupId, fetchGroupData])
-  );
-
   // Fetch proposals for the group
   const fetchProposals = useCallback(async () => {
+    const version = fetchVersionRef.current;
     setLoadingProposals(true);
     try {
       const data = await getGroupProposals(groupId);
+      if (fetchVersionRef.current !== version) return;
       setProposals(data);
     } catch (error) {
+      if (fetchVersionRef.current !== version) return;
       console.error("Error fetching proposals:", error);
     } finally {
-      setLoadingProposals(false);
+      if (fetchVersionRef.current === version) {
+        setLoadingProposals(false);
+      }
     }
   }, [groupId]);
 
   // Fetch event rooms for the group
   const fetchEventRooms = useCallback(async () => {
+    const version = fetchVersionRef.current;
     try {
       const data = await getGroupEventRooms(groupId);
+      if (fetchVersionRef.current !== version) return;
       setEventRooms(data.filter((room) => !room.is_expired));
     } catch (error) {
+      if (fetchVersionRef.current !== version) return;
       console.error("Error fetching event rooms:", error);
     }
   }, [groupId]);

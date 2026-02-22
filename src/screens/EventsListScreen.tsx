@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { formatDistanceToNow } from "date-fns";
 import { colors, spacing, borderRadius, typography } from "../theme";
+import { useAuth } from "../contexts/AuthContext";
 import {
   getUserEvents,
   subscribeToUserEvents,
@@ -25,12 +26,14 @@ interface EventsListScreenProps {
 
 const EventsListScreen = ({ onSelectEvent, selectedEventId }: EventsListScreenProps = {}) => {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const [events, setEvents] = useState<EventWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadEvents = useCallback(async () => {
     try {
+      if (!user) return;
       const data = await getUserEvents();
       setEvents(data);
     } catch (error) {
@@ -39,7 +42,7 @@ const EventsListScreen = ({ onSelectEvent, selectedEventId }: EventsListScreenPr
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadEvents();

@@ -54,6 +54,7 @@ const EventRoomScreen: React.FC = () => {
   const [timeRemaining, setTimeRemaining] = useState({ hours: 0, minutes: 0 });
 
   const flatListRef = useRef<FlatList>(null);
+  const loadVersionRef = useRef(0);
 
   const handleShare = async () => {
     const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
@@ -79,8 +80,10 @@ const EventRoomScreen: React.FC = () => {
   }, [navigation, title]);
 
   const loadEventRoom = useCallback(async () => {
+    const version = loadVersionRef.current;
     try {
       const room = await getEventRoomById(eventRoomId);
+      if (loadVersionRef.current !== version) return;
       if (room) {
         setEventRoom(room);
         const remaining = getEventRoomTimeRemaining(room);
@@ -88,34 +91,44 @@ const EventRoomScreen: React.FC = () => {
         setTimeRemaining({ hours: remaining.hours, minutes: remaining.minutes });
       }
     } catch (error) {
+      if (loadVersionRef.current !== version) return;
       console.error("Error loading event room:", error);
     }
   }, [eventRoomId]);
 
   const loadMessages = useCallback(async () => {
+    const version = loadVersionRef.current;
     try {
       const result = await getEventRoomMessages(eventRoomId);
+      if (loadVersionRef.current !== version) return;
       setMessages(result.messages);
       setIsExpired(result.is_expired);
     } catch (error) {
+      if (loadVersionRef.current !== version) return;
       console.error("Error loading messages:", error);
     }
   }, [eventRoomId]);
 
   const loadParticipants = useCallback(async () => {
+    const version = loadVersionRef.current;
     try {
       const data = await getEventRoomParticipants(eventRoomId);
+      if (loadVersionRef.current !== version) return;
       setParticipants(data);
     } catch (error) {
+      if (loadVersionRef.current !== version) return;
       console.error("Error loading participants:", error);
     }
   }, [eventRoomId]);
 
   useEffect(() => {
+    const version = ++loadVersionRef.current;
     const loadData = async () => {
       setLoading(true);
       await Promise.all([loadEventRoom(), loadMessages(), loadParticipants()]);
-      setLoading(false);
+      if (loadVersionRef.current === version) {
+        setLoading(false);
+      }
     };
 
     loadData();

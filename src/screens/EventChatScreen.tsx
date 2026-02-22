@@ -54,27 +54,35 @@ const EventChatScreen = ({ eventRoomIdProp, isDesktopPane }: EventChatScreenProp
   const [linkCopied, setLinkCopied] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const loadVersionRef = useRef(0);
 
   const loadData = useCallback(async () => {
+    const version = ++loadVersionRef.current;
+    console.log("[EventChat] loadData called, eventRoomId:", eventRoomId, "version:", version);
     try {
       const [details, msgs] = await Promise.all([
         getEventDetails(eventRoomId),
         getEventMessages(eventRoomId),
       ]);
+      if (loadVersionRef.current !== version) return; // Stale fetch, bail out
       setEventDetails(details);
       setMessages(msgs);
 
       // Load extension status
       try {
         const status = await getChatExtensionStatus(eventRoomId);
+        if (loadVersionRef.current !== version) return;
         setExtensionStatus(status);
       } catch {
         // Extension status may fail if migration hasn't run yet
       }
     } catch (error) {
-      console.error("Error loading event data:", error);
+      if (loadVersionRef.current !== version) return;
+      console.error("[EventChat] Error loading event data:", error);
     } finally {
-      setLoading(false);
+      if (loadVersionRef.current === version) {
+        setLoading(false);
+      }
     }
   }, [eventRoomId]);
 
