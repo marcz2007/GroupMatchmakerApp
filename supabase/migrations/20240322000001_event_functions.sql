@@ -174,7 +174,7 @@ BEGIN
                 SELECT
                     v_event_room.id as id,
                     CONCAT(
-                        'Welcome to the chat for ', v_event_room.title, '! 🎉',
+                        v_event_room.title, ' 🎉',
                         CASE WHEN v_event_room.starts_at IS NOT NULL
                             THEN CONCAT(E'\n', '📅 ', to_char(v_event_room.starts_at, 'Dy, Mon DD at HH12:MI AM'))
                             ELSE ''
@@ -184,7 +184,6 @@ BEGIN
                             ELSE ''
                         END,
                         E'\n\n', 'This chat is temporary — it''ll close 48 hours after the event ends. No endless group chats here, just real plans with real people.',
-                        E'\n\n', 'Want to keep chatting? When the time comes, you can vote to stay. Anyone who doesn''t vote to stay gets removed.',
                         E'\n\n', 'Share this event: https://group-matchmaker-app.vercel.app/event/', v_event_room.id,
                         E'\n', 'Tap the link above to copy it!'
                     ) as content,
