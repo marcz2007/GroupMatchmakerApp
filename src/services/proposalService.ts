@@ -127,7 +127,36 @@ export async function createProposal(
     throw new Error(error.message || "Failed to create proposal");
   }
 
+  // Fire-and-forget: classify the proposal in the background
+  classifyProposalAsync(data, input);
+
   return data;
+}
+
+/**
+ * Classify a proposal via AI edge function (fire-and-forget).
+ * Failures are silently logged — classification is non-critical.
+ */
+async function classifyProposalAsync(
+  proposal: Proposal,
+  input: CreateProposalInput
+): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke("classify-proposal", {
+      body: {
+        proposal_id: proposal.id,
+        title: input.title,
+        description: input.description || null,
+        estimated_cost: input.estimated_cost || null,
+        starts_at: input.starts_at || null,
+      },
+    });
+    if (error) {
+      console.warn("Proposal classification failed:", error);
+    }
+  } catch (err) {
+    console.warn("Proposal classification error:", err);
+  }
 }
 
 /**
