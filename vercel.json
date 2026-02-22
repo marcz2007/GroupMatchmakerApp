@@ -1,5 +1,5 @@
 {
-  "buildCommand": "yarn install --ignore-engines && npx expo export --platform web",
+  "buildCommand": "printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\nGOOGLE_PLACES_API_KEY=%s\n' \"$SUPABASE_URL\" \"$SUPABASE_ANON_KEY\" \"$GOOGLE_PLACES_API_KEY\" > .env && yarn install --ignore-engines && npx expo export --platform web",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/auth", "destination": "/auth/index.html" },

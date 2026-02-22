@@ -138,8 +138,10 @@ function AppContent() {
               },
             }}
           >
-            <View style={styles.container}>
-              <AppNavigator isAuthenticated={!!user} />
+            <View style={styles.webRoot}>
+              <View style={styles.appFrame}>
+                <AppNavigator isAuthenticated={!!user} />
+              </View>
             </View>
           </NavigationContainer>
         </KeyboardWrapper>
@@ -158,9 +160,21 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  webRoot: {
     flex: 1,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+  },
+  appFrame: {
+    flex: 1,
+    width: '100%',
     backgroundColor: colors.background,
+    ...(Platform.OS === 'web' ? {
+      maxWidth: 480,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.divider,
+    } : {}),
   },
   loadingContainer: {
     flex: 1,
