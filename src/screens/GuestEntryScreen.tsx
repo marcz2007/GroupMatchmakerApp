@@ -2,6 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -16,7 +17,48 @@ const GuestEntryScreen = () => {
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const navigation = useNavigation<RootStackNavigationProp<"GuestEntry">>();
+
+  const handleGoogleSignIn = async () => {
+    setOauthLoading(true);
+    try {
+      if (Platform.OS === "web") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) Alert.alert("Error", error.message);
+      } else {
+        const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+        const idToken = userInfo.data?.idToken;
+
+        if (!idToken) {
+          Alert.alert("Error", "Failed to get Google ID token.");
+          return;
+        }
+
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: "google",
+          token: idToken,
+        });
+
+        if (error) {
+          Alert.alert("Google Sign-In Error", error.message);
+        }
+      }
+    } catch (error: any) {
+      if (error?.code !== "SIGN_IN_CANCELLED") {
+        Alert.alert("Error", error.message || "Google sign-in failed.");
+      }
+    } finally {
+      setOauthLoading(false);
+    }
+  };
 
   const handleGuestJoin = async () => {
     const cleanName = firstName.trim();
@@ -105,15 +147,30 @@ const GuestEntryScreen = () => {
         variant="primary"
         onPress={handleGuestJoin}
         fullWidth
-        disabled={loading}
+        disabled={loading || oauthLoading}
       >
         {loading ? <ActivityIndicator color="#fff" size="small" /> : "Continue"}
+      </Button>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <Button
+        variant="secondary"
+        onPress={handleGoogleSignIn}
+        fullWidth
+        disabled={loading || oauthLoading}
+      >
+        {oauthLoading ? <ActivityIndicator color="#fff" size="small" /> : "Continue with Google"}
       </Button>
 
       <Button
         variant="link"
         onPress={() => navigation.navigate("Login")}
-        disabled={loading}
+        disabled={loading || oauthLoading}
       >
         Already have an account? Sign in
       </Button>
@@ -150,6 +207,21 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: "#3a3a3a",
     color: "#ffffff",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#404040",
+  },
+  dividerText: {
+    color: "#b0b0b0",
+    paddingHorizontal: 10,
+    fontSize: 13,
   },
 });
 

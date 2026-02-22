@@ -312,6 +312,14 @@ const LoginScreen = () => {
         Don't have an account? Sign up
       </Button>
 
+      <Button
+        variant="link"
+        onPress={() => navigation.navigate("GuestEntry")}
+        disabled={isDisabled}
+      >
+        Join as Guest
+      </Button>
+
       {DEBUG_AUTH && (
         <Text style={styles.debugHint}>
           Debug mode ON - you'll see alert popups with API responses

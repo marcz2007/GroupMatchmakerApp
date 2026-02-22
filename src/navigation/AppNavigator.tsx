@@ -50,8 +50,11 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 // Auth stack that shows Login/Signup/ResetPassword/GuestEntry screens
-const AuthStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
+const AuthStack = ({ hasPendingEvent }: { hasPendingEvent?: boolean }) => (
+  <Stack.Navigator
+    screenOptions={{ headerShown: false }}
+    initialRouteName={hasPendingEvent ? "GuestEntry" : "Login"}
+  >
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Signup" component={SignupScreen} />
     <Stack.Screen name="GuestEntry" component={GuestEntryScreen} />
@@ -151,10 +154,10 @@ const AppStack = () => (
 
 // Conditional navigator based on authentication status
 // Calendar connection is no longer a gate — it's optional via profile settings
-const AppNavigator = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
+const AppNavigator = ({ isAuthenticated, hasPendingEvent }: { isAuthenticated: boolean; hasPendingEvent?: boolean }) => {
   // If not authenticated, show auth screens
   if (!isAuthenticated) {
-    return <AuthStack />;
+    return <AuthStack hasPendingEvent={hasPendingEvent} />;
   }
 
   // If authenticated (guest or full account), show main app

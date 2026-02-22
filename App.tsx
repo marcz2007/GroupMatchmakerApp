@@ -1,7 +1,7 @@
 // App.tsx
-import { LinkingOptions, NavigationContainer } from "@react-navigation/native";
+import { LinkingOptions, NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, Linking, Platform, StyleSheet, View } from "react-native";
 
 // KeyboardProvider is native-only — on web, render children directly
@@ -90,8 +90,61 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
+/** Extract an eventRoomId from a URL path like /event/<uuid> */
+function extractEventId(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    // Handle both full URLs and bare paths
+    const path = url.includes("://") ? new URL(url).pathname : url;
+    const match = path.match(/\/event\/([^/?#]+)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+  // Synchronously detect event invite URL on web so the very first render
+  // can show GuestEntry instead of Login (refs set in useEffect would be too late).
+  const pendingEventRef = useRef<string | null>(
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? extractEventId(window.location.pathname)
+      : null
+  );
+
+  // For native: check Linking.getInitialURL asynchronously
+  useEffect(() => {
+    if (Platform.OS === "web") return; // already handled synchronously above
+    (async () => {
+      const initialUrl = await Linking.getInitialURL();
+      const eventId = extractEventId(initialUrl);
+      if (eventId) {
+        pendingEventRef.current = eventId;
+      }
+    })();
+  }, []);
+
+  // After auth, navigate to the pending event
+  useEffect(() => {
+    if (!user || !pendingEventRef.current) return;
+    const eventRoomId = pendingEventRef.current;
+    pendingEventRef.current = null; // consume it once
+
+    // Wait until the navigator is ready (AppStack needs to be mounted)
+    const tryNavigate = () => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("EventRoom", { eventRoomId });
+      } else {
+        // Retry shortly — AppStack may still be mounting
+        setTimeout(tryNavigate, 100);
+      }
+    };
+    // Small delay to let AppStack mount after auth state change
+    setTimeout(tryNavigate, 50);
+  }, [user, navigationRef]);
 
   if (loading) {
     return (
@@ -106,6 +159,7 @@ function AppContent() {
       <PendingProposalsProvider>
         <KeyboardWrapper>
           <NavigationContainer
+            ref={navigationRef}
             linking={linking}
             fallback={<ActivityIndicator color={colors.primary} size="large" />}
             theme={{
@@ -139,7 +193,7 @@ function AppContent() {
             }}
           >
             <View style={styles.container}>
-                <AppNavigator isAuthenticated={!!user} />
+                <AppNavigator isAuthenticated={!!user} hasPendingEvent={!!pendingEventRef.current} />
             </View>
           </NavigationContainer>
         </KeyboardWrapper>
