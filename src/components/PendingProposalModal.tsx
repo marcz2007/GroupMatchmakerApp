@@ -212,12 +212,19 @@ const PendingProposalModal: React.FC = () => {
                 )}
               </View>
 
-              {/* Proposed by */}
-              {created_by_profile && (
+              {/* Proposed by + cost badge */}
+              <View style={styles.proposedByRow}>
                 <Text style={styles.proposedBy}>
-                  Proposed by {created_by_profile.display_name}
+                  {!p.is_anonymous && created_by_profile
+                    ? `Proposed by ${created_by_profile.display_name}`
+                    : "Anonymous proposal"}
                 </Text>
-              )}
+                {p.estimated_cost && (
+                  <View style={styles.costBadge}>
+                    <Text style={styles.costBadgeText}>{p.estimated_cost}</Text>
+                  </View>
+                )}
+              </View>
 
               {/* Vote counts */}
               <View style={styles.voteCounts}>
@@ -418,11 +425,28 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     flex: 1,
   },
+  proposedByRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
   proposedBy: {
     fontSize: 13,
     color: colors.text.tertiary,
     textAlign: "center",
-    marginBottom: spacing.md,
+  },
+  costBadge: {
+    backgroundColor: colors.warning,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  costBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1a1a1a",
   },
   voteCounts: {
     flexDirection: "row",

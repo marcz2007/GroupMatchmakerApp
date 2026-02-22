@@ -13,6 +13,8 @@ export interface Proposal {
   vote_window_ends_at: string;
   threshold: number;
   status: "open" | "closed" | "triggered";
+  is_anonymous: boolean;
+  estimated_cost: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +58,8 @@ export interface CreateProposalInput {
   ends_at?: string;
   vote_window_ends_at: string;
   threshold?: number;
+  is_anonymous?: boolean;
+  estimated_cost?: string | null;
 }
 
 /**
@@ -109,6 +113,8 @@ export async function createProposal(
     p_ends_at: input.ends_at || null,
     p_vote_window_ends_at: input.vote_window_ends_at,
     p_threshold: input.threshold || 3,
+    p_is_anonymous: input.is_anonymous ?? true,
+    p_estimated_cost: input.estimated_cost || null,
   });
 
   if (error) {

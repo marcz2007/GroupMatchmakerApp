@@ -21,6 +21,7 @@ interface DetailChipsProps {
   onDateChange: (date: Date | null) => void;
   onTimeChange: (time: Date | null) => void;
   onLocationChange: (location: string) => void;
+  minimumDate?: Date;
 }
 
 export const DetailChips: React.FC<DetailChipsProps> = ({
@@ -30,6 +31,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   onDateChange,
   onTimeChange,
   onLocationChange,
+  minimumDate,
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -185,7 +187,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
-                minimumDate={new Date()}
+                minimumDate={minimumDate || new Date()}
                 textColor={colors.text.primary}
               />
             </View>

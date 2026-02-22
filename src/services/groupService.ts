@@ -103,3 +103,19 @@ export const createGroup = async (groupData: {
 
   return newGroup;
 };
+
+/**
+ * Get the number of members in a group
+ */
+export async function getGroupMemberCount(groupId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("get_group_member_count", {
+    p_group_id: groupId,
+  });
+
+  if (error) {
+    console.error("Error fetching group member count:", error);
+    throw error;
+  }
+
+  return data;
+}

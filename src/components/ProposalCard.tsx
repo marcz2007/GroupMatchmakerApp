@@ -177,11 +177,18 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
       )}
 
       <View style={styles.footer}>
-        {created_by_profile && (
+        <View style={styles.footerRow}>
           <Text style={styles.createdBy}>
-            by {created_by_profile.display_name}
+            {!p.is_anonymous && created_by_profile
+              ? `by ${created_by_profile.display_name}`
+              : "Anonymous proposal"}
           </Text>
-        )}
+          {p.estimated_cost && (
+            <View style={styles.costBadge}>
+              <Text style={styles.costBadgeText}>{p.estimated_cost}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -333,9 +340,25 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   createdBy: {
     fontSize: 12,
     color: colors.text.tertiary,
+  },
+  costBadge: {
+    backgroundColor: colors.warning,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+  },
+  costBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1a1a1a",
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -13,8 +13,13 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Switch,
+  ScrollView,
+  TextInput,
+  Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { IdeaInput } from "../components/propose/IdeaInput";
@@ -36,7 +41,36 @@ interface Group {
 }
 
 const TOTAL_STEPS = 4;
-const DEFAULT_VOTE_WINDOW_HOURS = 24;
+const DEFAULT_VOTE_WINDOW_HOURS = 48;
+
+const detectCurrency = (): string => {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const map: Record<string, string> = {
+      "en-US": "USD", "en-GB": "GBP", "en-AU": "AUD", "en-CA": "CAD",
+      "de-DE": "EUR", "fr-FR": "EUR", "es-ES": "EUR", "it-IT": "EUR",
+      "ja-JP": "JPY", "zh-CN": "CNY",
+    };
+    if (map[locale]) return map[locale];
+    const lang = locale.split("-")[0];
+    const match = Object.entries(map).find(([k]) => k.startsWith(lang + "-"));
+    return match ? match[1] : "GBP";
+  } catch {
+    return "GBP";
+  }
+};
+
+const getLocaleCurrencySymbol = (): string => {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: detectCurrency(),
+    }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value || "£";
+  } catch {
+    return "£";
+  }
+};
 
 const getStepNumber = (step: Step): number => {
   switch (step) {
@@ -68,6 +102,19 @@ const ProposeScreen = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // Advanced settings state
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [showMyName, setShowMyName] = useState(false);
+  const [customThreshold, setCustomThreshold] = useState("");
+  const [votingDeadline, setVotingDeadline] = useState<Date | null>(null);
+  const [costAmount, setCostAmount] = useState("");
+
+  // Deadline picker state
+  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
+  const [tempDeadline, setTempDeadline] = useState<Date>(new Date());
+
+  const currencySymbol = useMemo(() => getLocaleCurrencySymbol(), []);
 
   // Launch state
   const [isLaunching, setIsLaunching] = useState(false);
@@ -218,17 +265,39 @@ const ProposeScreen = () => {
     ]).start();
 
     try {
-      // Calculate vote window end time
-      const voteWindowEndsAt = new Date();
-      voteWindowEndsAt.setHours(
-        voteWindowEndsAt.getHours() + DEFAULT_VOTE_WINDOW_HOURS
-      );
-
       // Combine date and time for starts_at
       const startsAt = combineDateTime();
 
+      // Calculate vote window end time
+      const voteWindowEndsAt = votingDeadline
+        ? votingDeadline
+        : new Date(Date.now() + DEFAULT_VOTE_WINDOW_HOURS * 60 * 60 * 1000);
+
+      // Validate: event date must be after voting deadline
+      if (startsAt && voteWindowEndsAt >= startsAt) {
+        Alert.alert(
+          "Invalid date",
+          "The event date must be after the voting deadline."
+        );
+        setIsLaunching(false);
+        launchCardScale.setValue(1);
+        launchCardTranslateY.setValue(0);
+        launchCardOpacity.setValue(1);
+        return;
+      }
+
       // Build description with location if provided
       const description = location ? `📍 ${location}` : undefined;
+
+      // Threshold: if user set a custom value, use it; otherwise let RPC default (3)
+      const computedThreshold = customThreshold.trim()
+        ? Math.max(1, parseInt(customThreshold, 10) || 3)
+        : undefined;
+
+      // Cost: if user entered an amount, format with currency symbol
+      const estimatedCost = costAmount.trim()
+        ? `${currencySymbol}${costAmount.trim()}`
+        : null;
 
       // Create proposal in each selected group
       const createPromises = selectedGroups.map((groupId) =>
@@ -238,7 +307,9 @@ const ProposeScreen = () => {
           description,
           starts_at: startsAt?.toISOString(),
           vote_window_ends_at: voteWindowEndsAt.toISOString(),
-          threshold: 2, // Default threshold for V1
+          threshold: computedThreshold,
+          is_anonymous: !showMyName,
+          estimated_cost: estimatedCost,
         })
       );
 
@@ -290,6 +361,11 @@ const ProposeScreen = () => {
     setLocation("");
     setSelectedGroups([]);
     setShowConfetti(false);
+    setAdvancedOpen(false);
+    setShowMyName(false);
+    setCustomThreshold("");
+    setVotingDeadline(null);
+    setCostAmount("");
 
     // Reset animations
     inputOpacity.setValue(1);
@@ -329,29 +405,216 @@ const ProposeScreen = () => {
 
   const renderStepContent = () => {
     if (currentStep === "idea") {
+      const formatDeadline = (d: Date) => {
+        return d.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      };
+
+      const openDeadlinePicker = () => {
+        setTempDeadline(votingDeadline || new Date(Date.now() + DEFAULT_VOTE_WINDOW_HOURS * 60 * 60 * 1000));
+        setShowDeadlinePicker(true);
+      };
+
+      const handleDeadlineChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === "android") {
+          setShowDeadlinePicker(false);
+          if (event.type === "set" && selectedDate) {
+            setVotingDeadline(selectedDate);
+          }
+        } else if (selectedDate) {
+          setTempDeadline(selectedDate);
+        }
+      };
+
+      const handleDeadlineDone = () => {
+        setVotingDeadline(tempDeadline);
+        setShowDeadlinePicker(false);
+      };
+
       return (
         <Animated.View
           style={[
             styles.stepContent,
-            styles.ideaStepContent,
             {
               opacity: inputOpacity,
               transform: [{ scale: inputScale }],
             },
           ]}
         >
-          <Text style={styles.stepTitle}>Launch an idea</Text>
-          <Text style={styles.stepSubtitle}>
-            What do you want to do with your group?
-          </Text>
-          <View style={styles.inputContainer}>
-            <IdeaInput
-              value={ideaTitle}
-              onChangeText={setIdeaTitle}
-              onSubmit={handleIdeaSubmit}
-              autoFocus={true}
+          <ScrollView
+            contentContainerStyle={styles.ideaScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.stepTitle}>Launch an idea</Text>
+            <Text style={styles.stepSubtitle}>
+              What do you want to do with your group?
+            </Text>
+            <View style={styles.inputContainer}>
+              <IdeaInput
+                value={ideaTitle}
+                onChangeText={setIdeaTitle}
+                onSubmit={handleIdeaSubmit}
+                autoFocus={true}
+              />
+            </View>
+
+            {/* Advanced Settings Toggle */}
+            <TouchableOpacity
+              style={styles.advancedToggle}
+              onPress={() => setAdvancedOpen(!advancedOpen)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.advancedToggleText}>
+                Advanced Settings
+              </Text>
+              <Text style={styles.advancedToggleArrow}>
+                {advancedOpen ? "▲" : "▼"}
+              </Text>
+            </TouchableOpacity>
+
+            {advancedOpen && (
+              <View style={styles.advancedPanel}>
+                {/* Show my name */}
+                <View style={styles.advancedRow}>
+                  <View style={styles.advancedRowLabel}>
+                    <Text style={styles.advancedLabel}>Show my name</Text>
+                    <Text style={styles.advancedHint}>
+                      {showMyName
+                        ? "Your name will be visible"
+                        : "You will appear anonymous"}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showMyName}
+                    onValueChange={setShowMyName}
+                    trackColor={{
+                      false: "rgba(255,255,255,0.1)",
+                      true: colors.primary,
+                    }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+
+                {/* Minimum YES votes */}
+                <View style={styles.advancedSection}>
+                  <Text style={styles.advancedLabel}>Minimum YES votes</Text>
+                  <Text style={styles.advancedHint}>
+                    Leave blank to use default (3 yes votes for event creation)
+                  </Text>
+                  <TextInput
+                    style={styles.advancedInput}
+                    value={customThreshold}
+                    onChangeText={setCustomThreshold}
+                    placeholder="Default"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    keyboardType="number-pad"
+                    maxLength={3}
+                  />
+                </View>
+
+                {/* Voting deadline */}
+                <View style={styles.advancedSection}>
+                  <Text style={styles.advancedLabel}>Voting deadline</Text>
+                  <Text style={styles.advancedHint}>
+                    Leave unset for default (48h)
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.deadlineChip,
+                      votingDeadline && styles.deadlineChipFilled,
+                    ]}
+                    onPress={openDeadlinePicker}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.deadlineChipIcon}>⏳</Text>
+                    <Text
+                      style={[
+                        styles.deadlineChipText,
+                        votingDeadline && styles.deadlineChipTextFilled,
+                      ]}
+                    >
+                      {votingDeadline
+                        ? formatDeadline(votingDeadline)
+                        : "Set deadline"}
+                    </Text>
+                    {votingDeadline && (
+                      <TouchableOpacity
+                        onPress={() => setVotingDeadline(null)}
+                        style={styles.deadlineClear}
+                      >
+                        <Text style={styles.deadlineClearText}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Estimated cost */}
+                <View style={styles.advancedSection}>
+                  <Text style={styles.advancedLabel}>Estimated cost</Text>
+                  <Text style={styles.advancedHint}>
+                    Leave blank for none set
+                  </Text>
+                  <View style={styles.costInputRow}>
+                    <Text style={styles.currencyPrefix}>{currencySymbol}</Text>
+                    <TextInput
+                      style={styles.costInput}
+                      value={costAmount}
+                      onChangeText={setCostAmount}
+                      placeholder="—"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      keyboardType="numeric"
+                      maxLength={6}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* iOS Deadline Picker Modal */}
+          {Platform.OS === "ios" && showDeadlinePicker && (
+            <Modal transparent animationType="slide">
+              <View style={styles.pickerModal}>
+                <View style={styles.pickerContainer}>
+                  <View style={styles.pickerHeader}>
+                    <TouchableOpacity
+                      onPress={() => setShowDeadlinePicker(false)}
+                    >
+                      <Text style={styles.pickerCancel}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.pickerTitle}>Voting Deadline</Text>
+                    <TouchableOpacity onPress={handleDeadlineDone}>
+                      <Text style={styles.pickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={tempDeadline}
+                    mode="datetime"
+                    display="spinner"
+                    onChange={handleDeadlineChange}
+                    minimumDate={new Date()}
+                    textColor={colors.text.primary}
+                  />
+                </View>
+              </View>
+            </Modal>
+          )}
+
+          {/* Android Deadline Picker */}
+          {Platform.OS === "android" && showDeadlinePicker && (
+            <DateTimePicker
+              value={tempDeadline}
+              mode="datetime"
+              display="default"
+              onChange={handleDeadlineChange}
+              minimumDate={new Date()}
             />
-          </View>
+          )}
         </Animated.View>
       );
     }
@@ -375,6 +638,7 @@ const ProposeScreen = () => {
               onDateChange={setDate}
               onTimeChange={setTime}
               onLocationChange={setLocation}
+              minimumDate={votingDeadline && votingDeadline > new Date() ? votingDeadline : undefined}
             />
           </View>
 
@@ -458,29 +722,32 @@ const ProposeScreen = () => {
               Send this idea to one or more groups
             </Text>
 
-            {loadingGroups ? (
-              <ActivityIndicator
-                size="large"
-                color={colors.primary}
-                style={styles.loader}
-              />
-            ) : groups.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyTitle}>No groups yet</Text>
-                <Text style={styles.emptySubtitle}>
-                  Create or join a group to send ideas
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={groups}
-                keyExtractor={(item) => item.id}
-                renderItem={renderGroupItem}
-                style={styles.groupsList}
-                contentContainerStyle={styles.groupsListContent}
-              />
-            )}
+            <ScrollView
+              style={styles.groupsScrollArea}
+              contentContainerStyle={styles.groupsScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {loadingGroups ? (
+                <ActivityIndicator
+                  size="large"
+                  color={colors.primary}
+                  style={styles.loader}
+                />
+              ) : groups.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📭</Text>
+                  <Text style={styles.emptyTitle}>No groups yet</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Create or join a group to send ideas
+                  </Text>
+                </View>
+              ) : (
+                groups.map((item) => (
+                  <View key={item.id}>{renderGroupItem({ item })}</View>
+                ))
+              )}
+
+            </ScrollView>
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
@@ -620,9 +887,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
   },
-  ideaStepContent: {
+  ideaScrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
-    paddingBottom: "30%",
+    paddingBottom: spacing.xl,
   },
   detailsStepContent: {
     justifyContent: "center",
@@ -755,12 +1023,175 @@ const styles = StyleSheet.create({
   groupsContent: {
     flex: 1,
   },
+  groupsScrollArea: {
+    flex: 1,
+    marginTop: spacing.md,
+  },
+  groupsScrollContent: {
+    paddingBottom: spacing.md,
+  },
   groupsList: {
     flex: 1,
     marginTop: spacing.md,
   },
   groupsListContent: {
     paddingBottom: spacing.lg,
+  },
+  advancedToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  advancedToggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text.secondary,
+  },
+  advancedToggleArrow: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+  },
+  advancedPanel: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  advancedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.lg,
+  },
+  advancedRowLabel: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  advancedSection: {
+    marginBottom: spacing.lg,
+  },
+  advancedLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  advancedHint: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginBottom: spacing.sm,
+  },
+  advancedInput: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  deadlineChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderStyle: "dashed",
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    alignSelf: "flex-start",
+  },
+  deadlineChipFilled: {
+    backgroundColor: "rgba(87, 98, 183, 0.2)",
+    borderColor: "rgba(87, 98, 183, 0.4)",
+    borderStyle: "solid",
+  },
+  deadlineChipIcon: {
+    fontSize: 16,
+  },
+  deadlineChipText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+  },
+  deadlineChipTextFilled: {
+    color: colors.text.primary,
+    fontWeight: "500",
+  },
+  deadlineClear: {
+    marginLeft: spacing.xs,
+    padding: 4,
+  },
+  deadlineClearText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+  },
+  costInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    paddingHorizontal: spacing.md,
+  },
+  currencyPrefix: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.secondary,
+    marginRight: spacing.xs,
+  },
+  costInput: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  pickerModal: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  pickerContainer: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    paddingBottom: spacing.xl,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  pickerCancel: {
+    fontSize: 16,
+    color: colors.text.tertiary,
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.primary,
   },
   groupRow: {
     flexDirection: "row",

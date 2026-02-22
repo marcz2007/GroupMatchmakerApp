@@ -198,20 +198,20 @@ BEGIN
 
                 UNION ALL
 
-                -- Extension vote system message (only when within 24h of expiry)
+                -- Extension vote system message (appears at midnight the day after the event)
                 SELECT
                     ('00000000-0000-0000-0000-000000000001')::UUID as id,
-                    '⏳ This chat closes in 24 hours.' || E'\n\n' || 'Vote to stay! Only those who vote to keep it open will remain. Everyone else gets removed.' as content,
-                    (v_event_room.chat_expires_at - INTERVAL '24 hours') as created_at,
+                    '⏳ The event is over!' || E'\n\n' || 'Vote to keep this chat open. Only those who vote to stay will remain. Everyone else gets removed.' as content,
+                    DATE_TRUNC('day', COALESCE(v_event_room.ends_at, v_event_room.starts_at)) + INTERVAL '1 day' as created_at,
                     json_build_object(
                         'id', '00000000-0000-0000-0000-000000000000',
                         'display_name', 'Grapple',
                         'avatar_url', NULL
                     ) as "user",
                     true as is_system
-                WHERE v_event_room.chat_expires_at IS NOT NULL
-                    AND v_event_room.chat_expires_at - INTERVAL '24 hours' <= NOW()
-                    AND v_event_room.chat_expires_at > NOW()
+                WHERE COALESCE(v_event_room.ends_at, v_event_room.starts_at) IS NOT NULL
+                    AND NOW() >= DATE_TRUNC('day', COALESCE(v_event_room.ends_at, v_event_room.starts_at)) + INTERVAL '1 day'
+                    AND (v_event_room.chat_expires_at IS NULL OR v_event_room.chat_expires_at > NOW())
 
                 UNION ALL
 
