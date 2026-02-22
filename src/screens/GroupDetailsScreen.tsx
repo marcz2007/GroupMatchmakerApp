@@ -1,7 +1,7 @@
 import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -108,6 +108,31 @@ const GroupDetailsScreen = () => {
   const [selectedProposal, setSelectedProposal] =
     useState<ProposalWithVotes | null>(null);
   const [showVoteModal, setShowVoteModal] = useState(false);
+  const [showPastProposals, setShowPastProposals] = useState(false);
+
+  // Split proposals into active (today/future or still open for voting) and past
+  const { activeProposals, pastProposals } = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const active: ProposalWithVotes[] = [];
+    const past: ProposalWithVotes[] = [];
+
+    for (const p of proposals) {
+      const prop = p.proposal;
+      const isStillVoting = prop.status === "open" && new Date(prop.vote_window_ends_at) > now;
+      const startsInFuture = prop.starts_at && new Date(prop.starts_at) >= todayStart;
+      const endsInFuture = prop.ends_at && new Date(prop.ends_at) >= todayStart;
+
+      if (isStillVoting || startsInFuture || endsInFuture) {
+        active.push(p);
+      } else {
+        past.push(p);
+      }
+    }
+
+    return { activeProposals: active, pastProposals: past };
+  }, [proposals]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -1271,8 +1296,8 @@ const GroupDetailsScreen = () => {
         </View>
         {loadingProposals ? (
           <ActivityIndicator size="small" color={colors.primary} />
-        ) : proposals.length > 0 ? (
-          proposals.map((proposal) => (
+        ) : activeProposals.length > 0 ? (
+          activeProposals.map((proposal) => (
             <ProposalCard
               key={proposal.proposal.id}
               proposal={proposal}
@@ -1282,10 +1307,38 @@ const GroupDetailsScreen = () => {
           ))
         ) : (
           <Text style={styles.emptyProposalsText}>
-            No proposals yet. Create one to suggest an activity!
+            No active proposals. Create one to suggest an activity!
           </Text>
         )}
       </View>
+
+      {/* Past Proposals Section */}
+      {pastProposals.length > 0 && (
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
+            onPress={() => setShowPastProposals(!showPastProposals)}
+          >
+            <Text style={styles.pastProposalsTitle}>
+              Past Proposals ({pastProposals.length})
+            </Text>
+            <Ionicons
+              name={showPastProposals ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#b0b0b0"
+            />
+          </TouchableOpacity>
+          {showPastProposals &&
+            pastProposals.map((proposal) => (
+              <ProposalCard
+                key={proposal.proposal.id}
+                proposal={proposal}
+                onPress={() => handleOpenProposal(proposal)}
+                onVote={(vote) => handleVoteOnProposal(proposal, vote)}
+              />
+            ))}
+        </View>
+      )}
 
       <View style={styles.section}>
         <GroupAIAnalysisSection
@@ -1711,6 +1764,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  pastProposalsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#b0b0b0",
   },
 });
 

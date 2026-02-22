@@ -289,9 +289,9 @@ const ProposeScreen = () => {
       // Build description with location if provided
       const description = location ? `📍 ${location}` : undefined;
 
-      // Threshold: if user set a custom value, use it; otherwise let RPC default (3)
+      // Threshold: if user set a custom value, use it; otherwise let RPC calculate (33% of group)
       const computedThreshold = customThreshold.trim()
-        ? Math.max(1, parseInt(customThreshold, 10) || 3)
+        ? Math.max(1, parseInt(customThreshold, 10) || 2)
         : undefined;
 
       // Cost: if user entered an amount, format with currency symbol
@@ -504,13 +504,17 @@ const ProposeScreen = () => {
                 <View style={styles.advancedSection}>
                   <Text style={styles.advancedLabel}>Minimum YES votes</Text>
                   <Text style={styles.advancedHint}>
-                    Leave blank to use default (3 yes votes for event creation)
+                    Leave blank for default (33% of group members, min 2)
                   </Text>
                   <TextInput
                     style={styles.advancedInput}
                     value={customThreshold}
                     onChangeText={setCustomThreshold}
-                    placeholder="Default"
+                    placeholder={
+                      selectedGroups.length > 0
+                        ? `Default: ${Math.max(2, Math.ceil((groups.find((g) => g.id === selectedGroups[0])?.member_count || 3) * 0.33))}`
+                        : "Select groups first"
+                    }
                     placeholderTextColor="rgba(255,255,255,0.3)"
                     keyboardType="number-pad"
                     maxLength={3}

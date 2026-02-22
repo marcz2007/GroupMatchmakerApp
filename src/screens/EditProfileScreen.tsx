@@ -23,6 +23,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AIAnalysisSection } from "../components/profile/AIAnalysisSection";
 import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
+import { UpgradeModal } from "../components/UpgradeModal";
+import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../supabase";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { commonStyles } from "../theme/commonStyles";
@@ -83,8 +85,10 @@ interface Profile {
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { isGuest, refreshProfile: refreshAuthProfile } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const [visibilitySettings, setVisibilitySettings] = useState({
@@ -529,20 +533,41 @@ const EditProfileScreen = () => {
             )}
           </View>
 
-          {/* View Public Profile Button */}
-          <TouchableOpacity
-            style={styles.viewProfileButton}
-            onPress={() =>
-              profile?.id &&
-              navigation.navigate("PublicProfile", { userId: profile.id })
-            }
-            activeOpacity={0.8}
-          >
-            <Ionicons name="eye-outline" size={20} color={colors.primary} />
-            <Text style={styles.viewProfileButtonText}>View Public Profile</Text>
-          </TouchableOpacity>
+          {/* Guest Upgrade Banner */}
+          {isGuest && (
+            <TouchableOpacity
+              style={styles.upgradeBanner}
+              onPress={() => setShowUpgradeModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-up-circle-outline" size={22} color={colors.primary} />
+              <View style={styles.upgradeBannerTextContainer}>
+                <Text style={styles.upgradeBannerTitle}>Create an account</Text>
+                <Text style={styles.upgradeBannerSubtitle}>
+                  Unlock groups, proposals, and more
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          )}
 
-          {/* Interests Section */}
+          {/* View Public Profile Button - only for full accounts */}
+          {!isGuest && (
+            <TouchableOpacity
+              style={styles.viewProfileButton}
+              onPress={() =>
+                profile?.id &&
+                navigation.navigate("PublicProfile", { userId: profile.id })
+              }
+              activeOpacity={0.8}
+            >
+              <Ionicons name="eye-outline" size={20} color={colors.primary} />
+              <Text style={styles.viewProfileButtonText}>View Public Profile</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Interests Section - only for full accounts */}
+          {!isGuest && (
           <View style={styles.section}>
             <SectionHeader
               title="Interests"
@@ -579,8 +604,10 @@ const EditProfileScreen = () => {
               ))}
             </View>
           </View>
+          )}
 
-          {/* About Section */}
+          {/* About Section - only for full accounts */}
+          {!isGuest && (
           <View style={styles.section}>
             <SectionHeader
               title="About"
@@ -600,9 +627,10 @@ const EditProfileScreen = () => {
               numberOfLines={4}
             />
           </View>
+          )}
 
-          {/* Signature Words */}
-          {profile?.word_patterns &&
+          {/* Signature Words - only for full accounts */}
+          {!isGuest && profile?.word_patterns &&
             profile.word_patterns.topWords &&
             profile.word_patterns.topWords.length > 0 && (
               <View style={styles.section}>
@@ -625,7 +653,8 @@ const EditProfileScreen = () => {
               </View>
             )}
 
-          {/* Music Taste Section */}
+          {/* Music Taste Section - only for full accounts */}
+          {!isGuest && (
           <View style={styles.section}>
             <SectionHeader
               title="Music Taste"
@@ -734,8 +763,10 @@ const EditProfileScreen = () => {
               )}
             </View>
           </View>
+          )}
 
-          {/* AI Analysis Section */}
+          {/* AI Analysis Section - only for full accounts */}
+          {!isGuest && (
           <View style={styles.section}>
             <AIAnalysisSection
               enabled={profile?.enable_ai_analysis || false}
@@ -747,6 +778,7 @@ const EditProfileScreen = () => {
               hasAnalysis={hasAnalysis}
             />
           </View>
+          )}
 
           {/* Basic Information Section */}
           <View style={styles.section}>
@@ -850,6 +882,12 @@ const EditProfileScreen = () => {
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Upgrade Modal for Guests */}
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onDismiss={() => setShowUpgradeModal(false)}
+      />
     </View>
   );
 };
@@ -954,6 +992,33 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.secondary,
     textAlign: "center",
+  },
+  // Upgrade Banner
+  upgradeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  upgradeBannerTextContainer: {
+    flex: 1,
+  },
+  upgradeBannerTitle: {
+    color: colors.text.primary,
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  upgradeBannerSubtitle: {
+    color: colors.text.secondary,
+    fontSize: 13,
+    marginTop: 2,
   },
   // View Profile Button
   viewProfileButton: {

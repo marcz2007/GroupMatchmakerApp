@@ -13,6 +13,17 @@ import AppNavigator, {
 } from "./src/navigation/AppNavigator";
 import { colors } from "./src/theme";
 
+// Configure Google Sign-In — safe to fail in Expo Go (native module not available)
+try {
+  const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+  GoogleSignin.configure({
+    webClientId: "537397372254-aqjgrtgj2mbo1mdcit9g47kopsipkml7.apps.googleusercontent.com",
+    iosClientId: "537397372254-2gruob2oguontpaojcm52uel30bnecb5.apps.googleusercontent.com",
+  });
+} catch (e) {
+  console.log("[Auth] Google Sign-In not available (Expo Go). Will work in dev client build.");
+}
+
 // Export the navigation prop type for reuse in components
 export type RootStackNavigationProp<T extends keyof RootStackParamList> =
   StackNavigationProp<RootStackParamList, T>;

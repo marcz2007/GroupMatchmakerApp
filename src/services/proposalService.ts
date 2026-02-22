@@ -112,7 +112,7 @@ export async function createProposal(
     p_starts_at: input.starts_at || null,
     p_ends_at: input.ends_at || null,
     p_vote_window_ends_at: input.vote_window_ends_at,
-    p_threshold: input.threshold || 3,
+    p_threshold: input.threshold ?? null,
     p_is_anonymous: input.is_anonymous ?? true,
     p_estimated_cost: input.estimated_cost || null,
   });

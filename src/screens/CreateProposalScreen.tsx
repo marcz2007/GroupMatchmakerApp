@@ -102,9 +102,9 @@ const CreateProposalScreen: React.FC = () => {
         ? votingDeadline
         : addHours(new Date(), DEFAULT_VOTE_WINDOW_HOURS);
 
-      // Threshold: if user set a custom value, use it; otherwise let RPC default (3)
+      // Threshold: if user set a custom value, use it; otherwise let RPC calculate (33% of group)
       const computedThreshold = customThreshold.trim()
-        ? Math.max(1, parseInt(customThreshold, 10) || 3)
+        ? Math.max(1, parseInt(customThreshold, 10) || 2)
         : undefined;
 
       // Cost: if user entered an amount, format with currency symbol
@@ -240,7 +240,7 @@ const CreateProposalScreen: React.FC = () => {
               {/* Minimum YES votes */}
               <View style={styles.formSection}>
                 <Text style={styles.label}>Minimum YES votes</Text>
-                <Text style={styles.hint}>Leave blank to use default</Text>
+                <Text style={styles.hint}>Leave blank for default (33% of group, min 2)</Text>
                 <TextInput
                   style={styles.input}
                   value={customThreshold}

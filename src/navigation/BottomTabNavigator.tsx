@@ -9,8 +9,10 @@ import GroupsScreen from "../screens/GroupsScreen";
 import ProposeScreen from "../screens/ProposeScreen";
 import EventsListScreen from "../screens/EventsListScreen";
 
-// Import context
+// Import context and hooks
 import { useEvents } from "../contexts/EventsContext";
+import { usePermissions } from "../hooks/usePermissions";
+import { useAuth } from "../contexts/AuthContext";
 import { colors } from "../theme";
 
 // Create the tab navigator
@@ -18,6 +20,8 @@ const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = () => {
   const { hasEvents } = useEvents();
+  const { canAccessGroups } = usePermissions();
+  const { isGuest } = useAuth();
 
   return (
     <Tab.Navigator
@@ -56,8 +60,8 @@ const BottomTabNavigator = () => {
         headerShown: false,
       })}
     >
-      {/* Events tab - only show when there are active events */}
-      {hasEvents && (
+      {/* Events tab - always shown for guests, conditional on hasEvents for full accounts */}
+      {(isGuest || hasEvents) && (
         <Tab.Screen
           name="Events"
           component={EventsListScreen}
@@ -66,20 +70,25 @@ const BottomTabNavigator = () => {
           }}
         />
       )}
-      <Tab.Screen
-        name="Groups"
-        component={GroupsScreen}
-        options={{
-          title: "Groups",
-        }}
-      />
-      <Tab.Screen
-        name="Propose"
-        component={ProposeScreen}
-        options={{
-          title: "Propose",
-        }}
-      />
+      {/* Groups and Propose tabs - only for non-guest users */}
+      {canAccessGroups && (
+        <Tab.Screen
+          name="Groups"
+          component={GroupsScreen}
+          options={{
+            title: "Groups",
+          }}
+        />
+      )}
+      {canAccessGroups && (
+        <Tab.Screen
+          name="Propose"
+          component={ProposeScreen}
+          options={{
+            title: "Propose",
+          }}
+        />
+      )}
       <Tab.Screen
         name="Profile"
         component={EditProfileScreen}

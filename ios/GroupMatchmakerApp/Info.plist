@@ -27,6 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>groupmatchmakerapp</string>
           <string>com.marcz2007.GroupMatchmakerApp</string>
         </array>
       </dict>
@@ -34,6 +35,12 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>exp+groupmatchmakerapp</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.537397372254-2gruob2oguontpaojcm52uel30bnecb5</string>
         </array>
       </dict>
     </array>
@@ -58,6 +65,8 @@
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>The app needs access to your photos to let you set a profile picture.</string>
+    <key>RCTNewArchEnabled</key>
+    <false/>
     <key>UIAppFonts</key>
     <array>
       <string>Ionicons.ttf</string>

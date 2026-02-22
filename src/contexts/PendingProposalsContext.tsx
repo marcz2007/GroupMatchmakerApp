@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import {
   PendingProposal,
@@ -17,6 +18,7 @@ interface PendingProposalsContextType {
   currentProposal: PendingProposal | null;
   dismissCurrent: () => void;
   refreshPending: () => Promise<void>;
+  lockCurrent: () => void;
 }
 
 const PendingProposalsContext = createContext<PendingProposalsContextType>({
@@ -24,6 +26,7 @@ const PendingProposalsContext = createContext<PendingProposalsContextType>({
   currentProposal: null,
   dismissCurrent: () => {},
   refreshPending: async () => {},
+  lockCurrent: () => {},
 });
 
 export const usePendingProposals = () => useContext(PendingProposalsContext);
@@ -36,6 +39,8 @@ export const PendingProposalsProvider: React.FC<{
     []
   );
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  // When locked, currentProposal stays fixed even if the list changes
+  const [lockedProposal, setLockedProposal] = useState<PendingProposal | null>(null);
 
   const refreshPending = useCallback(async () => {
     if (!user) {
@@ -51,14 +56,24 @@ export const PendingProposalsProvider: React.FC<{
     }
   }, [user]);
 
-  const dismissCurrent = useCallback(() => {
-    const current = pendingProposals.find(
-      (p) => !dismissedIds.has(p.proposal.id)
-    );
-    if (current) {
-      setDismissedIds((prev) => new Set(prev).add(current.proposal.id));
+  const nextProposal =
+    pendingProposals.find((p) => !dismissedIds.has(p.proposal.id)) ?? null;
+
+  // Lock the current proposal so it doesn't change during celebration
+  const lockCurrent = useCallback(() => {
+    if (nextProposal) {
+      setLockedProposal(nextProposal);
     }
-  }, [pendingProposals, dismissedIds]);
+  }, [nextProposal]);
+
+  const dismissCurrent = useCallback(() => {
+    if (lockedProposal) {
+      setDismissedIds((prev) => new Set(prev).add(lockedProposal.proposal.id));
+      setLockedProposal(null);
+    } else if (nextProposal) {
+      setDismissedIds((prev) => new Set(prev).add(nextProposal.proposal.id));
+    }
+  }, [lockedProposal, nextProposal]);
 
   useEffect(() => {
     if (user) {
@@ -72,11 +87,12 @@ export const PendingProposalsProvider: React.FC<{
     } else {
       setPendingProposals([]);
       setDismissedIds(new Set());
+      setLockedProposal(null);
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const currentProposal =
-    pendingProposals.find((p) => !dismissedIds.has(p.proposal.id)) ?? null;
+  // If locked, show the locked proposal; otherwise show the next undismissed one
+  const currentProposal = lockedProposal ?? nextProposal;
 
   return (
     <PendingProposalsContext.Provider
@@ -85,6 +101,7 @@ export const PendingProposalsProvider: React.FC<{
         currentProposal,
         dismissCurrent,
         refreshPending,
+        lockCurrent,
       }}
     >
       {children}

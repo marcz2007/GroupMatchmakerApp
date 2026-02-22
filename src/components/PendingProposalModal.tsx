@@ -18,7 +18,7 @@ import { castVote, VoteValue } from "../services/proposalService";
 import { colors, spacing, borderRadius } from "../theme/theme";
 
 const PendingProposalModal: React.FC = () => {
-  const { currentProposal, dismissCurrent, refreshPending } =
+  const { currentProposal, dismissCurrent, refreshPending, lockCurrent } =
     usePendingProposals();
   const [loading, setLoading] = useState(false);
   const [selectedVote, setSelectedVote] = useState<VoteValue | null>(null);
@@ -68,6 +68,8 @@ const PendingProposalModal: React.FC = () => {
       const result = await castVote(p.id, vote);
 
       if (vote === "YES") {
+        // Lock the current proposal so it doesn't change during celebration
+        lockCurrent();
         await Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success
         );
@@ -86,7 +88,6 @@ const PendingProposalModal: React.FC = () => {
         }).start();
 
         setTimeout(() => {
-          refreshPending();
           dismissCurrent();
         }, 2500);
       } else {
@@ -148,6 +149,12 @@ const PendingProposalModal: React.FC = () => {
             <Animated.View
               style={[styles.celebrationContainer, { opacity: celebrationOpacity }]}
             >
+              <TouchableOpacity
+                style={styles.dismissButton}
+                onPress={handleDismiss}
+              >
+                <Text style={styles.dismissButtonText}>×</Text>
+              </TouchableOpacity>
               <Text style={styles.celebrationEmoji}>
                 {celebrationState === "threshold" ? "🎉" : "🙌"}
               </Text>
@@ -548,6 +555,7 @@ const styles = StyleSheet.create({
   },
   celebrationContainer: {
     padding: spacing.xl,
+    paddingTop: spacing.xl + spacing.md,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 300,

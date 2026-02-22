@@ -1598,6 +1598,11 @@
   dependencies:
     invariant "^2.2.4"
 
+"@react-native-google-signin/google-signin@^13.1.0":
+  version "13.3.1"
+  resolved "https://registry.yarnpkg.com/@react-native-google-signin/google-signin/-/google-signin-13.3.1.tgz#1834c4cd0264e9deb55bf8cef846aa8a1f335a9d"
+  integrity sha512-zLJxn6FZ5fUmtshmvUklN5eoxBf8TqAfUoW5fEycJ1zoyB9DjE0yB5LCoKNy+cZ3glyhji+cPXhfYsuzKzzFVQ==
+
 "@react-native/assets-registry@0.81.6":
   version "0.81.6"
   resolved "https://registry.yarnpkg.com/@react-native/assets-registry/-/assets-registry-0.81.6.tgz#4a9edfa209e4ef43adb372cbf481a7c4ff2e7342"

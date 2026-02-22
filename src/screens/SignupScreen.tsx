@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
   ActivityIndicator,
+  // Platform, // Uncomment when enabling Apple auth
 } from "react-native";
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
@@ -21,6 +22,7 @@ const SignupScreen = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const navigation = useNavigation<RootStackNavigationProp<"Signup">>();
 
   const debugAlert = (title: string, data: any) => {
@@ -29,6 +31,67 @@ const SignupScreen = () => {
     }
     console.log(`[AUTH DEBUG] ${title}:`, data);
   };
+
+  const handleGoogleSignUp = async () => {
+    setOauthLoading(true);
+    try {
+      const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) {
+        Alert.alert("Error", "Failed to get Google ID token.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
+
+      if (error) {
+        Alert.alert("Google Sign-Up Error", error.message);
+      }
+    } catch (error: any) {
+      if (error?.code !== "SIGN_IN_CANCELLED") {
+        Alert.alert("Error", error.message || "Google sign-up failed.");
+      }
+    } finally {
+      setOauthLoading(false);
+    }
+  };
+
+  // TODO: Uncomment when Apple Developer account is available
+  // const handleAppleSignUp = async () => {
+  //   setOauthLoading(true);
+  //   try {
+  //     const AppleAuthentication = require("expo-apple-authentication");
+  //     const credential = await AppleAuthentication.signInAsync({
+  //       requestedScopes: [
+  //         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+  //         AppleAuthentication.AppleAuthenticationScope.EMAIL,
+  //       ],
+  //     });
+  //     if (!credential.identityToken) {
+  //       Alert.alert("Error", "Failed to get Apple identity token.");
+  //       return;
+  //     }
+  //     const { error } = await supabase.auth.signInWithIdToken({
+  //       provider: "apple",
+  //       token: credential.identityToken,
+  //     });
+  //     if (error) {
+  //       Alert.alert("Apple Sign-Up Error", error.message);
+  //     }
+  //   } catch (error: any) {
+  //     if (error?.code !== "ERR_CANCELED") {
+  //       Alert.alert("Error", error.message || "Apple sign-up failed.");
+  //     }
+  //   } finally {
+  //     setOauthLoading(false);
+  //   }
+  // };
 
   const handleSignup = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -120,9 +183,39 @@ const SignupScreen = () => {
     }
   };
 
+  const isDisabled = loading || oauthLoading;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
+
+      {/* OAuth Buttons */}
+      <Button
+        variant="secondary"
+        onPress={handleGoogleSignUp}
+        fullWidth
+        disabled={isDisabled}
+      >
+        {oauthLoading ? <ActivityIndicator color="#fff" size="small" /> : "Continue with Google"}
+      </Button>
+
+      {/* TODO: Uncomment when Apple Developer account is available */}
+      {/* {Platform.OS === "ios" && (
+        <Button
+          variant="secondary"
+          onPress={handleAppleSignUp}
+          fullWidth
+          disabled={isDisabled}
+        >
+          Continue with Apple
+        </Button>
+      )} */}
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or sign up with email</Text>
+        <View style={styles.dividerLine} />
+      </View>
 
       <TextInput
         style={styles.input}
@@ -134,7 +227,7 @@ const SignupScreen = () => {
         autoCapitalize="none"
         autoComplete="email"
         autoCorrect={false}
-        editable={!loading}
+        editable={!isDisabled}
       />
 
       <TextInput
@@ -145,7 +238,7 @@ const SignupScreen = () => {
         onChangeText={setPassword}
         secureTextEntry
         autoComplete="new-password"
-        editable={!loading}
+        editable={!isDisabled}
       />
 
       <TextInput
@@ -156,14 +249,14 @@ const SignupScreen = () => {
         onChangeText={setConfirmPassword}
         secureTextEntry
         autoComplete="new-password"
-        editable={!loading}
+        editable={!isDisabled}
       />
 
       <Button
         variant="primary"
         onPress={handleSignup}
         fullWidth
-        disabled={loading}
+        disabled={isDisabled}
       >
         {loading ? <ActivityIndicator color="#fff" size="small" /> : "Sign Up"}
       </Button>
@@ -171,7 +264,7 @@ const SignupScreen = () => {
       <Button
         variant="link"
         onPress={() => navigation.navigate("Login")}
-        disabled={loading}
+        disabled={isDisabled}
       >
         Already have an account? Login
       </Button>
@@ -212,6 +305,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#3a3a3a",
     color: "#ffffff",
     borderRadius: 5,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#404040",
+  },
+  dividerText: {
+    color: "#b0b0b0",
+    paddingHorizontal: 10,
+    fontSize: 13,
   },
   hint: {
     marginTop: 20,

@@ -52,7 +52,8 @@
           "photosPermission": "The app needs access to your photos to let you set a profile picture."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      ["@react-native-google-signin/google-signin", { "iosUrlScheme": "com.googleusercontent.apps.537397372254-2gruob2oguontpaojcm52uel30bnecb5" }]
     ]
   }
 }
