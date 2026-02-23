@@ -9,7 +9,6 @@ import {
   Text,
   Keyboard,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   FlatList,
   ActivityIndicator,
   Alert,
@@ -135,6 +134,8 @@ const ProposeScreen = () => {
   // Direct event state
   const [directEventRoomId, setDirectEventRoomId] = useState<string | null>(null);
   const [creatingDirectEvent, setCreatingDirectEvent] = useState(false);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const copiedToastOpacity = useRef(new Animated.Value(0)).current;
 
   // Animation values
   const inputOpacity = useRef(new Animated.Value(1)).current;
@@ -429,14 +430,31 @@ const ProposeScreen = () => {
     }
   };
 
+  const showCopiedFeedback = () => {
+    setShowCopiedToast(true);
+    copiedToastOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(copiedToastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(copiedToastOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => setShowCopiedToast(false));
+  };
+
   const handleShareInviteLink = async () => {
     if (!directEventRoomId) return;
     const url = `https://group-matchmaker-app.vercel.app/event/${directEventRoomId}`;
-    try {
-      await Share.share({
-        message: `Join me for ${ideaTitle.trim()}! ${url}`,
-      });
-    } catch (_) {}
+    if (Platform.OS === "web" && navigator?.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url);
+        showCopiedFeedback();
+      } catch (_) {}
+    } else {
+      try {
+        await Share.share({
+          message: `Join me for ${ideaTitle.trim()}! ${url}`,
+        });
+      } catch (_) {}
+    }
   };
 
   const resetForm = () => {
@@ -1011,29 +1029,35 @@ const ProposeScreen = () => {
         />
       )}
 
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <SafeAreaView style={styles.safeArea}>
-          <KeyboardAvoidingView
-            style={styles.keyboardView}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-            enabled={Platform.OS !== "web"}
-          >
-            {/* Step indicator at top (hide on success) */}
-            {currentStep !== "success" && (
-              <View style={styles.header}>
-                <StepIndicator
-                  totalSteps={TOTAL_STEPS}
-                  currentStep={getStepNumber(currentStep)}
-                />
-              </View>
-            )}
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          enabled={Platform.OS !== "web"}
+        >
+          {/* Step indicator at top (hide on success) */}
+          {currentStep !== "success" && (
+            <View style={styles.header}>
+              <StepIndicator
+                totalSteps={TOTAL_STEPS}
+                currentStep={getStepNumber(currentStep)}
+              />
+            </View>
+          )}
 
-            {/* Main content area */}
-            <View style={styles.content}>{renderStepContent()}</View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </TouchableWithoutFeedback>
+          {/* Main content area */}
+          <View style={styles.content}>{renderStepContent()}</View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+
+      {/* Copied-to-clipboard toast */}
+      {showCopiedToast && (
+        <Animated.View style={[styles.copiedToast, { opacity: copiedToastOpacity }]}>
+          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+          <Text style={styles.copiedToastText}>Link copied to clipboard</Text>
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -1537,6 +1561,30 @@ const styles = StyleSheet.create({
   goToEventButtonText: {
     color: colors.text.primary,
     fontSize: 16,
+    fontWeight: "600",
+  },
+  copiedToast: {
+    position: "absolute",
+    bottom: 60,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  copiedToastText: {
+    color: colors.text.primary,
+    fontSize: 14,
     fontWeight: "600",
   },
 });

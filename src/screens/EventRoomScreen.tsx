@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -55,14 +56,33 @@ const EventRoomScreen: React.FC = () => {
 
   const flatListRef = useRef<FlatList>(null);
   const loadVersionRef = useRef(0);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const copiedToastOpacity = useRef(new Animated.Value(0)).current;
+
+  const showCopiedFeedback = () => {
+    setShowCopiedToast(true);
+    copiedToastOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(copiedToastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(copiedToastOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => setShowCopiedToast(false));
+  };
 
   const handleShare = async () => {
     const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
-    try {
-      await Share.share({
-        message: `Join us for ${title || "this event"}! ${url}`,
-      });
-    } catch (_) {}
+    if (Platform.OS === "web" && navigator?.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url);
+        showCopiedFeedback();
+      } catch (_) {}
+    } else {
+      try {
+        await Share.share({
+          message: `Join us for ${title || "this event"}! ${url}`,
+        });
+      } catch (_) {}
+    }
   };
 
   useEffect(() => {
@@ -328,6 +348,14 @@ const EventRoomScreen: React.FC = () => {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Copied-to-clipboard toast */}
+      {showCopiedToast && (
+        <Animated.View style={[styles.copiedToast, { opacity: copiedToastOpacity }]}>
+          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+          <Text style={styles.copiedToastText}>Link copied to clipboard</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -513,6 +541,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: colors.white,
+  },
+  copiedToast: {
+    position: "absolute",
+    bottom: 80,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  copiedToastText: {
+    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 
