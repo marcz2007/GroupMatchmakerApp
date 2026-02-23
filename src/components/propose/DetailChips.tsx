@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   SafeAreaView,
   KeyboardAvoidingView,
+  ScrollView,
 } from "react-native";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 import { colors, spacing, borderRadius } from "../../theme";
@@ -20,6 +21,295 @@ const DateTimePicker = Platform.OS !== "web"
 const GooglePlacesAutocomplete = Platform.OS !== "web"
   ? require("react-native-google-places-autocomplete").GooglePlacesAutocomplete
   : null;
+
+/* ─── Web Calendar Picker ─── */
+const DAYS_OF_WEEK = ["S", "M", "T", "W", "T", "F", "S"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfWeek(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+const WebCalendar: React.FC<{
+  selected: Date | null;
+  onSelect: (d: Date) => void;
+  minimumDate?: Date;
+}> = ({ selected, onSelect, minimumDate }) => {
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(selected?.getMonth() ?? today.getMonth());
+
+  const minDate = minimumDate || today;
+
+  const cells = useMemo(() => {
+    const daysInMonth = getDaysInMonth(viewYear, viewMonth);
+    const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
+    const rows: Array<Array<{ day: number; disabled: boolean } | null>> = [];
+    let row: Array<{ day: number; disabled: boolean } | null> = [];
+
+    // Leading blanks
+    for (let i = 0; i < firstDay; i++) row.push(null);
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const cellDate = new Date(viewYear, viewMonth, d);
+      const disabled =
+        cellDate.getFullYear() < minDate.getFullYear() ||
+        (cellDate.getFullYear() === minDate.getFullYear() &&
+          cellDate.getMonth() < minDate.getMonth()) ||
+        (cellDate.getFullYear() === minDate.getFullYear() &&
+          cellDate.getMonth() === minDate.getMonth() &&
+          cellDate.getDate() < minDate.getDate());
+      row.push({ day: d, disabled });
+      if (row.length === 7) {
+        rows.push(row);
+        row = [];
+      }
+    }
+    if (row.length > 0) {
+      while (row.length < 7) row.push(null);
+      rows.push(row);
+    }
+    return rows;
+  }, [viewYear, viewMonth, minDate]);
+
+  const goPrev = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(viewYear - 1);
+    } else {
+      setViewMonth(viewMonth - 1);
+    }
+  };
+
+  const goNext = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(viewYear + 1);
+    } else {
+      setViewMonth(viewMonth + 1);
+    }
+  };
+
+  const prevDisabled =
+    viewYear < minDate.getFullYear() ||
+    (viewYear === minDate.getFullYear() && viewMonth <= minDate.getMonth());
+
+  return (
+    <View style={calStyles.container}>
+      {/* Month nav */}
+      <View style={calStyles.header}>
+        <TouchableOpacity onPress={goPrev} disabled={prevDisabled} style={calStyles.navBtn}>
+          <Text style={[calStyles.navText, prevDisabled && { opacity: 0.3 }]}>‹</Text>
+        </TouchableOpacity>
+        <Text style={calStyles.monthLabel}>
+          {MONTHS[viewMonth]} {viewYear}
+        </Text>
+        <TouchableOpacity onPress={goNext} style={calStyles.navBtn}>
+          <Text style={calStyles.navText}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Day-of-week headers */}
+      <View style={calStyles.row}>
+        {DAYS_OF_WEEK.map((d, i) => (
+          <View key={i} style={calStyles.cell}>
+            <Text style={calStyles.dowText}>{d}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Day grid */}
+      {cells.map((week, wi) => (
+        <View key={wi} style={calStyles.row}>
+          {week.map((cell, ci) => {
+            if (!cell) return <View key={ci} style={calStyles.cell} />;
+            const cellDate = new Date(viewYear, viewMonth, cell.day);
+            const isSelected = selected && isSameDay(cellDate, selected);
+            const isToday = isSameDay(cellDate, today);
+            return (
+              <TouchableOpacity
+                key={ci}
+                style={calStyles.cell}
+                disabled={cell.disabled}
+                onPress={() => onSelect(cellDate)}
+              >
+                <View
+                  style={[
+                    calStyles.dayCircle,
+                    isSelected && calStyles.daySelected,
+                    isToday && !isSelected && calStyles.dayToday,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      calStyles.dayText,
+                      cell.disabled && calStyles.dayDisabled,
+                      isSelected && calStyles.daySelectedText,
+                    ]}
+                  >
+                    {cell.day}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const calStyles = StyleSheet.create({
+  container: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+  },
+  navBtn: { padding: spacing.sm },
+  navText: { fontSize: 24, color: colors.text.primary, fontWeight: "600" },
+  monthLabel: { fontSize: 16, fontWeight: "600", color: colors.text.primary },
+  row: { flexDirection: "row" },
+  cell: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 4 },
+  dowText: { fontSize: 12, color: colors.text.tertiary, fontWeight: "600" },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayText: { fontSize: 14, color: colors.text.primary },
+  dayDisabled: { color: colors.text.tertiary, opacity: 0.4 },
+  daySelected: { backgroundColor: colors.primary },
+  daySelectedText: { color: colors.white, fontWeight: "700" },
+  dayToday: { borderWidth: 1, borderColor: colors.primary },
+});
+
+/* ─── Web Time Picker ─── */
+const WebTimePicker: React.FC<{
+  selected: Date | null;
+  onSelect: (d: Date) => void;
+}> = ({ selected, onSelect }) => {
+  const initial = selected || new Date();
+  const initialHour12 = initial.getHours() % 12 || 12;
+  const initialAmPm = initial.getHours() >= 12 ? "PM" : "AM";
+
+  const [hour, setHour] = useState(initialHour12);
+  const [minute, setMinute] = useState(initial.getMinutes());
+  const [amPm, setAmPm] = useState<"AM" | "PM">(initialAmPm);
+
+  const commit = (h: number, m: number, ap: "AM" | "PM") => {
+    const d = new Date();
+    let h24 = h === 12 ? 0 : h;
+    if (ap === "PM") h24 += 12;
+    d.setHours(h24, m, 0, 0);
+    onSelect(d);
+  };
+
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+
+  return (
+    <View style={timeStyles.container}>
+      <View style={timeStyles.columns}>
+        {/* Hour */}
+        <View style={timeStyles.column}>
+          <Text style={timeStyles.colLabel}>Hour</Text>
+          <ScrollView style={timeStyles.scroll} showsVerticalScrollIndicator={false}>
+            {hours.map((h) => (
+              <TouchableOpacity
+                key={h}
+                style={[timeStyles.option, hour === h && timeStyles.optionSelected]}
+                onPress={() => { setHour(h); commit(h, minute, amPm); }}
+              >
+                <Text style={[timeStyles.optionText, hour === h && timeStyles.optionTextSelected]}>
+                  {h}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Minute */}
+        <View style={timeStyles.column}>
+          <Text style={timeStyles.colLabel}>Min</Text>
+          <ScrollView style={timeStyles.scroll} showsVerticalScrollIndicator={false}>
+            {minutes.map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[timeStyles.option, minute === m && timeStyles.optionSelected]}
+                onPress={() => { setMinute(m); commit(hour, m, amPm); }}
+              >
+                <Text style={[timeStyles.optionText, minute === m && timeStyles.optionTextSelected]}>
+                  {String(m).padStart(2, "0")}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* AM / PM */}
+        <View style={timeStyles.column}>
+          <Text style={timeStyles.colLabel}>{" "}</Text>
+          <View style={timeStyles.amPmCol}>
+            {(["AM", "PM"] as const).map((v) => (
+              <TouchableOpacity
+                key={v}
+                style={[timeStyles.option, timeStyles.amPmOption, amPm === v && timeStyles.optionSelected]}
+                onPress={() => { setAmPm(v); commit(hour, minute, v); }}
+              >
+                <Text style={[timeStyles.optionText, amPm === v && timeStyles.optionTextSelected]}>
+                  {v}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const timeStyles = StyleSheet.create({
+  container: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  columns: { flexDirection: "row", gap: spacing.sm },
+  column: { flex: 1, alignItems: "center" },
+  colLabel: { fontSize: 12, color: colors.text.tertiary, fontWeight: "600", marginBottom: spacing.xs },
+  scroll: { maxHeight: 200 },
+  amPmCol: { gap: spacing.xs },
+  option: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    minWidth: 52,
+  },
+  optionSelected: {
+    backgroundColor: colors.primary,
+  },
+  amPmOption: {
+    paddingVertical: 14,
+  },
+  optionText: { fontSize: 16, color: colors.text.secondary },
+  optionTextSelected: { color: colors.white, fontWeight: "700" },
+});
 
 interface DetailChipsProps {
   date: Date | null;
@@ -183,7 +473,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
         )}
       </TouchableOpacity>
 
-      {/* Web Date Picker */}
+      {/* Web Date Picker — custom calendar */}
       {Platform.OS === "web" && showDatePicker && (
         <Modal transparent animationType="fade">
           <View style={styles.pickerModal}>
@@ -195,28 +485,14 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                 <Text style={styles.pickerTitle}>Select Date</Text>
                 <View style={{ width: 50 }} />
               </View>
-              <View style={styles.webPickerContent}>
-                <input
-                  type="date"
-                  defaultValue={date ? date.toISOString().split("T")[0] : ""}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e: any) => {
-                    if (e.target.value) {
-                      onDateChange(new Date(e.target.value + "T00:00:00"));
-                      setShowDatePicker(false);
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: 12,
-                    fontSize: 18,
-                    backgroundColor: "#2a2a3e",
-                    color: "#ffffff",
-                    border: "1px solid #404060",
-                    borderRadius: 8,
-                  }}
-                />
-              </View>
+              <WebCalendar
+                selected={date}
+                minimumDate={minimumDate}
+                onSelect={(d) => {
+                  onDateChange(d);
+                  setShowDatePicker(false);
+                }}
+              />
             </View>
           </View>
         </Modal>
@@ -260,7 +536,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
         />
       )}
 
-      {/* Web Time Picker */}
+      {/* Web Time Picker — custom hour/min/am-pm columns */}
       {Platform.OS === "web" && showTimePicker && (
         <Modal transparent animationType="fade">
           <View style={styles.pickerModal}>
@@ -270,32 +546,14 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                   <Text style={styles.pickerCancel}>Cancel</Text>
                 </TouchableOpacity>
                 <Text style={styles.pickerTitle}>Select Time</Text>
-                <View style={{ width: 50 }} />
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.webPickerContent}>
-                <input
-                  type="time"
-                  defaultValue={time ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : ""}
-                  onChange={(e: any) => {
-                    if (e.target.value) {
-                      const [hours, minutes] = e.target.value.split(":").map(Number);
-                      const newTime = new Date();
-                      newTime.setHours(hours, minutes, 0, 0);
-                      onTimeChange(newTime);
-                      setShowTimePicker(false);
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: 12,
-                    fontSize: 18,
-                    backgroundColor: "#2a2a3e",
-                    color: "#ffffff",
-                    border: "1px solid #404060",
-                    borderRadius: 8,
-                  }}
-                />
-              </View>
+              <WebTimePicker
+                selected={time}
+                onSelect={(t) => onTimeChange(t)}
+              />
             </View>
           </View>
         </Modal>
@@ -535,9 +793,6 @@ const styles = StyleSheet.create({
   },
   locationContent: {
     flex: 1,
-  },
-  webPickerContent: {
-    padding: spacing.lg,
   },
   webLocationContainer: {
     padding: spacing.lg,
