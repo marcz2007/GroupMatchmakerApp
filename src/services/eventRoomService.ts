@@ -3,13 +3,14 @@ import { Proposal } from "./proposalService";
 
 export interface EventRoom {
   id: string;
-  proposal_id: string;
-  group_id: string;
+  proposal_id: string | null;
+  group_id: string | null;
   title: string;
   description: string | null;
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
+  created_by?: string | null;
 }
 
 export interface EventRoomParticipant {
@@ -32,11 +33,11 @@ export interface EventMessage {
 
 export interface EventRoomWithDetails {
   event_room: EventRoom;
-  proposal: Proposal;
+  proposal: Proposal | null;
   group: {
-    id: string;
+    id: string | null;
     name: string;
-  };
+  } | null;
   participant_count: number;
   is_expired: boolean;
 }
@@ -67,7 +68,7 @@ export async function getGroupEventRooms(
   groupId: string
 ): Promise<EventRoomWithDetails[]> {
   const allRooms = await getUserEventRooms();
-  return allRooms.filter((room) => room.group.id === groupId);
+  return allRooms.filter((room) => room.group?.id === groupId);
 }
 
 /**
@@ -273,6 +274,85 @@ export function getEventRoomTimeRemaining(eventRoom: EventRoom): {
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
   return { expired: false, hours, minutes };
+}
+
+/**
+ * Create a direct event (no proposal/group required)
+ */
+export async function createDirectEvent({
+  title,
+  description,
+  starts_at,
+  ends_at,
+}: {
+  title: string;
+  description?: string;
+  starts_at?: string;
+  ends_at?: string;
+}): Promise<EventRoom> {
+  const { data, error } = await supabase.rpc("create_direct_event", {
+    p_title: title,
+    p_description: description || null,
+    p_starts_at: starts_at || null,
+    p_ends_at: ends_at || null,
+  });
+
+  if (error) {
+    console.error("Error creating direct event:", error);
+    throw error;
+  }
+
+  return data;
+}
+
+export interface PublicEventDetails {
+  event_room: EventRoom;
+  group_name: string;
+  participant_count: number;
+  participants: Array<{
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+  }>;
+  creator_name: string | null;
+  is_participant: boolean;
+  is_expired: boolean;
+}
+
+/**
+ * Get public event details (for RSVP screen — works for non-participants too)
+ */
+export async function getPublicEventDetails(
+  eventRoomId: string
+): Promise<PublicEventDetails> {
+  const { data, error } = await supabase.rpc("get_public_event_details", {
+    p_event_room_id: eventRoomId,
+  });
+
+  if (error) {
+    console.error("Error fetching public event details:", error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Join an event room via invite link (bypasses RLS)
+ */
+export async function joinEventRoom(
+  eventRoomId: string
+): Promise<{ success: boolean; event_room_id: string; title: string }> {
+  const { data, error } = await supabase.rpc("join_event_room", {
+    p_event_room_id: eventRoomId,
+  });
+
+  if (error) {
+    console.error("Error joining event room:", error);
+    throw error;
+  }
+
+  return data;
 }
 
 /**

@@ -27,7 +27,7 @@ serve(async (req) => {
     // Fetch event room with group info
     const { data: eventRoom, error: eventError } = await supabase
       .from("event_rooms")
-      .select("id, title, description, starts_at, ends_at, created_at, group_id")
+      .select("id, title, description, starts_at, ends_at, created_at, group_id, created_by")
       .eq("id", eventRoomId)
       .single();
 
@@ -38,27 +38,24 @@ serve(async (req) => {
       );
     }
 
-    // Fetch group name
-    const { data: group } = await supabase
-      .from("groups")
-      .select("name")
-      .eq("id", eventRoom.group_id)
-      .single();
+    // Fetch group name (only if event has a group)
+    let groupName: string | null = null;
+    if (eventRoom.group_id) {
+      const { data: group } = await supabase
+        .from("groups")
+        .select("name")
+        .eq("id", eventRoom.group_id)
+        .single();
+      groupName = group?.name || null;
+    }
 
-    // Fetch proposal creator
-    const { data: proposal } = await supabase
-      .from("proposals")
-      .select("created_by")
-      .eq("group_id", eventRoom.group_id)
-      .eq("title", eventRoom.title)
-      .single();
-
+    // Fetch creator name using created_by column
     let creatorName: string | null = null;
-    if (proposal?.created_by) {
+    if (eventRoom.created_by) {
       const { data: creator } = await supabase
         .from("profiles")
         .select("display_name")
-        .eq("id", proposal.created_by)
+        .eq("id", eventRoom.created_by)
         .single();
       creatorName = creator?.display_name || null;
     }
@@ -101,7 +98,7 @@ serve(async (req) => {
       description: eventRoom.description,
       starts_at: eventRoom.starts_at,
       ends_at: eventRoom.ends_at,
-      group_name: group?.name || null,
+      group_name: groupName,
       creator_name: creatorName,
       participant_count: participants?.length || 0,
       participant_names: participantNames,

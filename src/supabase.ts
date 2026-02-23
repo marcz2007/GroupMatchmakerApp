@@ -48,9 +48,19 @@ const createWebLock = () => {
     });
     locks.set(name, lockPromise);
 
+    // Safety: force-release if fn() hangs for more than 10s
+    const safetyTimer = setTimeout(() => {
+      console.warn("[Supabase lock] Force-releasing stuck lock:", name);
+      release!();
+      if (locks.get(name) === lockPromise) {
+        locks.delete(name);
+      }
+    }, 10000);
+
     try {
       return await fn();
     } finally {
+      clearTimeout(safetyTimer);
       release!();
       if (locks.get(name) === lockPromise) {
         locks.delete(name);

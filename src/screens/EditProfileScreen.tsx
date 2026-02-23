@@ -85,7 +85,7 @@ interface Profile {
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user: authUser, isGuest, refreshProfile: refreshAuthProfile } = useAuth();
+  const { user: authUser, isGuest, loading: authLoading, refreshProfile: refreshAuthProfile } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -116,14 +116,19 @@ const EditProfileScreen = () => {
   const [savingField, setSavingField] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log("[EditProfile] useEffect fired — authLoading:", authLoading, "authUser:", !!authUser, "authUser.id:", authUser?.id);
+    if (authLoading) return;
     if (authUser) {
       fetchProfile();
+    } else {
+      setLoading(false);
     }
-  }, [authUser]);
+  }, [authUser, authLoading]);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
+      console.log("[EditProfile] fetchProfile called, authUser.id:", authUser?.id);
       if (!authUser) {
         console.warn("[Profile] No authenticated user found");
         setLoading(false);
@@ -136,10 +141,11 @@ const EditProfileScreen = () => {
         .eq("id", authUser.id)
         .single();
 
+      console.log("[EditProfile] profiles query result — error:", error, "data:", !!data);
       if (error) throw error;
 
       if (!data) {
-        console.warn("[Profile] No profile row found for user:", user.id);
+        console.warn("[Profile] No profile row found for user:", authUser.id);
         return;
       }
 

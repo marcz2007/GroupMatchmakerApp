@@ -87,16 +87,18 @@ serve(async (req) => {
       }
     }
 
-    // Add user to group_members if not already a member
-    const { error: groupMemberError } = await supabase
-      .from("group_members")
-      .upsert(
-        { group_id: eventRoom.group_id, user_id: user.id },
-        { onConflict: "group_id,user_id" }
-      );
+    // Add user to group_members if not already a member (only for group-based events)
+    if (eventRoom.group_id) {
+      const { error: groupMemberError } = await supabase
+        .from("group_members")
+        .upsert(
+          { group_id: eventRoom.group_id, user_id: user.id },
+          { onConflict: "group_id,user_id" }
+        );
 
-    if (groupMemberError) {
-      console.error("Error adding to group:", groupMemberError);
+      if (groupMemberError) {
+        console.error("Error adding to group:", groupMemberError);
+      }
     }
 
     // Add user to event_room_participants

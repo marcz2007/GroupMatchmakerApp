@@ -17,6 +17,7 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Share,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 const DateTimePicker = Platform.OS !== "web"
@@ -26,6 +27,9 @@ import * as Haptics from "expo-haptics";
 const ConfettiCannon = Platform.OS !== "web"
   ? require("react-native-confetti-cannon").default
   : (() => null) as any;
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { IdeaInput } from "../components/propose/IdeaInput";
 import { IdeaPill } from "../components/propose/IdeaPill";
 import { StepIndicator } from "../components/propose/StepIndicator";
@@ -35,6 +39,8 @@ import { colors, spacing, borderRadius } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 import { getUserGroups } from "../services/groupService";
 import { createProposal } from "../services/proposalService";
+import { createDirectEvent } from "../services/eventRoomService";
+import { RootStackParamList } from "../navigation/AppNavigator";
 
 type Step = "idea" | "details" | "groups" | "launching" | "success";
 
@@ -93,7 +99,8 @@ const getStepNumber = (step: Step): number => {
 };
 
 const ProposeScreen = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [currentStep, setCurrentStep] = useState<Step>("idea");
   const [ideaTitle, setIdeaTitle] = useState("");
 
@@ -125,6 +132,10 @@ const ProposeScreen = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const confettiRef = useRef<any>(null);
 
+  // Direct event state
+  const [directEventRoomId, setDirectEventRoomId] = useState<string | null>(null);
+  const [creatingDirectEvent, setCreatingDirectEvent] = useState(false);
+
   // Animation values
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const inputScale = useRef(new Animated.Value(1)).current;
@@ -136,19 +147,28 @@ const ProposeScreen = () => {
 
   // Load groups when reaching step 3
   useEffect(() => {
-    if (currentStep === "groups" && user) {
-      loadGroups();
+    if (currentStep === "groups" && !authLoading) {
+      if (user) {
+        loadGroups();
+      } else {
+        setLoadingGroups(false);
+      }
     }
-  }, [currentStep, user]);
+  }, [currentStep, user, authLoading]);
 
   const loadGroups = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("[ProposeScreen] loadGroups — no user, skipping");
+      return;
+    }
+    console.log("[ProposeScreen] loadGroups — user.id:", user.id);
     setLoadingGroups(true);
     try {
       const userGroups = await getUserGroups(user.id);
+      console.log("[ProposeScreen] loadGroups — got groups:", userGroups?.length);
       setGroups(userGroups || []);
     } catch (error) {
-      console.error("Error loading groups:", error);
+      console.error("[ProposeScreen] Error loading groups:", error);
     } finally {
       setLoadingGroups(false);
     }
@@ -303,7 +323,15 @@ const ProposeScreen = () => {
         ? `${currencySymbol}${costAmount.trim()}`
         : null;
 
-      // Create proposal in each selected group
+      // Create the shared event room FIRST so all proposals link to it
+      const directResult = await createDirectEvent({
+        title: ideaTitle.trim(),
+        description,
+        starts_at: startsAt?.toISOString(),
+      });
+      setDirectEventRoomId(directResult.id);
+
+      // Create proposal in each selected group, linking to the shared event room
       const createPromises = selectedGroups.map((groupId) =>
         createProposal({
           group_id: groupId,
@@ -314,6 +342,7 @@ const ProposeScreen = () => {
           threshold: computedThreshold,
           is_anonymous: !showMyName,
           estimated_cost: estimatedCost,
+          event_room_id: directResult.id,
         })
       );
 
@@ -357,6 +386,59 @@ const ProposeScreen = () => {
     }
   };
 
+  const handleCreateAndShare = async () => {
+    if (creatingDirectEvent) return;
+
+    setCreatingDirectEvent(true);
+
+    try {
+      const startsAt = combineDateTime();
+      const description = location ? `📍 ${location}` : undefined;
+
+      const result = await createDirectEvent({
+        title: ideaTitle.trim(),
+        description,
+        starts_at: startsAt?.toISOString(),
+      });
+
+      setDirectEventRoomId(result.id);
+
+      // Success! Show confetti
+      setCurrentStep("success");
+      setShowConfetti(true);
+
+      setTimeout(() => {
+        confettiRef.current?.start();
+      }, 100);
+
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error("Error creating direct event:", error);
+      Alert.alert(
+        "Couldn't create event",
+        error?.message || "Something went wrong. Please try again."
+      );
+    } finally {
+      setCreatingDirectEvent(false);
+    }
+  };
+
+  const handleShareInviteLink = async () => {
+    if (!directEventRoomId) return;
+    const url = `https://group-matchmaker-app.vercel.app/event/${directEventRoomId}`;
+    try {
+      await Share.share({
+        message: `Join me for ${ideaTitle.trim()}! ${url}`,
+      });
+    } catch (_) {}
+  };
+
   const resetForm = () => {
     // Reset all state
     setIdeaTitle("");
@@ -370,6 +452,8 @@ const ProposeScreen = () => {
     setCustomThreshold("");
     setVotingDeadline(null);
     setCostAmount("");
+    setDirectEventRoomId(null);
+    setCreatingDirectEvent(false);
 
     // Reset animations
     inputOpacity.setValue(1);
@@ -787,8 +871,23 @@ const ProposeScreen = () => {
                   <Text style={styles.emptyIcon}>📭</Text>
                   <Text style={styles.emptyTitle}>No groups yet</Text>
                   <Text style={styles.emptySubtitle}>
-                    Create or join a group to send ideas
+                    No worries — create your event and share the invite link
                   </Text>
+                  <TouchableOpacity
+                    style={[styles.createAndShareButton, creatingDirectEvent && styles.launchButtonDisabled]}
+                    onPress={handleCreateAndShare}
+                    disabled={creatingDirectEvent}
+                    activeOpacity={0.8}
+                  >
+                    {creatingDirectEvent ? (
+                      <ActivityIndicator size="small" color={colors.text.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="rocket-outline" size={20} color={colors.text.primary} style={{ marginRight: spacing.sm }} />
+                        <Text style={styles.createAndShareButtonText}>Create & Share Invite</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
               ) : (
                 groups.map((item) => (
@@ -831,21 +930,48 @@ const ProposeScreen = () => {
     }
 
     if (currentStep === "success") {
+      const hasGroups = selectedGroups.length > 0;
       return (
         <Animated.View
           style={[styles.successContent, { opacity: successOpacity }]}
         >
           <Text style={styles.successIcon}>🎉</Text>
-          <Text style={styles.successTitle}>Idea launched!</Text>
+          <Text style={styles.successTitle}>
+            {hasGroups ? "Idea launched!" : "Event created!"}
+          </Text>
           <Text style={styles.successSubtitle}>
-            Your idea has been sent to{" "}
-            {selectedGroups.length === 1
-              ? "1 group"
-              : `${selectedGroups.length} groups`}
-            . Group members can now vote!
+            {hasGroups
+              ? `Your idea has been sent to ${
+                  selectedGroups.length === 1
+                    ? "1 group"
+                    : `${selectedGroups.length} groups`
+                }. Group members can now vote!`
+              : "Your event is ready. Share the invite link to get people in!"}
           </Text>
 
           <View style={styles.successButtons}>
+            {directEventRoomId && (
+              <>
+                <TouchableOpacity
+                  style={styles.shareInviteButton}
+                  onPress={handleShareInviteLink}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="link-outline" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
+                  <Text style={styles.shareInviteButtonText}>Share Invite Link</Text>
+                  <Ionicons name="share-outline" size={18} color={colors.primary} style={{ marginLeft: spacing.sm }} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.goToEventButton}
+                  onPress={() => navigation.navigate("EventRoom", { eventRoomId: directEventRoomId, title: ideaTitle.trim() })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.goToEventButtonText}>Go to Event Room</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
             <TouchableOpacity
               style={styles.primarySuccessButton}
               onPress={resetForm}
@@ -1365,6 +1491,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primarySuccessButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  createAndShareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.success,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.lg,
+    minHeight: 48,
+  },
+  createAndShareButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  shareInviteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: "transparent",
+  },
+  shareInviteButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  goToEventButton: {
+    backgroundColor: colors.success,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+  },
+  goToEventButtonText: {
     color: colors.text.primary,
     fontSize: 16,
     fontWeight: "600",

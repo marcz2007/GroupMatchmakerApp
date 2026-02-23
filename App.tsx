@@ -51,8 +51,8 @@ const linking: LinkingOptions<RootStackParamList> = {
           groupId: (groupId: string) => groupId,
         },
       },
-      // Event invite deep link — from shared web links
-      EventRoom: {
+      // Event invite deep link — lands on RSVP screen
+      EventDetail: {
         path: "event/:eventRoomId",
         parse: {
           eventRoomId: (eventRoomId: string) => eventRoomId,
@@ -142,7 +142,7 @@ function AppContent() {
             index: 1,
             routes: [
               { name: "Main" },
-              { name: "EventRoom", params: { eventRoomId } },
+              { name: "EventDetail", params: { eventRoomId } },
             ],
           })
         );

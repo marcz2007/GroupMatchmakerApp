@@ -8,41 +8,41 @@ import {
   SafeAreaView,
   Share,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../theme";
-import { getEventParticipants, EventWithDetails } from "../services/eventService";
-
-interface Participant {
-  id: string;
-  display_name: string;
-  avatar_url: string | null;
-  joined_at: string;
-}
+import { getPublicEventDetails, joinEventRoom, PublicEventDetails } from "../services/eventRoomService";
+import { RootStackParamList } from "../navigation/AppNavigator";
 
 const EventDetailScreen = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
-  const { eventRoomId, eventDetails } = route.params as {
+  const { eventRoomId, eventDetails: passedDetails } = route.params as {
     eventRoomId: string;
-    eventDetails: EventWithDetails;
+    eventDetails?: any;
   };
 
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [details, setDetails] = useState<PublicEventDetails | null>(
+    passedDetails ? passedDetails : null
+  );
+  const [loading, setLoading] = useState(!passedDetails);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
-    loadParticipants();
-  }, []);
+    loadDetails();
+  }, [eventRoomId]);
 
-  const loadParticipants = async () => {
+  const loadDetails = async () => {
     try {
-      const data = await getEventParticipants(eventRoomId);
-      setParticipants(data);
+      setLoading(true);
+      const data = await getPublicEventDetails(eventRoomId);
+      setDetails(data);
     } catch (error) {
-      console.error("Error loading participants:", error);
+      console.error("Error loading event details:", error);
     } finally {
       setLoading(false);
     }
@@ -77,19 +77,14 @@ const EventDetailScreen = () => {
     }
   };
 
-  const event = eventDetails.event_room;
-  const eventDate = formatDate(event.starts_at);
-  const eventTime = formatTime(event.starts_at);
-
-  // Parse location from description (stored as "📍 location")
-  const location = event.description?.replace("📍 ", "") || null;
-
   const handleShare = async () => {
+    if (!details) return;
     const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    const eventDate = formatDate(details.event_room.starts_at);
     const dateText = eventDate ? ` on ${eventDate}` : "";
     try {
       await Share.share({
-        message: `Join us for ${event.title}${dateText}! ${url}`,
+        message: `Join us for ${details.event_room.title}${dateText}! ${url}`,
       });
     } catch (error: any) {
       if (error.message !== "User did not share") {
@@ -97,6 +92,53 @@ const EventDetailScreen = () => {
       }
     }
   };
+
+  const handleJoin = async () => {
+    if (joining) return;
+    setJoining(true);
+    try {
+      await joinEventRoom(eventRoomId);
+      navigation.replace("EventRoom", {
+        eventRoomId,
+        title: details?.event_room.title,
+      });
+    } catch (error: any) {
+      console.error("Error joining event:", error);
+      Alert.alert("Error", error?.message || "Could not join event");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleGoToChat = () => {
+    navigation.replace("EventRoom", {
+      eventRoomId,
+      title: details?.event_room.title,
+    });
+  };
+
+  if (loading || !details) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={colors.backgroundGradient}
+          locations={[0, 0.5, 1]}
+          style={styles.gradient}
+        />
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  const event = details.event_room;
+  const eventDate = formatDate(event.starts_at);
+  const eventTime = formatTime(event.starts_at);
+  const location = event.description?.replace("\u{1F4CD} ", "") || null;
+  const participants = details.participants || [];
 
   return (
     <View style={styles.container}>
@@ -136,10 +178,12 @@ const EventDetailScreen = () => {
               colors={[colors.primary, colors.secondary]}
               style={styles.titleIcon}
             >
-              <Text style={styles.titleEmoji}>🎉</Text>
+              <Text style={styles.titleEmoji}>{"\u{1F389}"}</Text>
             </LinearGradient>
             <Text style={styles.eventTitle}>{event.title}</Text>
-            <Text style={styles.groupName}>{eventDetails.group_name}</Text>
+            <Text style={styles.groupName}>
+              {details.creator_name ? `Hosted by ${details.creator_name}` : details.group_name}
+            </Text>
           </View>
 
           {/* Event Details */}
@@ -192,7 +236,7 @@ const EventDetailScreen = () => {
           {/* Participants */}
           <View style={styles.participantsSection}>
             <Text style={styles.sectionTitle}>
-              Going ({eventDetails.participant_count})
+              Going ({details.participant_count})
             </Text>
 
             <View style={styles.participantsList}>
@@ -224,7 +268,7 @@ const EventDetailScreen = () => {
           </View>
 
           {/* Status Badge */}
-          {eventDetails.is_expired ? (
+          {details.is_expired ? (
             <View style={styles.statusBadge}>
               <Ionicons name="time" size={16} color={colors.text.tertiary} />
               <Text style={styles.statusText}>This event has ended</Text>
@@ -238,6 +282,35 @@ const EventDetailScreen = () => {
             </View>
           )}
         </ScrollView>
+
+        {/* Bottom Action Button */}
+        {!details.is_expired && (
+          <View style={styles.bottomAction}>
+            {details.is_participant ? (
+              <TouchableOpacity
+                style={styles.goToChatButton}
+                onPress={handleGoToChat}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chatbubbles-outline" size={20} color={colors.text.primary} style={{ marginRight: spacing.sm }} />
+                <Text style={styles.goToChatButtonText}>Go to Chat</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.joinButton, joining && styles.joinButtonDisabled]}
+                onPress={handleJoin}
+                disabled={joining}
+                activeOpacity={0.8}
+              >
+                {joining ? (
+                  <ActivityIndicator size="small" color={colors.text.primary} />
+                ) : (
+                  <Text style={styles.joinButtonText}>I'm In!</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -253,6 +326,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",
@@ -409,6 +487,41 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.eventActive,
+  },
+  bottomAction: {
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  joinButton: {
+    backgroundColor: colors.success,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinButtonText: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  goToChatButton: {
+    flexDirection: "row",
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
+  },
+  goToChatButtonText: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
 

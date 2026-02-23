@@ -84,17 +84,22 @@ const EventRoomScreen: React.FC = () => {
     try {
       const room = await getEventRoomById(eventRoomId);
       if (loadVersionRef.current !== version) return;
-      if (room) {
-        setEventRoom(room);
-        const remaining = getEventRoomTimeRemaining(room);
-        setIsExpired(remaining.expired);
-        setTimeRemaining({ hours: remaining.hours, minutes: remaining.minutes });
+
+      // If room is null, user is not a participant — redirect to RSVP screen
+      if (!room) {
+        navigation.replace("EventDetail", { eventRoomId });
+        return;
       }
+
+      setEventRoom(room);
+      const remaining = getEventRoomTimeRemaining(room);
+      setIsExpired(remaining.expired);
+      setTimeRemaining({ hours: remaining.hours, minutes: remaining.minutes });
     } catch (error) {
       if (loadVersionRef.current !== version) return;
       console.error("Error loading event room:", error);
     }
-  }, [eventRoomId]);
+  }, [eventRoomId, navigation]);
 
   const loadMessages = useCallback(async () => {
     const version = loadVersionRef.current;

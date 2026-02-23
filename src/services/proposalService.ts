@@ -15,6 +15,7 @@ export interface Proposal {
   status: "open" | "closed" | "triggered";
   is_anonymous: boolean;
   estimated_cost: string | null;
+  event_room_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +61,7 @@ export interface CreateProposalInput {
   threshold?: number;
   is_anonymous?: boolean;
   estimated_cost?: string | null;
+  event_room_id?: string;
 }
 
 /**
@@ -115,6 +117,7 @@ export async function createProposal(
     p_threshold: input.threshold ?? null,
     p_is_anonymous: input.is_anonymous ?? true,
     p_estimated_cost: input.estimated_cost || null,
+    p_event_room_id: input.event_room_id || null,
   });
 
   if (error) {
