@@ -182,7 +182,7 @@ export default function EventPage() {
   const isAlreadyRsvpd = event.already_rsvpd;
 
   return (
-    <div className="min-h-screen bg-grapple-bg overflow-y-auto">
+    <div className="bg-grapple-bg">
       <div className="w-full max-w-md mx-auto px-6 py-12 pb-24">
         {/* Signed-in greeting */}
         {event.user_name && (
