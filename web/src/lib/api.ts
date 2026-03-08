@@ -15,18 +15,39 @@ export interface PublicEventData {
 }
 
 export async function fetchPublicEvent(
-  eventRoomId: string
+  eventRoomId: string,
+  retries = 2
 ): Promise<PublicEventData> {
-  const res = await fetch(
-    `${SUPABASE_URL}/functions/v1/get-public-event?event_room_id=${eventRoomId}`
-  );
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to load event");
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/get-public-event?event_room_id=${eventRoomId}`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to load event");
+      }
+
+      return res.json();
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (err.name === "AbortError" && attempt < retries) {
+        continue;
+      }
+      if (err.name === "AbortError") {
+        throw new Error("Request timed out. Please try again.");
+      }
+      throw err;
+    }
   }
 
-  return res.json();
+  throw new Error("Failed to load event");
 }
 
 export interface RsvpResult {
