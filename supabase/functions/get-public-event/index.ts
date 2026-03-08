@@ -24,6 +24,17 @@ serve(async (req) => {
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // Optionally resolve the authenticated user (if token provided)
+    let authUserId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user } } = await supabaseUser.auth.getUser();
+      if (user) authUserId = user.id;
+    }
+
     // Fetch event room with group info
     const { data: eventRoom, error: eventError } = await supabase
       .from("event_rooms")
@@ -92,8 +103,21 @@ serve(async (req) => {
       isExpired = new Date(eventRoom.created_at).getTime() + 72 * 60 * 60 * 1000 <= now.getTime();
     }
 
+    // Check if the authenticated user has already RSVP'd
+    let alreadyRsvpd = false;
+    let userName: string | null = null;
+    if (authUserId && participants) {
+      alreadyRsvpd = participants.some((p: any) => p.user_id === authUserId);
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", authUserId)
+        .single();
+      userName = userProfile?.display_name || null;
+    }
+
     // Return sanitized public data — no user IDs, no emails
-    const response = {
+    const response: Record<string, any> = {
       title: eventRoom.title,
       description: eventRoom.description,
       starts_at: eventRoom.starts_at,
@@ -103,6 +127,8 @@ serve(async (req) => {
       participant_count: participants?.length || 0,
       participant_names: participantNames,
       is_expired: isExpired,
+      already_rsvpd: alreadyRsvpd,
+      user_name: userName,
     };
 
     return new Response(JSON.stringify(response), {

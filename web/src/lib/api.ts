@@ -12,12 +12,21 @@ export interface PublicEventData {
   participant_count: number;
   participant_names: string[];
   is_expired: boolean;
+  already_rsvpd: boolean;
+  user_name: string | null;
 }
 
 export async function fetchPublicEvent(
   eventRoomId: string,
   retries = 2
 ): Promise<PublicEventData> {
+  // Include auth token if user has a session
+  const headers: Record<string, string> = {};
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -25,7 +34,7 @@ export async function fetchPublicEvent(
     try {
       const res = await fetch(
         `${SUPABASE_URL}/functions/v1/get-public-event?event_room_id=${eventRoomId}`,
-        { signal: controller.signal }
+        { signal: controller.signal, headers }
       );
       clearTimeout(timeout);
 
@@ -72,6 +81,29 @@ export async function rsvpToEvent(eventRoomId: string): Promise<RsvpResult> {
       Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ event_room_id: eventRoomId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to RSVP");
+  }
+
+  return res.json();
+}
+
+export async function guestRsvpToEvent(
+  eventRoomId: string,
+  name: string,
+  email: string
+): Promise<RsvpResult> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/web-rsvp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      event_room_id: eventRoomId,
+      guest_name: name,
+      guest_email: email,
+    }),
   });
 
   if (!res.ok) {

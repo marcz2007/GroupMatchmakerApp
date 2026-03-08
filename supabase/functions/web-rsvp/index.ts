@@ -10,39 +10,18 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify the user's auth token
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authorization header required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const body = await req.json();
+    const { event_room_id, guest_name, guest_email } = body;
 
-    // Create a client with the user's token to verify identity
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { event_room_id } = await req.json();
     if (!event_room_id) {
       return new Response(
         JSON.stringify({ error: "event_room_id is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Use service role for write operations (bypass RLS)
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Verify event room exists
     const { data: eventRoom, error: eventError } = await supabase
@@ -58,54 +37,106 @@ serve(async (req) => {
       );
     }
 
-    // Ensure user profile exists
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .single();
+    let userId: string;
 
-    if (!existingProfile) {
-      // Create profile from auth metadata
-      const displayName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email?.split("@")[0] ||
-        "New User";
+    if (authHeader) {
+      // --- Authenticated RSVP (OAuth user) ---
+      const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
 
-      const { error: profileError } = await supabase
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: "Invalid or expired token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      userId = user.id;
+
+      // Ensure profile exists
+      const { data: existingProfile } = await supabase
         .from("profiles")
-        .insert({
+        .select("id")
+        .eq("id", user.id)
+        .single();
+
+      if (!existingProfile) {
+        const displayName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split("@")[0] ||
+          "New User";
+
+        await supabase.from("profiles").insert({
           id: user.id,
           display_name: displayName,
           avatar_url: user.user_metadata?.avatar_url || null,
           email: user.email,
         });
+      }
+    } else {
+      // --- Guest RSVP (name + email, no auth required) ---
+      if (!guest_name || !guest_email) {
+        return new Response(
+          JSON.stringify({ error: "guest_name and guest_email are required for guest RSVP" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-      if (profileError) {
-        console.error("Error creating profile:", profileError);
+      // Check if a profile with this email already exists
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", guest_email.toLowerCase().trim())
+        .single();
+
+      if (existingProfile) {
+        // Reuse the existing user — don't create a duplicate
+        userId = existingProfile.id;
+      } else {
+        // Create an anonymous auth user, then create their profile
+        const { data: anonAuth, error: anonError } = await supabase.auth.admin.createUser({
+          email: guest_email.toLowerCase().trim(),
+          email_confirm: true,
+          user_metadata: { full_name: guest_name.trim(), is_guest: true },
+        });
+
+        if (anonError || !anonAuth.user) {
+          console.error("Error creating guest user:", anonError);
+          return new Response(
+            JSON.stringify({ error: "Failed to create guest account" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        userId = anonAuth.user.id;
+
+        await supabase.from("profiles").insert({
+          id: userId,
+          display_name: guest_name.trim(),
+          email: guest_email.toLowerCase().trim(),
+          is_guest: true,
+        });
       }
     }
 
-    // Add user to group_members if not already a member (only for group-based events)
+    // Add user to group_members if event has a group
     if (eventRoom.group_id) {
-      const { error: groupMemberError } = await supabase
+      await supabase
         .from("group_members")
         .upsert(
-          { group_id: eventRoom.group_id, user_id: user.id },
+          { group_id: eventRoom.group_id, user_id: userId },
           { onConflict: "group_id,user_id" }
         );
-
-      if (groupMemberError) {
-        console.error("Error adding to group:", groupMemberError);
-      }
     }
 
     // Add user to event_room_participants
     const { error: participantError } = await supabase
       .from("event_room_participants")
       .upsert(
-        { event_room_id, user_id: user.id },
+        { event_room_id, user_id: userId },
         { onConflict: "event_room_id,user_id" }
       );
 
