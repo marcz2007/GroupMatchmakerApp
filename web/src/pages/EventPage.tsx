@@ -113,7 +113,7 @@ export default function EventPage() {
   // Loading skeleton
   if (state === "loading") {
     return (
-      <div className="min-h-screen bg-grapple-bg flex items-center justify-center">
+      <div className="h-screen overflow-y-auto bg-grapple-bg flex items-center justify-center">
         <div className="w-full max-w-md mx-auto px-6 animate-pulse">
           <div className="flex flex-col items-center mb-8">
             <div className="w-20 h-20 rounded-full bg-grapple-surfaceLight mb-4" />
@@ -131,7 +131,7 @@ export default function EventPage() {
   // Not found
   if (state === "not-found") {
     return (
-      <div className="min-h-screen bg-grapple-bg flex items-center justify-center px-6">
+      <div className="h-screen overflow-y-auto bg-grapple-bg flex items-center justify-center px-6">
         <div className="text-center">
           <div className="text-6xl mb-4">🔍</div>
           <h1 className="text-2xl font-bold text-white mb-2">Event not found</h1>
@@ -146,7 +146,7 @@ export default function EventPage() {
   // Error
   if (state === "error") {
     return (
-      <div className="min-h-screen bg-grapple-bg flex items-center justify-center px-6">
+      <div className="h-screen overflow-y-auto bg-grapple-bg flex items-center justify-center px-6">
         <div className="text-center">
           <div className="text-6xl mb-4">😕</div>
           <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
@@ -168,7 +168,7 @@ export default function EventPage() {
   // RSVP success
   if (state === "rsvp-success" && event) {
     return (
-      <div className="min-h-screen bg-grapple-bg">
+      <div className="h-screen overflow-y-auto bg-grapple-bg">
         <div className="w-full max-w-md mx-auto px-6 py-12">
           <DownloadCTA eventTitle={event.title} />
         </div>
@@ -182,7 +182,7 @@ export default function EventPage() {
   const isAlreadyRsvpd = event.already_rsvpd;
 
   return (
-    <div className="bg-grapple-bg">
+    <div className="h-screen overflow-y-auto bg-grapple-bg">
       <div className="w-full max-w-md mx-auto px-6 py-12 pb-24">
         {/* Signed-in greeting */}
         {event.user_name && (
