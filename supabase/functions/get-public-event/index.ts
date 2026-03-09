@@ -97,10 +97,14 @@ serve(async (req) => {
     // Check if event is expired
     const now = new Date();
     let isExpired = false;
+    const H48 = 48 * 60 * 60 * 1000;
+    const H72 = 72 * 60 * 60 * 1000;
     if (eventRoom.ends_at) {
-      isExpired = new Date(eventRoom.ends_at).getTime() + 12 * 60 * 60 * 1000 <= now.getTime();
+      isExpired = new Date(eventRoom.ends_at).getTime() + H48 <= now.getTime();
+    } else if (eventRoom.starts_at) {
+      isExpired = new Date(eventRoom.starts_at).getTime() + H48 <= now.getTime();
     } else {
-      isExpired = new Date(eventRoom.created_at).getTime() + 72 * 60 * 60 * 1000 <= now.getTime();
+      isExpired = new Date(eventRoom.created_at).getTime() + H72 <= now.getTime();
     }
 
     // Check if the authenticated user has already RSVP'd

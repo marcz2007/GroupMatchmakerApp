@@ -233,12 +233,14 @@ export function isEventRoomExpired(eventRoom: EventRoom): boolean {
   const now = new Date();
 
   if (eventRoom.ends_at) {
-    // Expires 12 hours after ends_at
     const expiryTime = new Date(eventRoom.ends_at);
-    expiryTime.setHours(expiryTime.getHours() + 12);
+    expiryTime.setHours(expiryTime.getHours() + 48);
+    return now >= expiryTime;
+  } else if (eventRoom.starts_at) {
+    const expiryTime = new Date(eventRoom.starts_at);
+    expiryTime.setHours(expiryTime.getHours() + 48);
     return now >= expiryTime;
   } else {
-    // Expires 72 hours after created_at
     const expiryTime = new Date(eventRoom.created_at);
     expiryTime.setHours(expiryTime.getHours() + 72);
     return now >= expiryTime;
@@ -258,7 +260,10 @@ export function getEventRoomTimeRemaining(eventRoom: EventRoom): {
 
   if (eventRoom.ends_at) {
     expiryTime = new Date(eventRoom.ends_at);
-    expiryTime.setHours(expiryTime.getHours() + 12);
+    expiryTime.setHours(expiryTime.getHours() + 48);
+  } else if (eventRoom.starts_at) {
+    expiryTime = new Date(eventRoom.starts_at);
+    expiryTime.setHours(expiryTime.getHours() + 48);
   } else {
     expiryTime = new Date(eventRoom.created_at);
     expiryTime.setHours(expiryTime.getHours() + 72);
