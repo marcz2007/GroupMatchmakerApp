@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import {
   Alert,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -113,7 +114,11 @@ const GuestEntryScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>Join this event</Text>
       <Text style={styles.subtitle}>
         Enter your name and email to get started
@@ -174,16 +179,19 @@ const GuestEntryScreen = () => {
       >
         Already have an account? Sign in
       </Button>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContainer: {
     flex: 1,
+    backgroundColor: "#1a1a1a",
+  },
+  container: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#1a1a1a",
   },
   title: {
     fontSize: 24,

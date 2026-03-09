@@ -115,6 +115,14 @@ function AppContent() {
       : null
   );
 
+  // On web, override Expo's "body { overflow: hidden }" reset so that
+  // browser-native scrolling works as a fallback alongside ScrollView.
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.body.style.overflow = "auto";
+    }
+  }, []);
+
   // For native: check Linking.getInitialURL asynchronously
   useEffect(() => {
     if (Platform.OS === "web") return; // already handled synchronously above
