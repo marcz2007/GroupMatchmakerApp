@@ -248,13 +248,34 @@ const EventDetailScreen = () => {
             )}
           </View>
 
-          {/* Smart Scheduling */}
-          {event.scheduling_mode === "smart" && (
+          {/* Smart Scheduling — only show for participants */}
+          {event.scheduling_mode === "smart" && details.is_participant && (
             <View style={styles.schedulingSection}>
               <SmartSchedulingBanner
                 eventRoomId={eventRoomId}
                 onTimeChanged={loadDetails}
               />
+            </View>
+          )}
+
+          {/* Smart scheduling info for non-participants */}
+          {event.scheduling_mode === "smart" && !details.is_participant && !event.starts_at && (
+            <View style={styles.schedulingSection}>
+              <View style={{
+                backgroundColor: colors.surfaceGlass,
+                borderWidth: 1,
+                borderColor: colors.primaryBorder,
+                borderRadius: borderRadius.lg,
+                padding: spacing.md,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+              }}>
+                <Ionicons name="sparkles" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, color: colors.text.secondary, flex: 1 }}>
+                  This event uses smart scheduling. Join to sync your calendar and help find the best time!
+                </Text>
+              </View>
             </View>
           )}
 

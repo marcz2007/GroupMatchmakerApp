@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -16,7 +16,6 @@ import {
   SmartSchedulingStatus,
   CandidateTime,
   refreshCalendarAndSync,
-  syncCalendarForEvent,
   requestReschedule,
   getDayName,
 } from "../services/schedulingService";
@@ -37,6 +36,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   const { connectGoogleCalendar } = useCalendar();
   const [status, setStatus] = useState<SmartSchedulingStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
   const [syncingProvider, setSyncingProvider] = useState<CalendarProvider | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
@@ -46,8 +46,10 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     try {
       const data = await getSmartSchedulingStatus(eventRoomId);
       setStatus(data);
+      setLoadError(false);
     } catch (error) {
       console.error("[SmartBanner] Error loading scheduling status:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -63,6 +65,30 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     const interval = setInterval(loadStatus, 30000);
     return () => clearInterval(interval);
   }, [status?.scheduling_status, loadStatus]);
+
+  // Auto-sync after Google Calendar is connected (returning from OAuth)
+  const prevCalendarConnected = useRef(calendarConnected);
+  useEffect(() => {
+    if (
+      calendarConnected &&
+      !prevCalendarConnected.current &&
+      status?.scheduling_status === "collecting" &&
+      !status?.user_has_synced &&
+      user?.id
+    ) {
+      // Calendar just became connected — auto-sync
+      (async () => {
+        try {
+          await refreshCalendarAndSync(eventRoomId, user.id, "google");
+          await loadStatus();
+          Alert.alert("Synced!", "Your Google Calendar has been synced for this event.");
+        } catch (error) {
+          console.error("[SmartBanner] Auto-sync after connect failed:", error);
+        }
+      })();
+    }
+    prevCalendarConnected.current = calendarConnected;
+  }, [calendarConnected, status, user?.id, eventRoomId, loadStatus]);
 
   const handleSyncButtonPress = () => {
     if (!user?.id) {
@@ -177,7 +203,8 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     );
   }
 
-  if (!status || status.scheduling_mode !== "smart") return null;
+  // If the RPC failed (e.g. user is not a participant yet), hide the banner
+  if (loadError || !status || status.scheduling_mode !== "smart") return null;
 
   const { scheduling_status, synced_count, total_participants, user_has_synced } = status;
 
