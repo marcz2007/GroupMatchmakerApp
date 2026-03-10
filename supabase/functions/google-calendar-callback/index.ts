@@ -122,73 +122,62 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
   }
 }
 
-function createHtmlResponse(message: string, redirectUrl: string, success: boolean = true) {
+const WEB_APP_URL = "https://group-matchmaker-app.vercel.app";
+
+function parseStateForPlatform(state: string): { stateKey: string; isWeb: boolean } {
+  // State format: "uuid:web" or "uuid:native" (or just "uuid" for legacy)
+  if (state.endsWith(":web")) {
+    return { stateKey: state, isWeb: true };
+  }
+  if (state.endsWith(":native")) {
+    return { stateKey: state, isWeb: false };
+  }
+  return { stateKey: state, isWeb: false };
+}
+
+function createResponse(message: string, redirectUrl: string, success: boolean, isWeb: boolean) {
+  // For web: redirect straight to the web app — user returns to the tab they came from
+  if (isWeb) {
+    const url = new URL(WEB_APP_URL);
+    url.searchParams.set("calendar_connected", success ? "true" : "false");
+    if (!success) url.searchParams.set("calendar_error", message);
+    return new Response(null, {
+      status: 302,
+      headers: { Location: url.toString(), ...corsHeaders },
+    });
+  }
+
+  // For native: show a simple success page that auto-redirects via deep link
   const bgColor = success ? "#10B981" : "#EF4444";
   return new Response(
     `<!DOCTYPE html>
-    <html>
-      <head>
-        <title>Calendar Connection</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-            background-color: #1a1a2e;
-            color: #ffffff;
-          }
-          .container {
-            max-width: 600px;
-            padding: 40px;
-            background-color: #16213e;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-          }
-          h1 {
-            margin-bottom: 20px;
-            color: ${bgColor};
-          }
-          p {
-            margin-bottom: 30px;
-            line-height: 1.5;
-          }
-          .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background-color: ${bgColor};
-            color: white;
-            text-decoration: none;
-            border-radius: 12px;
-            font-weight: bold;
-            transition: opacity 0.3s ease;
-          }
-          .button:hover {
-            opacity: 0.9;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>Calendar Connection</h1>
-          <p>${message}</p>
-          <a href="${redirectUrl}" class="button">Return to App</a>
-        </div>
-        <script>
-          // Automatically redirect after 3 seconds
-          setTimeout(() => {
-            window.location.href = "${redirectUrl}";
-          }, 3000);
-        </script>
-      </body>
-    </html>`,
+<html>
+<head>
+  <title>Calendar Connection</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; margin: 0; padding: 20px; text-align: center;
+      background-color: #1a1a2e; color: #ffffff;
+    }
+    .container { max-width: 600px; padding: 40px; background-color: #16213e; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    h1 { margin-bottom: 20px; color: ${bgColor}; }
+    p { margin-bottom: 30px; line-height: 1.5; }
+    .button { display: inline-block; padding: 12px 24px; background-color: ${bgColor}; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${success ? "Connected!" : "Error"}</h1>
+    <p>${message}</p>
+    <a href="${redirectUrl}" class="button">Return to App</a>
+  </div>
+  <script>setTimeout(() => { window.location.href = "${redirectUrl}"; }, 2000);</script>
+</body>
+</html>`,
     {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -215,21 +204,26 @@ serve(async (req: Request) => {
 
     console.log("Request parameters:", { code: !!code, state, error });
 
+    // Parse platform from state (format: "uuid:web" or "uuid:native")
+    const { isWeb } = state ? parseStateForPlatform(state) : { isWeb: false };
+
     if (error) {
       console.error("Google authorization error:", error);
-      return createHtmlResponse(
+      return createResponse(
         `Error: ${error}. Please try connecting your calendar again.`,
         APP_URL,
-        false
+        false,
+        isWeb
       );
     }
 
     if (!code || !state) {
       console.error("Missing required parameters:", { code: !!code, state });
-      return createHtmlResponse(
+      return createResponse(
         "Missing required parameters. Please try connecting your calendar again.",
         APP_URL,
-        false
+        false,
+        isWeb
       );
     }
 
@@ -242,10 +236,11 @@ serve(async (req: Request) => {
 
     if (stateError || !stateData) {
       console.error("Database error while verifying state:", stateError);
-      return createHtmlResponse(
+      return createResponse(
         "Invalid or expired session. Please try connecting your calendar again.",
         APP_URL,
-        false
+        false,
+        isWeb
       );
     }
 
@@ -279,10 +274,11 @@ serve(async (req: Request) => {
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
       console.error("Token exchange error:", errorData);
-      return createHtmlResponse(
+      return createResponse(
         "Failed to connect to Google Calendar. Please try again.",
         APP_URL,
-        false
+        false,
+        isWeb
       );
     }
 
@@ -306,10 +302,11 @@ serve(async (req: Request) => {
 
     if (updateError) {
       console.error("Error updating profile:", updateError);
-      return createHtmlResponse(
+      return createResponse(
         "Failed to save calendar connection. Please try again.",
         APP_URL,
-        false
+        false,
+        isWeb
       );
     }
 
@@ -320,16 +317,18 @@ serve(async (req: Request) => {
     console.log("Profile updated successfully");
     console.log("=== Google Calendar Callback Function Completed Successfully ===");
 
-    return createHtmlResponse(
+    return createResponse(
       "Successfully connected your Google Calendar! You can now close this window.",
       APP_URL,
-      true
+      true,
+      isWeb
     );
   } catch (error) {
     console.error("Unexpected error in callback:", error);
-    return createHtmlResponse(
+    return createResponse(
       "An unexpected error occurred. Please try connecting your calendar again.",
       APP_URL,
+      false,
       false
     );
   }

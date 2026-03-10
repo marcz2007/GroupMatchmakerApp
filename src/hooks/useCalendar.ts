@@ -20,7 +20,7 @@ export const useCalendar = () => {
       const { data, error } = await supabase.functions.invoke(
         "google-calendar-auth",
         {
-          body: { userId: user.id },
+          body: { userId: user.id, platform: Platform.OS },
         }
       );
 
