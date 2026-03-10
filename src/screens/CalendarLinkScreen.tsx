@@ -7,6 +7,7 @@ import {
   Alert,
   Linking,
   Image,
+  Platform,
 } from "react-native";
 import { Button } from "../components/Button";
 import { supabase } from "../supabase";
@@ -47,9 +48,22 @@ const CalendarLinkScreen = () => {
         if (supported) {
           await Linking.openURL(data.authUrl);
           // After returning from browser, refresh profile to check connection
-          setTimeout(() => {
-            refreshProfile?.();
-          }, 3000);
+          if (Platform.OS === "web" && typeof document !== "undefined") {
+            const handleVisibilityChange = () => {
+              if (document.visibilityState === "visible") {
+                document.removeEventListener("visibilitychange", handleVisibilityChange);
+                refreshProfile?.();
+              }
+            };
+            document.addEventListener("visibilitychange", handleVisibilityChange);
+            setTimeout(() => {
+              document.removeEventListener("visibilitychange", handleVisibilityChange);
+            }, 300000);
+          } else {
+            setTimeout(() => {
+              refreshProfile?.();
+            }, 3000);
+          }
         } else {
           Alert.alert("Error", "Cannot open the authorization page.");
         }

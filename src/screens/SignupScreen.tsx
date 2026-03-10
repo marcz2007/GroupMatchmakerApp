@@ -13,6 +13,7 @@ import {
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
 import { supabase } from "../supabase";
+import { twoButtonAlert } from "../utils/alertHelper";
 
 // Set to true to see debug alerts
 const DEBUG_AUTH = false;
@@ -158,16 +159,12 @@ const SignupScreen = () => {
       // KEY CHECK: If identities is empty, the email already exists
       // Supabase returns this instead of an error to prevent email enumeration
       if (data?.user?.identities?.length === 0) {
-        Alert.alert(
+        twoButtonAlert(
           "Email Already Registered",
           `An account with ${cleanEmail} already exists.\n\nPlease login or reset your password.`,
-          [
-            {
-              text: "Go to Login",
-              onPress: () => navigation.navigate("Login"),
-            },
-            { text: "Cancel", style: "cancel" },
-          ]
+          "Cancel",
+          "Go to Login",
+          () => navigation.navigate("Login")
         );
         return;
       }
@@ -176,15 +173,12 @@ const SignupScreen = () => {
       if (data?.session) {
         Alert.alert("Welcome!", "Account created and logged in!");
       } else if (data?.user) {
-        Alert.alert(
+        twoButtonAlert(
           "Check Your Email",
           `We sent a confirmation link to ${cleanEmail}.\n\nClick the link to activate your account, then come back and login.\n\nCheck spam/junk if you don't see it.`,
-          [
-            {
-              text: "Go to Login",
-              onPress: () => navigation.navigate("Login"),
-            },
-          ]
+          "Stay Here",
+          "Go to Login",
+          () => navigation.navigate("Login")
         );
       }
     } catch (error: any) {

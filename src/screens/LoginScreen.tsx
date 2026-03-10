@@ -13,6 +13,7 @@ import {
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
 import { supabase } from "../supabase";
+import { twoButtonAlert } from "../utils/alertHelper";
 
 // Set to true to see debug alerts
 const DEBUG_AUTH = false;
@@ -76,17 +77,12 @@ const LoginScreen = () => {
           error.status === 400;
 
         if (isInvalidCredentials) {
-          Alert.alert(
+          twoButtonAlert(
             "Incorrect Email or Password",
             "The password is wrong, or this email isn't registered.\n\nTry resetting your password.",
-            [
-              { text: "Try Again", style: "cancel" },
-              {
-                text: "Reset Password",
-                onPress: () => handleForgotPassword(),
-                style: "destructive",
-              },
-            ]
+            "Try Again",
+            "Reset Password",
+            () => handleForgotPassword()
           );
         } else {
           Alert.alert("Login Error", error.message);

@@ -98,7 +98,12 @@ const EventDetailScreen = () => {
     if (joining) return;
     setJoining(true);
     try {
-      await joinEventRoom(eventRoomId);
+      // Add timeout to prevent infinite spinner on web
+      const joinPromise = joinEventRoom(eventRoomId);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out. Please try again.")), 15000)
+      );
+      await Promise.race([joinPromise, timeoutPromise]);
       navigation.replace("EventRoom", {
         eventRoomId,
         title: details?.event_room.title,

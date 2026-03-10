@@ -12,6 +12,7 @@ import {
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
 import { supabase } from "../supabase";
+import { twoButtonAlert } from "../utils/alertHelper";
 
 const ResetPasswordScreen = () => {
   const [newPassword, setNewPassword] = useState("");
@@ -63,15 +64,12 @@ const ResetPasswordScreen = () => {
       if (error) {
         Alert.alert("Error", error.message);
       } else {
-        Alert.alert(
+        twoButtonAlert(
           "Password Updated!",
           "Your password has been reset. You can now login.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () => navigation.navigate("Login"),
-            },
-          ]
+          "Stay Here",
+          "Go to Login",
+          () => navigation.navigate("Login")
         );
       }
     } catch (error: any) {

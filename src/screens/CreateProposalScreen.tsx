@@ -124,9 +124,8 @@ const CreateProposalScreen: React.FC = () => {
         estimated_cost: estimatedCost,
       });
 
-      Alert.alert("Success", "Proposal created!", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert("Success", "Proposal created!");
+      navigation.goBack();
     } catch (error) {
       console.error("Error creating proposal:", error);
       Alert.alert("Error", "Failed to create proposal. Please try again.");

@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { confirmAlert } from "../utils/alertHelper";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useCalendar } from "../hooks/useCalendar";
@@ -147,32 +148,27 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
       minute: "2-digit",
     });
 
-    Alert.alert(
+    confirmAlert(
       "Reschedule Event",
       `Change to ${dateStr} at ${timeStr}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reschedule",
-          onPress: async () => {
-            setRescheduling(candidate.id);
-            try {
-              await requestReschedule(eventRoomId, candidate.id);
-              await loadStatus();
-              setShowAlternatives(false);
-              onTimeChanged?.();
-            } catch (error: any) {
-              console.error("Error rescheduling:", error);
-              Alert.alert(
-                "Reschedule Failed",
-                error?.message || "Could not reschedule. Please try again."
-              );
-            } finally {
-              setRescheduling(null);
-            }
-          },
-        },
-      ]
+      async () => {
+        setRescheduling(candidate.id);
+        try {
+          await requestReschedule(eventRoomId, candidate.id);
+          await loadStatus();
+          setShowAlternatives(false);
+          onTimeChanged?.();
+        } catch (error: any) {
+          console.error("Error rescheduling:", error);
+          Alert.alert(
+            "Reschedule Failed",
+            error?.message || "Could not reschedule. Please try again."
+          );
+        } finally {
+          setRescheduling(null);
+        }
+      },
+      "Reschedule"
     );
   };
 
