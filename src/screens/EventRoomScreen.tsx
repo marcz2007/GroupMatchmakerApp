@@ -30,6 +30,7 @@ import {
 } from "../services/eventRoomService";
 import { colors, spacing, borderRadius, typography } from "../theme/theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
+import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
 
 type EventRoomScreenRouteProp = RouteProp<RootStackParamList, "EventRoom">;
 type EventRoomScreenNavigationProp = StackNavigationProp<
@@ -273,6 +274,11 @@ const EventRoomScreen: React.FC = () => {
           </Text>
         </View>
       )}
+      {eventRoom?.scheduling_mode === "smart" && (
+        <View style={styles.schedulingBannerContainer}>
+          <SmartSchedulingBanner eventRoomId={eventRoomId} compact />
+        </View>
+      )}
     </View>
   );
 
@@ -435,6 +441,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.warning,
     textAlign: "center",
+  },
+  schedulingBannerContainer: {
+    marginTop: spacing.sm,
   },
   messagesList: {
     flexGrow: 1,

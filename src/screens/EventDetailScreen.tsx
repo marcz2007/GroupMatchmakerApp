@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { getPublicEventDetails, joinEventRoom, PublicEventDetails } from "../services/eventRoomService";
 import { RootStackParamList } from "../navigation/AppNavigator";
+import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
 
 const EventDetailScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -188,7 +189,7 @@ const EventDetailScreen = () => {
 
           {/* Event Details */}
           <View style={styles.detailsSection}>
-            {eventDate && (
+            {eventDate ? (
               <View style={styles.detailRow}>
                 <View style={styles.detailIcon}>
                   <Ionicons
@@ -202,7 +203,21 @@ const EventDetailScreen = () => {
                   <Text style={styles.detailValue}>{eventDate}</Text>
                 </View>
               </View>
-            )}
+            ) : event.scheduling_mode === "smart" ? (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIcon}>
+                  <Ionicons
+                    name="sparkles"
+                    size={22}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Date & Time</Text>
+                  <Text style={styles.detailValue}>Finding best time...</Text>
+                </View>
+              </View>
+            ) : null}
 
             {eventTime && (
               <View style={styles.detailRow}>
@@ -232,6 +247,13 @@ const EventDetailScreen = () => {
               </View>
             )}
           </View>
+
+          {/* Smart Scheduling */}
+          {event.scheduling_mode === "smart" && (
+            <View style={styles.schedulingSection}>
+              <SmartSchedulingBanner eventRoomId={eventRoomId} />
+            </View>
+          )}
 
           {/* Participants */}
           <View style={styles.participantsSection}>
@@ -419,6 +441,9 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.primary,
     fontWeight: "500",
+  },
+  schedulingSection: {
+    marginBottom: spacing.lg,
   },
   participantsSection: {
     marginBottom: spacing.lg,
