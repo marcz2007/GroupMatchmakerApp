@@ -81,33 +81,21 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
         if (calendarConnected) {
           // Already connected — refresh and sync
           await refreshCalendarAndSync(eventRoomId, user.id, "google");
+          await loadStatus();
+          setShowCalendarPicker(false);
+          Alert.alert("Synced!", "Your calendar has been synced for this event.");
         } else {
-          // Need to connect Google Calendar first
+          // Not connected — start Google OAuth flow directly
           setShowCalendarPicker(false);
           setSyncingProvider(null);
-          Alert.alert(
-            "Connect Google Calendar",
-            "You'll be redirected to sign in with Google. After connecting, come back and sync again.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Connect",
-                onPress: async () => {
-                  await connectGoogleCalendar();
-                },
-              },
-            ]
-          );
+          await connectGoogleCalendar();
           return;
         }
       } else {
         // Apple / Outlook — coming soon, handled by modal disabled state
+        setSyncingProvider(null);
         return;
       }
-
-      await loadStatus();
-      setShowCalendarPicker(false);
-      Alert.alert("Synced!", "Your calendar has been synced for this event.");
     } catch (error: any) {
       console.error("[SmartBanner] Sync error:", error);
       Alert.alert(
