@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Alert, Linking } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 import { supabase } from "../supabase";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -34,10 +34,26 @@ export const useCalendar = () => {
         const supported = await Linking.canOpenURL(data.authUrl);
         if (supported) {
           await Linking.openURL(data.authUrl);
-          // After returning from browser, refresh profile
-          setTimeout(() => {
-            refreshProfile?.();
-          }, 3000);
+
+          if (Platform.OS === "web" && typeof document !== "undefined") {
+            // On web, OAuth opens in a new tab. Refresh profile when user returns.
+            const handleVisibilityChange = () => {
+              if (document.visibilityState === "visible") {
+                document.removeEventListener("visibilitychange", handleVisibilityChange);
+                refreshProfile?.();
+              }
+            };
+            document.addEventListener("visibilitychange", handleVisibilityChange);
+            // Clean up after 5 minutes in case user never returns
+            setTimeout(() => {
+              document.removeEventListener("visibilitychange", handleVisibilityChange);
+            }, 300000);
+          } else {
+            // On native, app returns to foreground after browser
+            setTimeout(() => {
+              refreshProfile?.();
+            }, 3000);
+          }
         } else {
           Alert.alert("Error", "Cannot open the authorization page.");
         }
