@@ -784,59 +784,64 @@ const ProposeScreen = () => {
     if (currentStep === "details") {
       return (
         <Animated.View
-          style={[styles.stepContent, styles.detailsStepContent, { opacity: stepContentOpacity }]}
+          style={[styles.stepContent, { opacity: stepContentOpacity }]}
         >
-          {/* Locked idea pill */}
-          <View style={styles.detailsPillContainer}>
-            <IdeaPill title={ideaTitle} animateIn={true} large />
-          </View>
-
-          {/* Detail chips — hide date/time when smart scheduling is on */}
-          <View style={styles.chipsContainer}>
-            <DetailChips
-              date={smartScheduling ? null : date}
-              time={smartScheduling ? null : time}
-              location={location}
-              onDateChange={setDate}
-              onTimeChange={setTime}
-              onLocationChange={setLocation}
-              minimumDate={votingDeadline && votingDeadline > new Date() ? votingDeadline : undefined}
-              hideDatetime={smartScheduling}
-            />
-          </View>
-
-          {/* Find best time toggle */}
-          <TouchableOpacity
-            style={[styles.smartToggle, smartScheduling && styles.smartToggleActive]}
-            onPress={() => setSmartScheduling(!smartScheduling)}
-            activeOpacity={0.7}
+          <ScrollView
+            contentContainerStyle={styles.detailsStepContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.smartToggleLeft}>
-              <Ionicons
-                name="sparkles"
-                size={18}
-                color={smartScheduling ? colors.primary : colors.text.tertiary}
-              />
-              <View style={{ marginLeft: spacing.sm }}>
-                <Text style={[styles.smartToggleText, smartScheduling && styles.smartToggleTextActive]}>
-                  Find best time
-                </Text>
-                <Text style={styles.smartToggleHint}>
-                  {smartScheduling
-                    ? "Invitees sync calendars, app picks the best time"
-                    : "Let the app find when everyone is free"}
-                </Text>
-              </View>
+            {/* Locked idea pill */}
+            <View style={styles.detailsPillContainer}>
+              <IdeaPill title={ideaTitle} animateIn={true} large />
             </View>
-            <Switch
-              value={smartScheduling}
-              onValueChange={setSmartScheduling}
-              trackColor={{ false: "rgba(255,255,255,0.1)", true: "rgba(87,98,183,0.4)" }}
-              thumbColor={smartScheduling ? colors.primary : "#888"}
-            />
-          </TouchableOpacity>
 
-          <View style={styles.detailsButtonRow}>
+            {/* Detail chips — hide date/time when smart scheduling is on */}
+            <View style={styles.chipsContainer}>
+              <DetailChips
+                date={smartScheduling ? null : date}
+                time={smartScheduling ? null : time}
+                location={location}
+                onDateChange={setDate}
+                onTimeChange={setTime}
+                onLocationChange={setLocation}
+                minimumDate={votingDeadline && votingDeadline > new Date() ? votingDeadline : undefined}
+                hideDatetime={smartScheduling}
+              />
+            </View>
+
+            {/* Find best time toggle */}
+            <TouchableOpacity
+              style={[styles.smartToggle, smartScheduling && styles.smartToggleActive]}
+              onPress={() => setSmartScheduling(!smartScheduling)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.smartToggleLeft}>
+                <Ionicons
+                  name="sparkles"
+                  size={18}
+                  color={smartScheduling ? colors.primary : colors.text.tertiary}
+                />
+                <View style={{ marginLeft: spacing.sm }}>
+                  <Text style={[styles.smartToggleText, smartScheduling && styles.smartToggleTextActive]}>
+                    Find best time
+                  </Text>
+                  <Text style={styles.smartToggleHint}>
+                    {smartScheduling
+                      ? "Invitees sync calendars, app picks the best time"
+                      : "Let the app find when everyone is free"}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={smartScheduling}
+                onValueChange={setSmartScheduling}
+                trackColor={{ false: "rgba(255,255,255,0.1)", true: "rgba(87,98,183,0.4)" }}
+                thumbColor={smartScheduling ? colors.primary : "#888"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.detailsButtonRow}>
             <TouchableOpacity
               style={styles.detailsBackButton}
               onPress={handleBackToIdea}
@@ -853,6 +858,7 @@ const ProposeScreen = () => {
               <Text style={styles.detailsNextButtonText}>Next</Text>
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </Animated.View>
       );
     }
@@ -1136,9 +1142,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   detailsStepContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingBottom: "10%",
+    paddingBottom: spacing.xl,
   },
   stepTitle: {
     fontSize: 28,
