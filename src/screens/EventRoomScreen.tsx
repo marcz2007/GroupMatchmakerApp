@@ -276,7 +276,14 @@ const EventRoomScreen: React.FC = () => {
       )}
       {eventRoom?.scheduling_mode === "smart" && (
         <View style={styles.schedulingBannerContainer}>
-          <SmartSchedulingBanner eventRoomId={eventRoomId} compact />
+          <SmartSchedulingBanner
+            eventRoomId={eventRoomId}
+            compact
+            onTimeChanged={() => {
+              loadEventRoom();
+              loadMessages();
+            }}
+          />
         </View>
       )}
     </View>

@@ -251,7 +251,10 @@ const EventDetailScreen = () => {
           {/* Smart Scheduling */}
           {event.scheduling_mode === "smart" && (
             <View style={styles.schedulingSection}>
-              <SmartSchedulingBanner eventRoomId={eventRoomId} />
+              <SmartSchedulingBanner
+                eventRoomId={eventRoomId}
+                onTimeChanged={loadDetails}
+              />
             </View>
           )}
 

@@ -13,7 +13,9 @@ import { useCalendar } from "../hooks/useCalendar";
 import {
   getSmartSchedulingStatus,
   SmartSchedulingStatus,
+  CandidateTime,
   refreshCalendarAndSync,
+  requestReschedule,
   getDayName,
 } from "../services/schedulingService";
 import { colors, spacing, borderRadius, typography } from "../theme";
@@ -22,17 +24,22 @@ interface SmartSchedulingBannerProps {
   eventRoomId: string;
   /** Compact mode for use in event room header */
   compact?: boolean;
+  /** Called when the event time changes (reschedule) */
+  onTimeChanged?: () => void;
 }
 
 const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   eventRoomId,
   compact = false,
+  onTimeChanged,
 }) => {
   const { user, calendarConnected } = useAuth();
   const { connectGoogleCalendar, loading: calendarLoading } = useCalendar();
   const [status, setStatus] = useState<SmartSchedulingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [rescheduling, setRescheduling] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -99,10 +106,52 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
 
   const { scheduling_status, synced_count, total_participants, user_has_synced } = status;
 
-  // Scheduled — show the selected time
-  if (scheduling_status === "scheduled" && status.selected_time) {
-    const start = new Date(status.selected_time.candidate_start);
-    const end = new Date(status.selected_time.candidate_end);
+  const handleReschedule = async (candidate: CandidateTime) => {
+    if (rescheduling) return;
+
+    const start = new Date(candidate.candidate_start);
+    const dateStr = start.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    const timeStr = start.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    Alert.alert(
+      "Reschedule Event",
+      `Change to ${dateStr} at ${timeStr}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reschedule",
+          onPress: async () => {
+            setRescheduling(candidate.id);
+            try {
+              await requestReschedule(eventRoomId, candidate.id);
+              await loadStatus();
+              setShowAlternatives(false);
+              onTimeChanged?.();
+            } catch (error: any) {
+              console.error("Error rescheduling:", error);
+              Alert.alert(
+                "Reschedule Failed",
+                error?.message || "Could not reschedule. Please try again."
+              );
+            } finally {
+              setRescheduling(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatCandidateTime = (candidate: CandidateTime) => {
+    const start = new Date(candidate.candidate_start);
+    const end = new Date(candidate.candidate_end);
     const dateStr = start.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
@@ -116,6 +165,13 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
       hour: "numeric",
       minute: "2-digit",
     });
+    return { dateStr, timeStr, endTimeStr };
+  };
+
+  // Scheduled — show the selected time + alternatives
+  if (scheduling_status === "scheduled" && status.selected_time) {
+    const { dateStr, timeStr, endTimeStr } = formatCandidateTime(status.selected_time);
+    const alternatives = status.alternative_times || [];
 
     return (
       <View style={[styles.container, styles.scheduledContainer, compact && styles.containerCompact]}>
@@ -130,6 +186,59 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
           <Text style={styles.scheduledDetail}>
             {status.selected_time.available_count} of {total_participants} available
           </Text>
+        )}
+
+        {/* Alternatives toggle */}
+        {!compact && alternatives.length > 0 && (
+          <>
+            <TouchableOpacity
+              style={styles.alternativesToggle}
+              onPress={() => setShowAlternatives(!showAlternatives)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.alternativesToggleText}>
+                {showAlternatives ? "Hide alternatives" : `${alternatives.length} alternative time${alternatives.length !== 1 ? "s" : ""}`}
+              </Text>
+              <Ionicons
+                name={showAlternatives ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+
+            {showAlternatives && (
+              <View style={styles.alternativesList}>
+                {alternatives.map((alt) => {
+                  const { dateStr: altDate, timeStr: altTime, endTimeStr: altEnd } =
+                    formatCandidateTime(alt);
+                  const isRescheduling = rescheduling === alt.id;
+                  return (
+                    <TouchableOpacity
+                      key={alt.id}
+                      style={styles.alternativeRow}
+                      onPress={() => handleReschedule(alt)}
+                      disabled={!!rescheduling}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.alternativeInfo}>
+                        <Text style={styles.alternativeTime}>
+                          {altDate} {altTime} - {altEnd}
+                        </Text>
+                        <Text style={styles.alternativeAvailability}>
+                          {alt.available_count} of {total_participants} available
+                        </Text>
+                      </View>
+                      {isRescheduling ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Ionicons name="swap-horizontal" size={18} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </>
         )}
       </View>
     );
@@ -402,6 +511,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.primary,
     fontWeight: "500",
+  },
+  alternativesToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  alternativesToggleText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: "500",
+  },
+  alternativesList: {
+    gap: spacing.xs,
+  },
+  alternativeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  alternativeInfo: {
+    flex: 1,
+  },
+  alternativeTime: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.text.primary,
+  },
+  alternativeAvailability: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
 });
 
