@@ -15,6 +15,7 @@ import {
   SmartSchedulingStatus,
   CandidateTime,
   refreshCalendarAndSync,
+  syncCalendarForEvent,
   requestReschedule,
   getDayName,
 } from "../services/schedulingService";
@@ -64,30 +65,48 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   }, [status?.scheduling_status, loadStatus]);
 
   const handleSyncCalendar = async () => {
-    if (!user?.id || syncing) return;
+    console.log("[SmartBanner] handleSyncCalendar tapped", {
+      userId: user?.id,
+      syncing,
+      calendarConnected,
+      eventRoomId,
+    });
 
-    if (!calendarConnected) {
-      Alert.alert(
-        "Connect Calendar",
-        "Connect your Google Calendar first to sync your availability.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Connect", onPress: connectGoogleCalendar },
-        ]
-      );
+    if (!user?.id) {
+      console.warn("[SmartBanner] No user ID, cannot sync");
+      Alert.alert("Error", "You must be logged in to sync.");
       return;
     }
+    if (syncing) return;
 
     setSyncing(true);
     try {
-      await refreshCalendarAndSync(eventRoomId, user.id, "google");
+      if (calendarConnected) {
+        console.log("[SmartBanner] Calendar connected, refreshing and syncing...");
+        await refreshCalendarAndSync(eventRoomId, user.id, "google");
+      } else {
+        console.log("[SmartBanner] No calendar connected, marking as available...");
+        await syncCalendarForEvent(eventRoomId, "none");
+      }
+      console.log("[SmartBanner] Sync succeeded, reloading status...");
       await loadStatus();
-      Alert.alert("Synced!", "Your calendar has been synced for this event.");
+      if (!calendarConnected) {
+        Alert.alert(
+          "You're in!",
+          "You've been marked as available. Want better results? Connect Google Calendar in your profile to share your busy times.",
+          [
+            { text: "OK" },
+            { text: "Connect Calendar", onPress: connectGoogleCalendar },
+          ]
+        );
+      } else {
+        Alert.alert("Synced!", "Your calendar has been synced for this event.");
+      }
     } catch (error: any) {
-      console.error("Error syncing calendar:", error);
+      console.error("[SmartBanner] Sync error:", error);
       Alert.alert(
         "Sync Failed",
-        error?.message || "Could not sync your calendar. Please try again."
+        error?.message || "Could not sync your availability. Please try again."
       );
     } finally {
       setSyncing(false);
@@ -354,7 +373,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
                 style={{ marginRight: spacing.sm }}
               />
               <Text style={styles.syncButtonText}>
-                {calendarConnected ? "Sync My Calendar" : "Connect & Sync Calendar"}
+                {calendarConnected ? "Sync My Calendar" : "I'm Available!"}
               </Text>
             </>
           )}
