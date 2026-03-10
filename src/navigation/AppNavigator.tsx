@@ -9,6 +9,7 @@ import CreateProposalScreen from "../screens/CreateProposalScreen";
 import EventRoomScreen from "../screens/EventRoomScreen";
 import EventChatScreen from "../screens/EventChatScreen";
 import EventDetailScreen from "../screens/EventDetailScreen";
+import SmartScheduleSetupScreen from "../screens/SmartScheduleSetupScreen";
 import GroupActionsScreen from "../screens/GroupActionsScreen";
 import GroupDetailsScreen from "../screens/GroupDetailsScreen";
 import GroupsScreen from "../screens/GroupsScreen";
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   EventDetail: { eventRoomId: string; eventDetails?: any };
   CreateProposal: { groupId: string; groupName: string };
   GroupAvailability: { groupId: string; groupName: string };
+  SmartScheduleSetup: { title: string; location: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -143,6 +145,11 @@ const AppStack = () => (
       name="CreateProposal"
       component={CreateProposalScreen}
       options={{ title: "New Proposal" }}
+    />
+    <Stack.Screen
+      name="SmartScheduleSetup"
+      component={SmartScheduleSetupScreen}
+      options={{ headerShown: false }}
     />
     <Stack.Screen
       name="CalendarLink"

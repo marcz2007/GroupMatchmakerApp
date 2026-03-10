@@ -319,6 +319,7 @@ interface DetailChipsProps {
   onTimeChange: (time: Date | null) => void;
   onLocationChange: (location: string) => void;
   minimumDate?: Date;
+  hideDatetime?: boolean;
 }
 
 export const DetailChips: React.FC<DetailChipsProps> = ({
@@ -329,6 +330,7 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   onTimeChange,
   onLocationChange,
   minimumDate,
+  hideDatetime,
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -420,38 +422,42 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
   return (
     <View style={styles.container}>
       {/* Date Chip */}
-      <TouchableOpacity
-        style={[styles.chip, date && styles.chipFilled]}
-        onPress={openDatePicker}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.chipIcon}>📅</Text>
-        <Text style={[styles.chipText, date && styles.chipTextFilled]}>
-          {date ? formatDate(date) : "Add date"}
-        </Text>
-        {date && (
-          <TouchableOpacity onPress={clearDate} style={styles.clearButton}>
-            <Text style={styles.clearText}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+      {!hideDatetime && (
+        <TouchableOpacity
+          style={[styles.chip, date && styles.chipFilled]}
+          onPress={openDatePicker}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.chipIcon}>📅</Text>
+          <Text style={[styles.chipText, date && styles.chipTextFilled]}>
+            {date ? formatDate(date) : "Add date"}
+          </Text>
+          {date && (
+            <TouchableOpacity onPress={clearDate} style={styles.clearButton}>
+              <Text style={styles.clearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Time Chip */}
-      <TouchableOpacity
-        style={[styles.chip, time && styles.chipFilled]}
-        onPress={openTimePicker}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.chipIcon}>🕐</Text>
-        <Text style={[styles.chipText, time && styles.chipTextFilled]}>
-          {time ? formatTime(time) : "Add time"}
-        </Text>
-        {time && (
-          <TouchableOpacity onPress={clearTime} style={styles.clearButton}>
-            <Text style={styles.clearText}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+      {!hideDatetime && (
+        <TouchableOpacity
+          style={[styles.chip, time && styles.chipFilled]}
+          onPress={openTimePicker}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.chipIcon}>🕐</Text>
+          <Text style={[styles.chipText, time && styles.chipTextFilled]}>
+            {time ? formatTime(time) : "Add time"}
+          </Text>
+          {time && (
+            <TouchableOpacity onPress={clearTime} style={styles.clearButton}>
+              <Text style={styles.clearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Location Chip */}
       <TouchableOpacity

@@ -113,6 +113,9 @@ const ProposeScreen = () => {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
 
+  // Smart scheduling toggle
+  const [smartScheduling, setSmartScheduling] = useState(false);
+
   // Advanced settings state
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showMyName, setShowMyName] = useState(false);
@@ -230,6 +233,13 @@ const ProposeScreen = () => {
   };
 
   const handleDetailsNext = () => {
+    if (smartScheduling) {
+      navigation.navigate("SmartScheduleSetup", {
+        title: ideaTitle.trim(),
+        location: location || "",
+      });
+      return;
+    }
     animateToNextStep("groups");
   };
 
@@ -465,6 +475,7 @@ const ProposeScreen = () => {
     setLocation("");
     setSelectedGroups([]);
     setShowConfetti(false);
+    setSmartScheduling(false);
     setAdvancedOpen(false);
     setShowMyName(false);
     setCustomThreshold("");
@@ -780,18 +791,50 @@ const ProposeScreen = () => {
             <IdeaPill title={ideaTitle} animateIn={true} large />
           </View>
 
-          {/* Detail chips */}
+          {/* Detail chips — hide date/time when smart scheduling is on */}
           <View style={styles.chipsContainer}>
             <DetailChips
-              date={date}
-              time={time}
+              date={smartScheduling ? null : date}
+              time={smartScheduling ? null : time}
               location={location}
               onDateChange={setDate}
               onTimeChange={setTime}
               onLocationChange={setLocation}
               minimumDate={votingDeadline && votingDeadline > new Date() ? votingDeadline : undefined}
+              hideDatetime={smartScheduling}
             />
           </View>
+
+          {/* Find best time toggle */}
+          <TouchableOpacity
+            style={[styles.smartToggle, smartScheduling && styles.smartToggleActive]}
+            onPress={() => setSmartScheduling(!smartScheduling)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.smartToggleLeft}>
+              <Ionicons
+                name="sparkles"
+                size={18}
+                color={smartScheduling ? colors.primary : colors.text.tertiary}
+              />
+              <View style={{ marginLeft: spacing.sm }}>
+                <Text style={[styles.smartToggleText, smartScheduling && styles.smartToggleTextActive]}>
+                  Find best time
+                </Text>
+                <Text style={styles.smartToggleHint}>
+                  {smartScheduling
+                    ? "Invitees sync calendars, app picks the best time"
+                    : "Let the app find when everyone is free"}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={smartScheduling}
+              onValueChange={setSmartScheduling}
+              trackColor={{ false: "rgba(255,255,255,0.1)", true: "rgba(87,98,183,0.4)" }}
+              thumbColor={smartScheduling ? colors.primary : "#888"}
+            />
+          </TouchableOpacity>
 
           <View style={styles.detailsButtonRow}>
             <TouchableOpacity
@@ -1169,6 +1212,41 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: 16,
     fontWeight: "500",
+  },
+  smartToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    marginBottom: spacing.lg,
+    width: "100%",
+  },
+  smartToggleActive: {
+    backgroundColor: "rgba(87, 98, 183, 0.1)",
+    borderColor: "rgba(87, 98, 183, 0.3)",
+  },
+  smartToggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  smartToggleText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text.secondary,
+  },
+  smartToggleTextActive: {
+    color: colors.text.primary,
+  },
+  smartToggleHint: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
   detailsButtonRow: {
     flexDirection: "row",
