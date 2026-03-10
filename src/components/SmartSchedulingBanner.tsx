@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useCalendar } from "../hooks/useCalendar";
+import CalendarPickerModal, { CalendarProvider } from "./CalendarPickerModal";
 import {
   getSmartSchedulingStatus,
   SmartSchedulingStatus,
@@ -19,13 +20,11 @@ import {
   requestReschedule,
   getDayName,
 } from "../services/schedulingService";
-import { colors, spacing, borderRadius, typography } from "../theme";
+import { colors, spacing, borderRadius } from "../theme";
 
 interface SmartSchedulingBannerProps {
   eventRoomId: string;
-  /** Compact mode for use in event room header */
   compact?: boolean;
-  /** Called when the event time changes (reschedule) */
   onTimeChanged?: () => void;
 }
 
@@ -35,10 +34,11 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   onTimeChanged,
 }) => {
   const { user, calendarConnected } = useAuth();
-  const { connectGoogleCalendar, loading: calendarLoading } = useCalendar();
+  const { connectGoogleCalendar } = useCalendar();
   const [status, setStatus] = useState<SmartSchedulingStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+  const [syncingProvider, setSyncingProvider] = useState<CalendarProvider | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [rescheduling, setRescheduling] = useState<string | null>(null);
 
@@ -47,7 +47,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
       const data = await getSmartSchedulingStatus(eventRoomId);
       setStatus(data);
     } catch (error) {
-      console.error("Error loading scheduling status:", error);
+      console.error("[SmartBanner] Error loading scheduling status:", error);
     } finally {
       setLoading(false);
     }
@@ -64,66 +64,60 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     return () => clearInterval(interval);
   }, [status?.scheduling_status, loadStatus]);
 
-  const handleSyncCalendar = async () => {
-    console.log("[SmartBanner] handleSyncCalendar tapped", {
-      userId: user?.id,
-      syncing,
-      calendarConnected,
-      eventRoomId,
-    });
-
+  const handleSyncButtonPress = () => {
     if (!user?.id) {
-      console.warn("[SmartBanner] No user ID, cannot sync");
       Alert.alert("Error", "You must be logged in to sync.");
       return;
     }
-    if (syncing) return;
+    setShowCalendarPicker(true);
+  };
 
-    setSyncing(true);
+  const handleCalendarSelected = async (provider: CalendarProvider) => {
+    if (!user?.id) return;
+
+    setSyncingProvider(provider);
     try {
-      if (calendarConnected) {
-        console.log("[SmartBanner] Calendar connected, refreshing and syncing...");
-        await refreshCalendarAndSync(eventRoomId, user.id, "google");
+      if (provider === "google") {
+        if (calendarConnected) {
+          // Already connected — refresh and sync
+          await refreshCalendarAndSync(eventRoomId, user.id, "google");
+        } else {
+          // Need to connect Google Calendar first
+          setShowCalendarPicker(false);
+          setSyncingProvider(null);
+          Alert.alert(
+            "Connect Google Calendar",
+            "You'll be redirected to sign in with Google. After connecting, come back and sync again.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Connect",
+                onPress: async () => {
+                  await connectGoogleCalendar();
+                },
+              },
+            ]
+          );
+          return;
+        }
       } else {
-        console.log("[SmartBanner] No calendar connected, marking as available...");
-        await syncCalendarForEvent(eventRoomId, "none");
+        // Apple / Outlook — coming soon, handled by modal disabled state
+        return;
       }
-      console.log("[SmartBanner] Sync succeeded, reloading status...");
+
       await loadStatus();
-      if (!calendarConnected) {
-        Alert.alert(
-          "You're in!",
-          "You've been marked as available. Want better results? Connect Google Calendar in your profile to share your busy times.",
-          [
-            { text: "OK" },
-            { text: "Connect Calendar", onPress: connectGoogleCalendar },
-          ]
-        );
-      } else {
-        Alert.alert("Synced!", "Your calendar has been synced for this event.");
-      }
+      setShowCalendarPicker(false);
+      Alert.alert("Synced!", "Your calendar has been synced for this event.");
     } catch (error: any) {
       console.error("[SmartBanner] Sync error:", error);
       Alert.alert(
         "Sync Failed",
-        error?.message || "Could not sync your availability. Please try again."
+        error?.message || "Could not sync your calendar. Please try again."
       );
     } finally {
-      setSyncing(false);
+      setSyncingProvider(null);
     }
   };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, compact && styles.containerCompact]}>
-        <ActivityIndicator size="small" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (!status || status.scheduling_mode !== "smart") return null;
-
-  const { scheduling_status, synced_count, total_participants, user_has_synced } = status;
 
   const handleReschedule = async (candidate: CandidateTime) => {
     if (rescheduling) return;
@@ -187,6 +181,18 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     return { dateStr, timeStr, endTimeStr };
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, compact && styles.containerCompact]}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!status || status.scheduling_mode !== "smart") return null;
+
+  const { scheduling_status, synced_count, total_participants, user_has_synced } = status;
+
   // Scheduled — show the selected time + alternatives
   if (scheduling_status === "scheduled" && status.selected_time) {
     const { dateStr, timeStr, endTimeStr } = formatCandidateTime(status.selected_time);
@@ -207,7 +213,6 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
           </Text>
         )}
 
-        {/* Alternatives toggle */}
         {!compact && alternatives.length > 0 && (
           <>
             <TouchableOpacity
@@ -354,43 +359,49 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
         </Text>
       )}
 
-      {/* Sync button */}
+      {/* Sync status + button */}
       {!user_has_synced ? (
-        <TouchableOpacity
-          style={styles.syncButton}
-          onPress={handleSyncCalendar}
-          disabled={syncing || calendarLoading}
-          activeOpacity={0.8}
-        >
-          {syncing ? (
-            <ActivityIndicator size="small" color={colors.text.primary} />
-          ) : (
-            <>
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={colors.text.primary}
-                style={{ marginRight: spacing.sm }}
-              />
-              <Text style={styles.syncButtonText}>
-                {calendarConnected ? "Sync My Calendar" : "I'm Available!"}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.notSyncedSection}>
+          <View style={styles.notSyncedRow}>
+            <Ionicons name="close-circle" size={16} color={colors.warning} />
+            <Text style={styles.notSyncedText}>
+              You haven't synced yet. The best time will be picked from those who have.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.syncButton}
+            onPress={handleSyncButtonPress}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={colors.text.primary}
+              style={{ marginRight: spacing.sm }}
+            />
+            <Text style={styles.syncButtonText}>Sync My Calendar</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <View style={styles.syncedRow}>
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           <Text style={styles.syncedText}>Your calendar is synced</Text>
           <TouchableOpacity
-            onPress={handleSyncCalendar}
-            disabled={syncing}
+            onPress={handleSyncButtonPress}
             activeOpacity={0.7}
           >
-            <Text style={styles.resyncText}>{syncing ? "Syncing..." : "Re-sync"}</Text>
+            <Text style={styles.resyncText}>Re-sync</Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Calendar picker modal */}
+      <CalendarPickerModal
+        visible={showCalendarPicker}
+        onClose={() => setShowCalendarPicker(false)}
+        onSelect={handleCalendarSelected}
+        loading={syncingProvider}
+      />
     </View>
   );
 };
@@ -501,6 +512,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.warning,
     fontWeight: "500",
+  },
+  notSyncedSection: {
+    gap: spacing.sm,
+  },
+  notSyncedRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  notSyncedText: {
+    fontSize: 13,
+    color: colors.warning,
+    flex: 1,
+    lineHeight: 18,
   },
   syncButton: {
     flexDirection: "row",
