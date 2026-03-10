@@ -124,21 +124,29 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
 
 const WEB_APP_URL = "https://group-matchmaker-app.vercel.app";
 
-function parseStateForPlatform(state: string): { stateKey: string; isWeb: boolean } {
-  // State format: "uuid:web" or "uuid:native" (or just "uuid" for legacy)
-  if (state.endsWith(":web")) {
-    return { stateKey: state, isWeb: true };
+function parseState(state: string): { isWeb: boolean; returnPath: string } {
+  // State format: "uuid:platform" or "uuid:platform:base64returnPath"
+  const parts = state.split(":");
+  // parts[0] = uuid, parts[1] = platform, parts[2] = base64 encoded return path
+  const isWeb = parts[1] === "web";
+  let returnPath = "";
+  if (parts[2]) {
+    try {
+      // Add back padding
+      const padded = parts[2] + "=".repeat((4 - (parts[2].length % 4)) % 4);
+      returnPath = atob(padded);
+    } catch {
+      returnPath = "";
+    }
   }
-  if (state.endsWith(":native")) {
-    return { stateKey: state, isWeb: false };
-  }
-  return { stateKey: state, isWeb: false };
+  return { isWeb, returnPath };
 }
 
-function createResponse(message: string, redirectUrl: string, success: boolean, isWeb: boolean) {
-  // For web: redirect straight to the web app — user returns to the tab they came from
+function createResponse(message: string, redirectUrl: string, success: boolean, isWeb: boolean, returnPath?: string) {
+  // For web: redirect straight to the web app — user returns to the event they came from
   if (isWeb) {
-    const url = new URL(WEB_APP_URL);
+    const path = returnPath || "";
+    const url = new URL(path, WEB_APP_URL);
     url.searchParams.set("calendar_connected", success ? "true" : "false");
     if (!success) url.searchParams.set("calendar_error", message);
     return new Response(null, {
@@ -204,8 +212,8 @@ serve(async (req: Request) => {
 
     console.log("Request parameters:", { code: !!code, state, error });
 
-    // Parse platform from state (format: "uuid:web" or "uuid:native")
-    const { isWeb } = state ? parseStateForPlatform(state) : { isWeb: false };
+    // Parse platform + return path from state
+    const { isWeb, returnPath } = state ? parseState(state) : { isWeb: false, returnPath: "" };
 
     if (error) {
       console.error("Google authorization error:", error);
@@ -213,7 +221,8 @@ serve(async (req: Request) => {
         `Error: ${error}. Please try connecting your calendar again.`,
         APP_URL,
         false,
-        isWeb
+        isWeb,
+        returnPath
       );
     }
 
@@ -223,7 +232,8 @@ serve(async (req: Request) => {
         "Missing required parameters. Please try connecting your calendar again.",
         APP_URL,
         false,
-        isWeb
+        isWeb,
+        returnPath
       );
     }
 
@@ -240,7 +250,8 @@ serve(async (req: Request) => {
         "Invalid or expired session. Please try connecting your calendar again.",
         APP_URL,
         false,
-        isWeb
+        isWeb,
+        returnPath
       );
     }
 
@@ -278,7 +289,8 @@ serve(async (req: Request) => {
         "Failed to connect to Google Calendar. Please try again.",
         APP_URL,
         false,
-        isWeb
+        isWeb,
+        returnPath
       );
     }
 
@@ -306,7 +318,8 @@ serve(async (req: Request) => {
         "Failed to save calendar connection. Please try again.",
         APP_URL,
         false,
-        isWeb
+        isWeb,
+        returnPath
       );
     }
 

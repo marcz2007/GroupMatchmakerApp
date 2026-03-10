@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { confirmAlert } from "../utils/alertHelper";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   const [syncingProvider, setSyncingProvider] = useState<CalendarProvider | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [rescheduling, setRescheduling] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -79,17 +81,34 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     ) {
       // Calendar just became connected — auto-sync
       (async () => {
+        setSyncing(true);
         try {
           await refreshCalendarAndSync(eventRoomId, user.id, "google");
-          await loadStatus();
           Alert.alert("Synced!", "Your Google Calendar has been synced for this event.");
         } catch (error) {
           console.error("[SmartBanner] Auto-sync after connect failed:", error);
+        } finally {
+          // Always reload status, even if sync failed
+          await loadStatus();
+          setSyncing(false);
         }
       })();
     }
     prevCalendarConnected.current = calendarConnected;
   }, [calendarConnected, status, user?.id, eventRoomId, loadStatus]);
+
+  // On web: reload status when user returns to this tab (e.g. after OAuth in another tab)
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadStatus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [loadStatus]);
 
   const handleSyncButtonPress = () => {
     if (!user?.id) {
@@ -115,7 +134,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
           // Not connected — start Google OAuth flow directly
           setShowCalendarPicker(false);
           setSyncingProvider(null);
-          await connectGoogleCalendar();
+          await connectGoogleCalendar(`/event/${eventRoomId}`);
           return;
         }
       } else {
@@ -371,7 +390,12 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
       )}
 
       {/* Sync status + button */}
-      {!user_has_synced ? (
+      {syncing ? (
+        <View style={styles.syncedRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.syncedText}>Syncing your calendar...</Text>
+        </View>
+      ) : !user_has_synced ? (
         <View style={styles.notSyncedSection}>
           <View style={styles.notSyncedRow}>
             <Ionicons name="close-circle" size={16} color={colors.warning} />

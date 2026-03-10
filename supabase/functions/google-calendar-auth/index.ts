@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, platform } = await req.json();
+    const { userId, platform, returnPath } = await req.json();
     console.log("Received user ID:", userId);
 
     if (!userId) {
@@ -43,10 +43,16 @@ serve(async (req) => {
     console.log("Creating Supabase client...");
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
-    // Generate a random state, encoding the platform for the callback
+    // Generate a random state, encoding platform + return path for the callback
     console.log("Generating state...");
     const platformTag = platform === "web" ? "web" : "native";
-    const state = `${crypto.randomUUID()}:${platformTag}`;
+    // Encode return path as base64 so it's URL-safe
+    const encodedReturn = returnPath
+      ? btoa(returnPath).replace(/=+$/, "")
+      : "";
+    const state = encodedReturn
+      ? `${crypto.randomUUID()}:${platformTag}:${encodedReturn}`
+      : `${crypto.randomUUID()}:${platformTag}`;
 
     // Store the state in the database
     console.log("Storing state in database...");

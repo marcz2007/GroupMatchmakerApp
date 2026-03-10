@@ -135,11 +135,18 @@ const EditProfileScreen = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      // Add timeout to prevent eternal loading on web
+      const profilePromise = supabase
         .from("profiles")
         .select("*")
         .eq("id", authUser.id)
         .single();
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Profile fetch timed out")), 10000)
+      );
+
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
       console.log("[EditProfile] profiles query result — error:", error, "data:", !!data);
       if (error) throw error;

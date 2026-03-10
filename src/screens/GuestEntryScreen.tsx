@@ -77,6 +77,22 @@ const GuestEntryScreen = () => {
     setLoading(true);
 
     try {
+      // Check if an account with this email already exists
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id, is_guest")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (existingProfile) {
+        Alert.alert(
+          "Account Exists",
+          "An account with this email already exists. Please sign in instead."
+        );
+        setLoading(false);
+        return;
+      }
+
       // Sign in anonymously — creates a real auth.uid() in Supabase
       const { data, error } = await supabase.auth.signInAnonymously();
 

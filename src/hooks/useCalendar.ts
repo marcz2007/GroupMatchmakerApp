@@ -8,7 +8,7 @@ export const useCalendar = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const connectGoogleCalendar = useCallback(async () => {
+  const connectGoogleCalendar = useCallback(async (returnPath?: string) => {
     if (!user?.id) {
       Alert.alert("Error", "You must be logged in to connect your calendar.");
       return;
@@ -20,7 +20,7 @@ export const useCalendar = () => {
       const { data, error } = await supabase.functions.invoke(
         "google-calendar-auth",
         {
-          body: { userId: user.id, platform: Platform.OS },
+          body: { userId: user.id, platform: Platform.OS, returnPath },
         }
       );
 
