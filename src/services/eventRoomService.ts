@@ -27,6 +27,7 @@ export interface EventMessage {
   id: string;
   content: string;
   created_at: string;
+  is_system_message?: boolean;
   user: {
     id: string;
     display_name: string;
@@ -389,6 +390,7 @@ export function subscribeToEventRoomMessages(
             id,
             content,
             created_at,
+            is_system_message,
             profiles!event_messages_user_id_fkey (
               id,
               username,
@@ -412,6 +414,7 @@ export function subscribeToEventRoomMessages(
             id: data.id,
             content: data.content,
             created_at: data.created_at,
+            is_system_message: data.is_system_message || false,
             user: {
               id: profiles.id,
               display_name: profiles.username || profiles.first_name || "Unknown",

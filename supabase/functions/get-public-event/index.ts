@@ -38,7 +38,7 @@ serve(async (req) => {
     // Fetch event room with group info
     const { data: eventRoom, error: eventError } = await supabase
       .from("event_rooms")
-      .select("id, title, description, starts_at, ends_at, created_at, group_id, created_by")
+      .select("id, title, description, starts_at, ends_at, created_at, group_id, created_by, scheduling_mode, scheduling_status, scheduling_deadline")
       .eq("id", eventRoomId)
       .single();
 
@@ -133,6 +133,9 @@ serve(async (req) => {
       is_expired: isExpired,
       already_rsvpd: alreadyRsvpd,
       user_name: userName,
+      scheduling_mode: eventRoom.scheduling_mode || "fixed",
+      scheduling_status: eventRoom.scheduling_status || "none",
+      scheduling_deadline: eventRoom.scheduling_deadline || null,
     };
 
     return new Response(JSON.stringify(response), {

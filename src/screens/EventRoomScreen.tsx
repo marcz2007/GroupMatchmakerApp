@@ -204,6 +204,20 @@ const EventRoomScreen: React.FC = () => {
   };
 
   const renderMessage = ({ item }: { item: EventMessage }) => {
+    // System messages (scheduling announcements)
+    if (item.is_system_message) {
+      return (
+        <View style={styles.systemMessageContainer}>
+          <View style={styles.systemMessageBubble}>
+            <Text style={styles.systemMessageText}>{item.content}</Text>
+          </View>
+          <Text style={styles.systemMessageTime}>
+            {format(new Date(item.created_at), "h:mm a")}
+          </Text>
+        </View>
+      );
+    }
+
     const isOwnMessage = item.user.id === user?.id;
 
     return (
@@ -451,6 +465,31 @@ const styles = StyleSheet.create({
   },
   schedulingBannerContainer: {
     marginTop: spacing.sm,
+  },
+  systemMessageContainer: {
+    alignItems: "center",
+    marginVertical: spacing.sm,
+    marginHorizontal: spacing.md,
+  },
+  systemMessageBubble: {
+    backgroundColor: "rgba(87, 98, 183, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(87, 98, 183, 0.3)",
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    maxWidth: "90%",
+  },
+  systemMessageText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  systemMessageTime: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
   messagesList: {
     flexGrow: 1,
