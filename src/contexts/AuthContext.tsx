@@ -88,14 +88,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setSession(session);
       setUser(session?.user ?? null);
 
+      // Unblock the app immediately — don't wait for profile fetch.
+      // Profile loads in the background; screens that need it have
+      // their own loading states.
+      setLoading(false);
+
       if (session?.user?.id) {
         const profileData = await fetchProfile(session.user.id);
         setProfile(profileData);
       } else {
         setProfile(null);
       }
-
-      setLoading(false);
     });
 
     return () => {

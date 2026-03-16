@@ -123,7 +123,7 @@ const EditProfileScreen = () => {
     } else {
       setLoading(false);
     }
-  }, [authUser, authLoading]);
+  }, [authUser?.id, authLoading]);
 
   const fetchProfile = async () => {
     try {
