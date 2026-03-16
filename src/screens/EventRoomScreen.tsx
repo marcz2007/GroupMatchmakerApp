@@ -50,6 +50,7 @@ const EventRoomScreen: React.FC = () => {
     Array<{ id: string; display_name: string; avatar_url: string | null }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sending, setSending] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [isExpired, setIsExpired] = useState(false);
@@ -151,7 +152,13 @@ const EventRoomScreen: React.FC = () => {
     const version = ++loadVersionRef.current;
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([loadEventRoom(), loadMessages(), loadParticipants()]);
+      setLoadError(false);
+      try {
+        await Promise.all([loadEventRoom(), loadMessages(), loadParticipants()]);
+      } catch (error) {
+        console.error("Error loading event room data:", error);
+        if (loadVersionRef.current === version) setLoadError(true);
+      }
       if (loadVersionRef.current === version) {
         setLoading(false);
       }
@@ -308,6 +315,36 @@ const EventRoomScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError && !eventRoom) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.text.tertiary} />
+          <Text style={{ color: colors.text.secondary, marginTop: 12, fontSize: 16 }}>
+            Could not load event
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              const version = ++loadVersionRef.current;
+              const reload = async () => {
+                setLoading(true);
+                setLoadError(false);
+                try {
+                  await Promise.all([loadEventRoom(), loadMessages(), loadParticipants()]);
+                } catch { setLoadError(true); }
+                if (loadVersionRef.current === version) setLoading(false);
+              };
+              reload();
+            }}
+            style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 24, backgroundColor: colors.primary, borderRadius: 8 }}
+          >
+            <Text style={{ color: colors.text.primary, fontWeight: "600" }}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );

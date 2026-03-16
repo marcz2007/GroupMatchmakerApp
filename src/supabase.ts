@@ -33,7 +33,20 @@ const webNoOpLock = async (
   return await fn();
 };
 
+// On web, browser fetch() has no default timeout — a stuck request hangs
+// forever, causing infinite loading spinners. This wrapper aborts after 15s.
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timeoutId)
+  );
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    ...(Platform.OS === "web" ? { fetch: fetchWithTimeout } : {}),
+  },
   auth: {
     storage,
     autoRefreshToken: true,

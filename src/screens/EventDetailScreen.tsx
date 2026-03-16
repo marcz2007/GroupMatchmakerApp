@@ -31,6 +31,7 @@ const EventDetailScreen = () => {
     passedDetails ? passedDetails : null
   );
   const [loading, setLoading] = useState(!passedDetails);
+  const [loadError, setLoadError] = useState(false);
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
@@ -40,10 +41,12 @@ const EventDetailScreen = () => {
   const loadDetails = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const data = await getPublicEventDetails(eventRoomId);
       setDetails(data);
     } catch (error) {
       console.error("Error loading event details:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -123,7 +126,7 @@ const EventDetailScreen = () => {
     });
   };
 
-  if (loading || !details) {
+  if (loading) {
     return (
       <View style={styles.container}>
         <LinearGradient
@@ -134,6 +137,32 @@ const EventDetailScreen = () => {
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (loadError || !details) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={colors.backgroundGradient}
+          locations={[0, 0.5, 1]}
+          style={styles.gradient}
+        />
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.loadingContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color={colors.text.tertiary} />
+            <Text style={{ color: colors.text.secondary, marginTop: spacing.md, fontSize: 16 }}>
+              Could not load event details
+            </Text>
+            <TouchableOpacity
+              onPress={loadDetails}
+              style={{ marginTop: spacing.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.primary, borderRadius: borderRadius.md }}
+            >
+              <Text style={{ color: colors.text.primary, fontWeight: "600" }}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </View>
