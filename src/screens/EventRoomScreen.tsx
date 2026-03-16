@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -161,6 +161,8 @@ const EventRoomScreen: React.FC = () => {
       }
       if (loadVersionRef.current === version) {
         setLoading(false);
+        // Scroll to bottom after initial load
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
       }
     };
 
@@ -172,8 +174,11 @@ const EventRoomScreen: React.FC = () => {
     const unsubscribe = subscribeToEventRoomMessages(
       eventRoomId,
       (newMessage) => {
-        setMessages((prev) => [...prev, newMessage]);
-        // Scroll to bottom on new message
+        setMessages((prev) => {
+          // Skip if we already have this message (from optimistic add or dedup)
+          if (prev.some((m) => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -197,14 +202,41 @@ const EventRoomScreen: React.FC = () => {
   }, [eventRoom]);
 
   const handleSend = async () => {
-    if (!messageText.trim() || sending || isExpired) return;
+    if (!messageText.trim() || sending || isExpired || !user) return;
+
+    const text = messageText.trim();
+    const optimisticId = `optimistic-${Date.now()}`;
+
+    // Optimistically add the message so it appears instantly
+    const optimisticMessage: EventMessage = {
+      id: optimisticId,
+      content: text,
+      created_at: new Date().toISOString(),
+      user: {
+        id: user.id,
+        display_name: user.user_metadata?.first_name || user.email || "You",
+        avatar_url: null,
+      },
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setMessageText("");
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
 
     setSending(true);
     try {
-      await sendEventMessage(eventRoomId, messageText.trim());
-      setMessageText("");
+      const sent = await sendEventMessage(eventRoomId, text);
+      // Replace the optimistic message with the real one (subscription
+      // may also deliver it — the dedup in the subscription handler or
+      // the replacement here handles that)
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? sent : m))
+      );
     } catch (error) {
       console.error("Error sending message:", error);
+      // Remove the optimistic message on failure
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setMessageText(text); // restore the text so user can retry
     } finally {
       setSending(false);
     }
@@ -259,7 +291,8 @@ const EventRoomScreen: React.FC = () => {
     );
   };
 
-  const renderHeader = () => (
+  // Memoize header so typing in the input doesn't re-render it
+  const headerElement = useMemo(() => (
     <View style={styles.header}>
       {eventRoom?.starts_at && (
         <Text style={styles.eventTime}>
@@ -308,7 +341,7 @@ const EventRoomScreen: React.FC = () => {
         </View>
       )}
     </View>
-  );
+  ), [eventRoom, participants, isExpired, timeRemaining, eventRoomId]);
 
   if (loading) {
     return (
@@ -363,11 +396,8 @@ const EventRoomScreen: React.FC = () => {
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={headerElement}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: false })
-          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No messages yet</Text>
