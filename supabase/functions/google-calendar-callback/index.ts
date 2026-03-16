@@ -334,7 +334,8 @@ serve(async (req: Request) => {
       "Successfully connected your Google Calendar! You can now close this window.",
       APP_URL,
       true,
-      isWeb
+      isWeb,
+      returnPath
     );
   } catch (error) {
     console.error("Unexpected error in callback:", error);

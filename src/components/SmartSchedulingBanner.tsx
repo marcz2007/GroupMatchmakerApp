@@ -69,17 +69,20 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     return () => clearInterval(interval);
   }, [status?.scheduling_status, loadStatus]);
 
-  // Auto-sync after Google Calendar is connected (returning from OAuth)
-  const prevCalendarConnected = useRef(calendarConnected);
+  // Auto-sync when calendar is connected but not yet synced for this event.
+  // Covers both: (a) calendarConnected changing from false→true in this session,
+  // and (b) fresh page load after OAuth redirect where calendarConnected is
+  // already true but user_has_synced is still false.
+  const autoSyncAttempted = useRef(false);
   useEffect(() => {
     if (
       calendarConnected &&
-      !prevCalendarConnected.current &&
       status?.scheduling_status === "collecting" &&
       !status?.user_has_synced &&
-      user?.id
+      user?.id &&
+      !autoSyncAttempted.current
     ) {
-      // Calendar just became connected — auto-sync
+      autoSyncAttempted.current = true;
       (async () => {
         setSyncing(true);
         try {
@@ -94,7 +97,6 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
         }
       })();
     }
-    prevCalendarConnected.current = calendarConnected;
   }, [calendarConnected, status, user?.id, eventRoomId, loadStatus]);
 
   // On web: reload status when user returns to this tab (e.g. after OAuth in another tab)
