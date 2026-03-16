@@ -70,47 +70,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user?.id, fetchProfile]);
 
   useEffect(() => {
-    let resolved = false;
-
-    // Safety timeout — if getSession() hangs, unblock after 5s
+    // Safety timeout — if Supabase init hangs, unblock after 5s
     const timeout = setTimeout(() => {
-      if (!resolved) {
-        console.warn("[Auth] getSession() timed out after 5s, unblocking app");
-        resolved = true;
-        setLoading(false);
-      }
+      console.warn("[Auth] Supabase init timed out after 5s, unblocking app");
+      setLoading(false);
     }, 5000);
 
-    // Get initial session
-    console.log("[Auth] Calling getSession()...");
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log("[Auth] getSession() resolved, session:", !!session);
-      if (resolved) return; // timeout already fired
-      resolved = true;
-      clearTimeout(timeout);
-
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user?.id) {
-        const profileData = await fetchProfile(session.user.id);
-        setProfile(profileData);
-      }
-
-      setLoading(false);
-    }).catch((error) => {
-      console.error("[Auth] getSession() error:", error);
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timeout);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION once Supabase finishes
+    // initializing, giving us the session without a separate getSession()
+    // call (which would compete for the same internal lock).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("[Auth] onAuthStateChange:", _event);
+      clearTimeout(timeout);
+
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -121,11 +95,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setProfile(null);
       }
 
-      // If getSession() hung but auth state change came through, unblock
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-      }
       setLoading(false);
     });
 

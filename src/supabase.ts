@@ -20,53 +20,17 @@ const shouldDetectSessionInUrl =
     window.location.hash.includes("error"));
 
 // On web, navigator.locks can permanently deadlock the Supabase auth.
-// This is an in-memory mutex with a timeout: it properly serializes
-// auth operations but releases the lock if it takes too long (no deadlock).
-const createWebLock = () => {
-  const locks = new Map<string, Promise<void>>();
-
-  return async (
-    name: string,
-    acquireTimeout: number,
-    fn: () => Promise<any>
-  ) => {
-    const timeout = Math.max(acquireTimeout, 5000);
-
-    // Wait for any existing lock on this name, with a timeout
-    const existing = locks.get(name);
-    if (existing) {
-      await Promise.race([
-        existing,
-        new Promise<void>((resolve) => setTimeout(resolve, timeout)),
-      ]);
-    }
-
-    // Create a new lock
-    let release: () => void;
-    const lockPromise = new Promise<void>((r) => {
-      release = r;
-    });
-    locks.set(name, lockPromise);
-
-    // Safety: force-release if fn() hangs for more than 10s
-    const safetyTimer = setTimeout(() => {
-      console.warn("[Supabase lock] Force-releasing stuck lock:", name);
-      release!();
-      if (locks.get(name) === lockPromise) {
-        locks.delete(name);
-      }
-    }, 10000);
-
-    try {
-      return await fn();
-    } finally {
-      clearTimeout(safetyTimer);
-      release!();
-      if (locks.get(name) === lockPromise) {
-        locks.delete(name);
-      }
-    }
-  };
+// A serializing mutex also deadlocks because Supabase's internal auth
+// code is re-entrant (e.g. _initialize → _callRefreshToken both acquire
+// the same named lock). The safest approach is a no-op lock: it avoids
+// both the navigator.locks deadlock and the re-entrancy deadlock.
+// Cross-tab coordination is not needed for this app.
+const webNoOpLock = async (
+  _name: string,
+  _acquireTimeout: number,
+  fn: () => Promise<any>
+) => {
+  return await fn();
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -75,7 +39,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: shouldDetectSessionInUrl,
-    ...(Platform.OS === "web" ? { lock: createWebLock() } : {}),
+    ...(Platform.OS === "web" ? { lock: webNoOpLock } : {}),
   },
   realtime: {
     params: {
