@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   StyleSheet,
   View,
@@ -15,9 +15,9 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../theme";
-import { getPublicEventDetails, joinEventRoom, PublicEventDetails } from "../services/eventRoomService";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
+import { usePublicEventDetails, useJoinEventRoom } from "../hooks/queries";
 
 const EventDetailScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -27,30 +27,14 @@ const EventDetailScreen = () => {
     eventDetails?: any;
   };
 
-  const [details, setDetails] = useState<PublicEventDetails | null>(
-    passedDetails ? passedDetails : null
-  );
-  const [loading, setLoading] = useState(!passedDetails);
-  const [loadError, setLoadError] = useState(false);
-  const [joining, setJoining] = useState(false);
+  const {
+    data: details,
+    isLoading: loading,
+    isError: loadError,
+    refetch: loadDetails,
+  } = usePublicEventDetails(eventRoomId, passedDetails || undefined);
 
-  useEffect(() => {
-    loadDetails();
-  }, [eventRoomId]);
-
-  const loadDetails = async () => {
-    try {
-      setLoading(true);
-      setLoadError(false);
-      const data = await getPublicEventDetails(eventRoomId);
-      setDetails(data);
-    } catch (error) {
-      console.error("Error loading event details:", error);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const joinMutation = useJoinEventRoom(eventRoomId);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
@@ -97,27 +81,21 @@ const EventDetailScreen = () => {
     }
   };
 
-  const handleJoin = async () => {
-    if (joining) return;
-    setJoining(true);
-    try {
-      // Add timeout to prevent infinite spinner on web
-      const joinPromise = joinEventRoom(eventRoomId);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timed out. Please try again.")), 15000)
-      );
-      await Promise.race([joinPromise, timeoutPromise]);
-      navigation.replace("EventRoom", {
-        eventRoomId,
-        title: details?.event_room.title,
-      });
-    } catch (error: any) {
-      console.error("Error joining event:", error);
-      Alert.alert("Error", error?.message || "Could not join event");
-    } finally {
-      setJoining(false);
-    }
+  const handleJoin = () => {
+    if (joinMutation.isPending) return;
+    joinMutation.mutate(undefined, {
+      onSuccess: () => {
+        navigation.replace("EventRoom", {
+          eventRoomId,
+          title: details?.event_room.title,
+        });
+      },
+      onError: (error: any) => {
+        Alert.alert("Error", error?.message || "Could not join event");
+      },
+    });
   };
+  const joining = joinMutation.isPending;
 
   const handleGoToChat = () => {
     navigation.replace("EventRoom", {

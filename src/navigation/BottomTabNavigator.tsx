@@ -14,8 +14,8 @@ import EventsDesktopView from "../screens/web/EventsDesktopView";
 import GroupsDesktopView from "../screens/web/GroupsDesktopView";
 import WebSidebar from "../components/web/WebSidebar";
 
-// Import context and hooks
-import { useEvents } from "../contexts/EventsContext";
+// Import hooks
+import { useHasActiveEvents } from "../hooks/queries";
 import { usePermissions } from "../hooks/usePermissions";
 import { useAuth } from "../contexts/AuthContext";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -25,7 +25,7 @@ import { colors } from "../theme";
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = () => {
-  const { hasEvents } = useEvents();
+  const { data: hasEvents = false } = useHasActiveEvents();
   const { canAccessGroups } = usePermissions();
   const { isGuest } = useAuth();
   const { isDesktopWeb } = useResponsiveLayout();

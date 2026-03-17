@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { colors } from "../../theme";
-import { useEvents } from "../../contexts/EventsContext";
+import { useHasActiveEvents } from "../../hooks/queries";
 
 const TAB_ICONS: Record<string, { focused: string; unfocused: string }> = {
   Events: { focused: "calendar", unfocused: "calendar-outline" },
@@ -13,7 +13,7 @@ const TAB_ICONS: Record<string, { focused: string; unfocused: string }> = {
 };
 
 const WebSidebar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
-  const { hasEvents } = useEvents();
+  const { data: hasEvents = false } = useHasActiveEvents();
 
   // Separate Profile (pinned to bottom) from the rest
   const mainRoutes = state.routes.filter((r) => r.name !== "Profile");

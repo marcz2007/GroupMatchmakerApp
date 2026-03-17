@@ -8,9 +8,9 @@ import { ActivityIndicator, Linking, Platform, StyleSheet, View } from "react-na
 const KeyboardWrapper = Platform.OS === 'web'
   ? ({ children }: { children: React.ReactNode }) => <>{children}</>
   : require('react-native-keyboard-controller').KeyboardProvider;
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./src/queryClient";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
-import { EventsProvider } from "./src/contexts/EventsContext";
-import { PendingProposalsProvider } from "./src/contexts/PendingProposalsContext";
 import PendingProposalModal from "./src/components/PendingProposalModal";
 import AppNavigator, {
   RootStackParamList,
@@ -170,59 +170,57 @@ function AppContent() {
   }
 
   return (
-    <EventsProvider>
-      <PendingProposalsProvider>
-        <KeyboardWrapper>
-          <NavigationContainer
-            ref={navigationRef}
-            linking={linking}
-            fallback={<ActivityIndicator color={colors.primary} size="large" />}
-            theme={{
-              dark: true,
-              colors: {
-                primary: colors.primary,
-                background: colors.background,
-                card: colors.surface,
-                text: colors.text.primary,
-                border: colors.divider,
-                notification: colors.eventBadge,
-              },
-              fonts: {
-                regular: {
-                  fontFamily: "System",
-                  fontWeight: "400" as const,
-                },
-                medium: {
-                  fontFamily: "System",
-                  fontWeight: "500" as const,
-                },
-                bold: {
-                  fontFamily: "System",
-                  fontWeight: "700" as const,
-                },
-                heavy: {
-                  fontFamily: "System",
-                  fontWeight: "900" as const,
-                },
-              },
-            }}
-          >
-            <View style={styles.container}>
-                <AppNavigator isAuthenticated={!!user} hasPendingEvent={!!pendingEventRef.current} />
-            </View>
-          </NavigationContainer>
-        </KeyboardWrapper>
-        <PendingProposalModal />
-      </PendingProposalsProvider>
-    </EventsProvider>
+    <KeyboardWrapper>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        fallback={<ActivityIndicator color={colors.primary} size="large" />}
+        theme={{
+          dark: true,
+          colors: {
+            primary: colors.primary,
+            background: colors.background,
+            card: colors.surface,
+            text: colors.text.primary,
+            border: colors.divider,
+            notification: colors.eventBadge,
+          },
+          fonts: {
+            regular: {
+              fontFamily: "System",
+              fontWeight: "400" as const,
+            },
+            medium: {
+              fontFamily: "System",
+              fontWeight: "500" as const,
+            },
+            bold: {
+              fontFamily: "System",
+              fontWeight: "700" as const,
+            },
+            heavy: {
+              fontFamily: "System",
+              fontWeight: "900" as const,
+            },
+          },
+        }}
+      >
+        <View style={styles.container}>
+            <AppNavigator isAuthenticated={!!user} hasPendingEvent={!!pendingEventRef.current} />
+        </View>
+      </NavigationContainer>
+    </KeyboardWrapper>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AppContent />
+        <PendingProposalModal />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

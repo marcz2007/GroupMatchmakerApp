@@ -16,13 +16,13 @@ const ConfettiCannon = Platform.OS !== "web"
   : (() => null) as any;
 import * as Haptics from "expo-haptics";
 import { format, formatDistanceToNow } from "date-fns";
-import { usePendingProposals } from "../contexts/PendingProposalsContext";
+import { usePendingProposalModal } from "../hooks/queries";
 import { castVote, VoteValue } from "../services/proposalService";
 import { colors, spacing, borderRadius } from "../theme/theme";
 
 const PendingProposalModal: React.FC = () => {
   const { currentProposal, dismissCurrent, refreshPending, lockCurrent } =
-    usePendingProposals();
+    usePendingProposalModal();
   const [loading, setLoading] = useState(false);
   const [selectedVote, setSelectedVote] = useState<VoteValue | null>(null);
   const [celebrationState, setCelebrationState] = useState<

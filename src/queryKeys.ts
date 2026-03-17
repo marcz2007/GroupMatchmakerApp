@@ -1,0 +1,15 @@
+export const queryKeys = {
+  profile: (userId: string) => ["profile", userId] as const,
+  userGroups: (userId: string) => ["groups", "list", userId] as const,
+  groupDetails: (groupId: string) => ["groups", "detail", groupId] as const,
+  groupMembers: (groupId: string) => ["groups", "members", groupId] as const,
+  groupProposals: (groupId: string) => ["proposals", "group", groupId] as const,
+  pendingProposals: () => ["proposals", "pending"] as const,
+  userEvents: () => ["events", "list"] as const,
+  hasActiveEvents: () => ["events", "hasActive"] as const,
+  eventRoomDetail: (id: string) => ["eventRoom", "detail", id] as const,
+  eventRoomMessages: (id: string) => ["eventRoom", "messages", id] as const,
+  eventRoomParticipants: (id: string) => ["eventRoom", "participants", id] as const,
+  publicEventDetails: (id: string) => ["eventRoom", "public", id] as const,
+  smartSchedulingStatus: (id: string) => ["scheduling", id] as const,
+} as const;
