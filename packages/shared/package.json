@@ -1,0 +1,15 @@
+{
+  "name": "@grapple/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "@tanstack/react-query": "^5.90.21",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}

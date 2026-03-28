@@ -79,3 +79,10 @@ yarn-error.*
 
 .env
 .vercel
+
+# Next.js (web app)
+packages/web/.next/
+packages/web/out/
+
+# Turborepo
+.turbo/

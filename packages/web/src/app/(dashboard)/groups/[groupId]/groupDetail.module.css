@@ -1,0 +1,133 @@
+.back {
+  display: inline-block;
+  color: var(--color-primary);
+  font-size: 14px;
+  margin-bottom: 20px;
+  transition: opacity 0.15s;
+}
+
+.back:hover {
+  opacity: 0.7;
+}
+
+.header {
+  margin-bottom: 32px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.description {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.loading {
+  color: var(--color-text-tertiary);
+  font-size: 15px;
+  padding: 20px 0;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.proposalList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proposalCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.proposalTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusOpen {
+  background: rgba(87, 98, 183, 0.15);
+  color: var(--color-primary);
+}
+
+.statusTriggered {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+.statusClosed {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--color-text-tertiary);
+}
+
+.proposalDescription {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.voteBar {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.voteYes {
+  color: var(--color-success);
+}
+
+.voteMaybe {
+  color: var(--color-warning);
+}
+
+.voteNo {
+  color: var(--color-error);
+}
+
+.myVote {
+  color: var(--color-primary);
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.proposalDate {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
