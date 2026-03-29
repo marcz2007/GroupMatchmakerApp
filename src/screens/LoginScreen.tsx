@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { twoButtonAlert } from "../utils/alertHelper";
 
 // Set to true to see debug alerts

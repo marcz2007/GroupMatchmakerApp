@@ -20,7 +20,7 @@ import {
   refreshCalendarAndSync,
   requestReschedule,
   getDayName,
-} from "../services/schedulingService";
+} from "@grapple/shared";
 import { colors, spacing, borderRadius } from "../theme";
 
 interface SmartSchedulingBannerProps {

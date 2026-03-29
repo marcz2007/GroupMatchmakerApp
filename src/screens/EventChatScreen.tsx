@@ -28,7 +28,7 @@ import {
   EventMessage,
   EventWithDetails,
   ChatExtensionStatus,
-} from "../services/eventService";
+} from "@grapple/shared";
 
 const INVITE_LINK_REGEX = /https:\/\/group-matchmaker-app\.vercel\.app\/event\/[a-f0-9-]+/;
 const EXTENSION_MESSAGE_ID = "00000000-0000-0000-0000-000000000001";

@@ -20,8 +20,7 @@ const DateTimePicker = Platform.OS !== "web"
   ? require("@react-native-community/datetimepicker").default
   : null;
 import { addHours } from "date-fns";
-import { createProposal } from "../services/proposalService";
-import { getGroupMemberCount } from "../services/groupService";
+import { createProposal, getGroupMemberCount } from "@grapple/shared";
 import { colors, spacing, borderRadius } from "../theme/theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 

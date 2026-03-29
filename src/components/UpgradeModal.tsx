@@ -11,7 +11,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Button } from "./Button";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme";
 
 interface UpgradeModalProps {

@@ -10,10 +10,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { supabase } from "../supabase";
+import { supabase, Profile } from "@grapple/shared";
 import { commonStyles } from "../theme/commonStyles";
 import { borderRadius, colors, spacing, typography } from "../theme/theme";
-import { Profile } from "../types";
 
 const { width: screenWidth } = Dimensions.get("window");
 

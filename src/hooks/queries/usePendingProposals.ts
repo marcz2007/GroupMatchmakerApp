@@ -1,11 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useCallback } from "react";
-import { queryKeys } from "../../queryKeys";
-import {
-  PendingProposal,
-  getPendingProposals,
-  subscribeToPendingProposals,
-} from "../../services/proposalService";
+import { queryKeys, PendingProposal, getPendingProposals, subscribeToPendingProposals } from "@grapple/shared";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Replaces PendingProposalsContext — fetches pending proposals + realtime. */

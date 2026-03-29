@@ -25,7 +25,7 @@ import { PlaylistSelector } from "../components/profile/PlaylistSelector";
 import { SpotifyConnect } from "../components/profile/SpotifyConnect";
 import { UpgradeModal } from "../components/UpgradeModal";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { commonStyles } from "../theme/commonStyles";
 

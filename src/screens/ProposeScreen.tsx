@@ -36,9 +36,7 @@ import { DetailChips } from "../components/propose/DetailChips";
 import Starfield from "../components/propose/Starfield";
 import { colors, spacing, borderRadius } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
-import { getUserGroups } from "../services/groupService";
-import { createProposal } from "../services/proposalService";
-import { createDirectEvent } from "../services/eventRoomService";
+import { getUserGroups, createProposal, createDirectEvent } from "@grapple/shared";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type Step = "idea" | "details" | "groups" | "launching" | "success";

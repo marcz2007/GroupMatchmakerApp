@@ -1,8 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { queryKeys } from "../../queryKeys";
-import { hasActiveEvents, subscribeToUserEvents } from "../../services/eventService";
-import { getUserEventRooms } from "../../services/eventRoomService";
+import { queryKeys, hasActiveEvents, subscribeToUserEvents, getUserEventRooms } from "@grapple/shared";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Replaces EventsContext — tracks whether user has active events (for tab badge). */

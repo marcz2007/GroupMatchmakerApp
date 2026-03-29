@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "../../queryKeys";
-import { getSmartSchedulingStatus } from "../../services/schedulingService";
+import { queryKeys, getSmartSchedulingStatus } from "@grapple/shared";
 
 export function useSmartSchedulingStatus(eventRoomId: string) {
   return useQuery({

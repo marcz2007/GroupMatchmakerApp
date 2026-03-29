@@ -17,7 +17,7 @@ import {
   getUserEvents,
   subscribeToUserEvents,
   EventWithDetails,
-} from "../services/eventService";
+} from "@grapple/shared";
 
 interface EventsListScreenProps {
   onSelectEvent?: (eventRoomId: string) => void;

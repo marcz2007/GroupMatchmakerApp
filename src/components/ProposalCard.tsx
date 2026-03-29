@@ -6,7 +6,7 @@ import {
   View,
 } from "react-native";
 import { format, formatDistanceToNow, isPast } from "date-fns";
-import { ProposalWithVotes, VoteValue } from "../services/proposalService";
+import { ProposalWithVotes, VoteValue } from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme/theme";
 
 interface ProposalCardProps {

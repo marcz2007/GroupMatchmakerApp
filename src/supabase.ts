@@ -1,6 +1,6 @@
 // src/supabase.ts
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@env";
-import { createClient } from "@supabase/supabase-js";
+import { initSupabase } from "@grapple/shared";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -20,11 +20,6 @@ const shouldDetectSessionInUrl =
     window.location.hash.includes("error"));
 
 // On web, navigator.locks can permanently deadlock the Supabase auth.
-// A serializing mutex also deadlocks because Supabase's internal auth
-// code is re-entrant (e.g. _initialize → _callRefreshToken both acquire
-// the same named lock). The safest approach is a no-op lock: it avoids
-// both the navigator.locks deadlock and the re-entrancy deadlock.
-// Cross-tab coordination is not needed for this app.
 const webNoOpLock = async (
   _name: string,
   _acquireTimeout: number,
@@ -33,8 +28,7 @@ const webNoOpLock = async (
   return await fn();
 };
 
-// On web, browser fetch() has no default timeout — a stuck request hangs
-// forever, causing infinite loading spinners. This wrapper aborts after 15s.
+// On web, browser fetch() has no default timeout
 const fetchWithTimeout: typeof fetch = (input, init) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -43,20 +37,8 @@ const fetchWithTimeout: typeof fetch = (input, init) => {
   );
 };
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: {
-    ...(Platform.OS === "web" ? { fetch: fetchWithTimeout } : {}),
-  },
-  auth: {
-    storage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: shouldDetectSessionInUrl,
-    ...(Platform.OS === "web" ? { lock: webNoOpLock } : {}),
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
+export const supabase = initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  storage,
+  detectSessionInUrl: shouldDetectSessionInUrl,
+  ...(Platform.OS === "web" ? { fetch: fetchWithTimeout, lock: webNoOpLock } : {}),
 });

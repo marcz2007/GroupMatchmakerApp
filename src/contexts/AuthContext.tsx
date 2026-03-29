@@ -1,6 +1,6 @@
 import { Session, User } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 
 interface Profile {
   id: string;

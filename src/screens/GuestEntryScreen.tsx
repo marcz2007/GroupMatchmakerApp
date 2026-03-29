@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 
 const GuestEntryScreen = () => {
   const [firstName, setFirstName] = useState("");

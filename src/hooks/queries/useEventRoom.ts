@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { queryKeys } from "../../queryKeys";
 import {
+  queryKeys,
   getEventRoomById,
   getEventRoomMessages,
   getEventRoomParticipants,
@@ -9,7 +9,7 @@ import {
   subscribeToEventRoomMessages,
   EventMessage,
   EventRoomMessagesResult,
-} from "../../services/eventRoomService";
+} from "@grapple/shared";
 
 export function useEventRoom(eventRoomId: string) {
   return useQuery({

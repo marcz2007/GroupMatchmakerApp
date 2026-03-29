@@ -28,12 +28,10 @@ import {
   castVote,
   getGroupProposals,
   subscribeToGroupProposals,
-} from "../services/proposalService";
-import {
   EventRoomWithDetails,
   getGroupEventRooms,
-} from "../services/eventRoomService";
-import { supabase } from "../supabase";
+  supabase,
+} from "@grapple/shared";
 import { useAuth } from "../contexts/AuthContext";
 import { colors } from "../theme/theme";
 

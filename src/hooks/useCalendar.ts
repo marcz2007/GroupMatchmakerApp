@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Alert, Linking, Platform } from "react-native";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { useAuth } from "../contexts/AuthContext";
 
 export const useCalendar = () => {

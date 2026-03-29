@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme";
 
 // Define the type for the route parameters

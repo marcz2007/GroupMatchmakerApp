@@ -10,7 +10,7 @@ import {
   PendingProposal,
   getPendingProposals,
   subscribeToPendingProposals,
-} from "../services/proposalService";
+} from "@grapple/shared";
 import { useAuth } from "./AuthContext";
 
 interface PendingProposalsContextType {

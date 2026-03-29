@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Button } from "../components/Button";
 import { RootStackParamList } from "../navigation/AppNavigator"; // Adjust path if needed
-import { supabase } from "../supabase"; // Adjust path if needed
+import { supabase } from "@grapple/shared";
 
 // Define the type for the navigation prop
 type CreateGroupScreenNavigationProp = StackNavigationProp<

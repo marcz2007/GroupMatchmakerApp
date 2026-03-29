@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { createGroup, getUserGroups, Group } from "../services/groupService";
+import { createGroup, getUserGroups, Group } from "@grapple/shared";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, borderRadius, typography } from "../theme";
 

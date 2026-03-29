@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { hasActiveEvents, subscribeToUserEvents } from "../services/eventService";
+import { hasActiveEvents, subscribeToUserEvents } from "@grapple/shared";
 import { useAuth } from "./AuthContext";
 
 interface EventsContextType {

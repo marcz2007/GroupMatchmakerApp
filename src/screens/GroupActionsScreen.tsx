@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { colors, spacing, typography } from "../theme/theme";
 
 type GroupActionsScreenRouteProp = RouteProp<

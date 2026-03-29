@@ -24,7 +24,7 @@ const DateTimePicker =
     : null;
 import Starfield from "../components/propose/Starfield";
 import { colors, spacing, borderRadius } from "../theme";
-import { createSmartEvent, SchedulingSlot } from "../services/schedulingService";
+import { createSmartEvent, SchedulingSlot } from "@grapple/shared";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type RouteParams = RouteProp<RootStackParamList, "SmartScheduleSetup">;

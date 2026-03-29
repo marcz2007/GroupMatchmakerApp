@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { Button } from "../components/Button";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing } from "../theme";
 

@@ -27,7 +27,7 @@ import {
   getEventRoomTimeRemaining,
   sendEventMessage,
   subscribeToEventRoomMessages,
-} from "../services/eventRoomService";
+} from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme/theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import SmartSchedulingBanner from "../components/SmartSchedulingBanner";

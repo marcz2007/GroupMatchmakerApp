@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { colors, spacing, typography } from "../theme/theme";
 
 interface ActivityVoteModalProps {

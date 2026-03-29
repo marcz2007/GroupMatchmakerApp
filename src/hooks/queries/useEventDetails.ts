@@ -1,10 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "../../queryKeys";
-import {
-  getPublicEventDetails,
-  joinEventRoom,
-  PublicEventDetails,
-} from "../../services/eventRoomService";
+import { queryKeys, getPublicEventDetails, joinEventRoom, PublicEventDetails } from "@grapple/shared";
 
 export function usePublicEventDetails(
   eventRoomId: string,

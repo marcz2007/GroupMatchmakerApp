@@ -19,7 +19,7 @@ import {
   ProposalWithVotes,
   VoteValue,
   castVote,
-} from "../services/proposalService";
+} from "@grapple/shared";
 import { colors, spacing, typography, borderRadius } from "../theme/theme";
 
 interface ProposalVoteModalProps {

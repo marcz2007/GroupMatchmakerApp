@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 
 export type VoteValue = "YES" | "MAYBE" | "NO";
 

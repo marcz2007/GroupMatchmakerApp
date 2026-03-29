@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { supabase } from "@grapple/shared";
 import { Proposal } from "./proposalService";
 
 export interface EventRoom {
