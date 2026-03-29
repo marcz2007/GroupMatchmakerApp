@@ -1,5 +1,2 @@
 {
-  "framework": "nextjs",
-  "installCommand": "cd ../.. && yarn install --ignore-engines",
-  "buildCommand": "npx next build"
 }
