@@ -26,7 +26,7 @@ import BottomTabNavigator from "./BottomTabNavigator";
 import { colors } from "../theme";
 
 // Import types
-import { PublicEventDetails } from "../services/eventRoomService";
+import { PublicEventDetails } from "@grapple/shared";
 
 // Define updated param list for Grapple Lite
 export type RootStackParamList = {
