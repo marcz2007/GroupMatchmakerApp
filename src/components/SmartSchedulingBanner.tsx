@@ -23,6 +23,11 @@ import {
 } from "@grapple/shared";
 import { colors, spacing, borderRadius } from "../theme";
 
+/** Polling interval in milliseconds while collecting calendar availability */
+const SCHEDULING_POLL_INTERVAL_MS = 30000;
+/** Maximum number of scheduling slots to preview in the banner */
+const SLOTS_PREVIEW_LIMIT = 3;
+
 interface SmartSchedulingBannerProps {
   eventRoomId: string;
   compact?: boolean;
@@ -65,7 +70,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
   // Refresh every 30s while collecting
   useEffect(() => {
     if (status?.scheduling_status !== "collecting") return;
-    const interval = setInterval(loadStatus, 30000);
+    const interval = setInterval(loadStatus, SCHEDULING_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [status?.scheduling_status, loadStatus]);
 
@@ -144,11 +149,11 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
         setSyncingProvider(null);
         return;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SmartBanner] Sync error:", error);
       Alert.alert(
         "Sync Failed",
-        error?.message || "Could not sync your calendar. Please try again."
+        error instanceof Error ? error.message : "Could not sync your calendar. Please try again."
       );
     } finally {
       setSyncingProvider(null);
@@ -179,11 +184,11 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
           await loadStatus();
           setShowAlternatives(false);
           onTimeChanged?.();
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error rescheduling:", error);
           Alert.alert(
             "Reschedule Failed",
-            error?.message || "Could not reschedule. Please try again."
+            error instanceof Error ? error.message : "Could not reschedule. Please try again."
           );
         } finally {
           setRescheduling(null);
@@ -329,7 +334,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
     : null;
 
   const slotsPreview = status.slots
-    .slice(0, 3)
+    .slice(0, SLOTS_PREVIEW_LIMIT)
     .map(
       (s) =>
         `${getDayName(s.day_of_week).slice(0, 3)} ${s.start_time.slice(0, 5)}`
@@ -380,7 +385,7 @@ const SmartSchedulingBanner: React.FC<SmartSchedulingBannerProps> = ({
       {!compact && slotsPreview && (
         <Text style={styles.slotsPreview}>
           Looking at: {slotsPreview}
-          {status.slots.length > 3 ? ` +${status.slots.length - 3} more` : ""}
+          {status.slots.length > SLOTS_PREVIEW_LIMIT ? ` +${status.slots.length - SLOTS_PREVIEW_LIMIT} more` : ""}
         </Text>
       )}
 

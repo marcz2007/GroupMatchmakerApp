@@ -1,3 +1,6 @@
+// Utils
+export { getDisplayName, pluralize, formatDate } from "./utils";
+
 // Supabase client
 export { initSupabase, getSupabase, supabase } from "./supabase";
 
@@ -55,13 +58,13 @@ export {
   getChatExtensionStatus,
 } from "./services/eventService";
 export type {
+  EventSummaryRoom,
   EventWithDetails,
+  EventChatMessage,
   ChatExtensionStatus,
   ChatExtensionVoteResult,
 } from "./services/eventService";
-// Rename to avoid conflict with eventRoomService
-export { sendEventMessage as sendEventServiceMessage } from "./services/eventService";
-export type { EventRoom as EventServiceRoom, EventMessage as EventServiceMessage } from "./services/eventService";
+export { sendEventChatMessage } from "./services/eventService";
 
 // Services - Event Room
 export {
@@ -76,9 +79,8 @@ export {
   getPublicEventDetails,
   joinEventRoom,
   subscribeToEventRoomMessages,
+  sendEventMessage,
 } from "./services/eventRoomService";
-// Use eventRoomService's types as the primary ones
-export { sendEventMessage } from "./services/eventRoomService";
 export type {
   EventRoom,
   EventRoomParticipant,

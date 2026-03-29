@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -18,23 +19,5 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      height: "100vh",
-      background: "var(--color-background)",
-    }}>
-      <div style={{
-        width: 40,
-        height: 40,
-        border: "3px solid var(--color-surface-light)",
-        borderTopColor: "var(--color-primary)",
-        borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+  return <LoadingSpinner />;
 }

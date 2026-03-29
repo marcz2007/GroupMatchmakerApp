@@ -82,11 +82,11 @@ const CreateGroupScreen = () => {
           "Failed to create the group. No data returned."
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating group:", error);
       Alert.alert(
         "Error",
-        error.message ||
+        error instanceof Error ? error.message :
           "An unexpected error occurred while creating the group."
       );
     } finally {

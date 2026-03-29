@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDisplayName } from "@grapple/shared";
 import styles from "./profile.module.css";
 
 export default function ProfilePage() {
@@ -25,7 +26,7 @@ export default function ProfilePage() {
             />
           ) : (
             <div className={styles.avatarPlaceholder}>
-              {(profile.username || profile.first_name || "?")[0].toUpperCase()}
+              {getDisplayName(profile.username, profile.first_name)[0].toUpperCase()}
             </div>
           )}
           <div>

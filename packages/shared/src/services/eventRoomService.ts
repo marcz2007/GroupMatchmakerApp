@@ -1,5 +1,17 @@
 import { supabase } from "../supabase";
+import { getDisplayName } from "../utils";
 import { Proposal } from "./proposalService";
+
+/** Hours after ends_at or starts_at before an event room expires */
+const EVENT_EXPIRY_HOURS_WITH_DATES = 48;
+/** Hours after created_at before an event room without dates expires */
+const EVENT_EXPIRY_HOURS_WITHOUT_DATES = 72;
+/** Default number of messages to fetch per page */
+const DEFAULT_MESSAGE_LIMIT = 50;
+/** Milliseconds per hour, used for time-remaining calculations */
+const MS_PER_HOUR = 1000 * 60 * 60;
+/** Milliseconds per minute, used for time-remaining calculations */
+const MS_PER_MINUTE = 1000 * 60;
 
 export interface EventRoom {
   id: string;
@@ -55,7 +67,7 @@ export async function getUserEventRooms(): Promise<EventRoomWithDetails[]> {
   const { data, error } = await supabase.rpc("get_user_event_rooms");
 
   if (error) {
-    console.error("Error fetching user event rooms:", error);
+    console.error("[EventRoomService] getUserEventRooms failed:", error);
     throw error;
   }
 
@@ -71,7 +83,7 @@ export async function getGroupEventRooms(
 
 export async function getEventRoomMessages(
   eventRoomId: string,
-  limit: number = 50,
+  limit: number = DEFAULT_MESSAGE_LIMIT,
   offset: number = 0
 ): Promise<EventRoomMessagesResult> {
   const { data, error } = await supabase.rpc("get_event_room_messages", {
@@ -81,7 +93,7 @@ export async function getEventRoomMessages(
   });
 
   if (error) {
-    console.error("Error fetching event room messages:", error);
+    console.error("[EventRoomService] getEventRoomMessages failed:", error);
     throw error;
   }
 
@@ -120,7 +132,7 @@ export async function sendEventMessage(
     .single();
 
   if (error) {
-    console.error("Error sending message:", error);
+    console.error("[EventRoomService] sendEventMessage failed:", error);
     throw error;
   }
 
@@ -137,7 +149,7 @@ export async function sendEventMessage(
     created_at: data.created_at,
     user: {
       id: profiles.id,
-      display_name: profiles.username || profiles.first_name || "Unknown",
+      display_name: getDisplayName(profiles.username, profiles.first_name),
       avatar_url: profiles.avatar_url,
     },
   };
@@ -156,7 +168,7 @@ export async function getEventRoomById(
     if (error.code === "PGRST116") {
       return null;
     }
-    console.error("Error fetching event room:", error);
+    console.error("[EventRoomService] getEventRoomById failed:", error);
     throw error;
   }
 
@@ -189,7 +201,7 @@ export async function getEventRoomParticipants(
     .eq("event_room_id", eventRoomId);
 
   if (error) {
-    console.error("Error fetching participants:", error);
+    console.error("[EventRoomService] getEventRoomParticipants failed:", error);
     throw error;
   }
 
@@ -203,7 +215,7 @@ export async function getEventRoomParticipants(
       };
       return {
         id: profile.id,
-        display_name: profile.username || profile.first_name || "Unknown",
+        display_name: getDisplayName(profile.username, profile.first_name),
         avatar_url: profile.avatar_url,
         joined_at: item.joined_at,
       };
@@ -211,22 +223,28 @@ export async function getEventRoomParticipants(
   );
 }
 
-export function isEventRoomExpired(eventRoom: EventRoom): boolean {
-  const now = new Date();
-
+/**
+ * Calculates the expiry time for an event room based on its date fields.
+ * Uses ends_at or starts_at (+ 48h) if available, otherwise created_at (+ 72h).
+ */
+function calculateEventExpiryTime(eventRoom: EventRoom): Date {
   if (eventRoom.ends_at) {
     const expiryTime = new Date(eventRoom.ends_at);
-    expiryTime.setHours(expiryTime.getHours() + 48);
-    return now >= expiryTime;
+    expiryTime.setHours(expiryTime.getHours() + EVENT_EXPIRY_HOURS_WITH_DATES);
+    return expiryTime;
   } else if (eventRoom.starts_at) {
     const expiryTime = new Date(eventRoom.starts_at);
-    expiryTime.setHours(expiryTime.getHours() + 48);
-    return now >= expiryTime;
+    expiryTime.setHours(expiryTime.getHours() + EVENT_EXPIRY_HOURS_WITH_DATES);
+    return expiryTime;
   } else {
     const expiryTime = new Date(eventRoom.created_at);
-    expiryTime.setHours(expiryTime.getHours() + 72);
-    return now >= expiryTime;
+    expiryTime.setHours(expiryTime.getHours() + EVENT_EXPIRY_HOURS_WITHOUT_DATES);
+    return expiryTime;
   }
+}
+
+export function isEventRoomExpired(eventRoom: EventRoom): boolean {
+  return new Date() >= calculateEventExpiryTime(eventRoom);
 }
 
 export function getEventRoomTimeRemaining(eventRoom: EventRoom): {
@@ -234,28 +252,14 @@ export function getEventRoomTimeRemaining(eventRoom: EventRoom): {
   hours: number;
   minutes: number;
 } {
-  const now = new Date();
-  let expiryTime: Date;
-
-  if (eventRoom.ends_at) {
-    expiryTime = new Date(eventRoom.ends_at);
-    expiryTime.setHours(expiryTime.getHours() + 48);
-  } else if (eventRoom.starts_at) {
-    expiryTime = new Date(eventRoom.starts_at);
-    expiryTime.setHours(expiryTime.getHours() + 48);
-  } else {
-    expiryTime = new Date(eventRoom.created_at);
-    expiryTime.setHours(expiryTime.getHours() + 72);
-  }
-
-  const diffMs = expiryTime.getTime() - now.getTime();
+  const diffMs = calculateEventExpiryTime(eventRoom).getTime() - new Date().getTime();
 
   if (diffMs <= 0) {
     return { expired: true, hours: 0, minutes: 0 };
   }
 
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  const hours = Math.floor(diffMs / MS_PER_HOUR);
+  const minutes = Math.floor((diffMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
   return { expired: false, hours, minutes };
 }
@@ -279,7 +283,7 @@ export async function createDirectEvent({
   });
 
   if (error) {
-    console.error("Error creating direct event:", error);
+    console.error("[EventRoomService] createDirectEvent failed:", error);
     throw error;
   }
 
@@ -308,7 +312,7 @@ export async function getPublicEventDetails(
   });
 
   if (error) {
-    console.error("Error fetching public event details:", error);
+    console.error("[EventRoomService] getPublicEventDetails failed:", error);
     throw error;
   }
 
@@ -323,7 +327,7 @@ export async function joinEventRoom(
   });
 
   if (error) {
-    console.error("Error joining event room:", error);
+    console.error("[EventRoomService] joinEventRoom failed:", error);
     throw error;
   }
 
@@ -379,7 +383,7 @@ export function subscribeToEventRoomMessages(
             is_system_message: data.is_system_message || false,
             user: {
               id: profiles.id,
-              display_name: profiles.username || profiles.first_name || "Unknown",
+              display_name: getDisplayName(profiles.username, profiles.first_name),
               avatar_url: profiles.avatar_url,
             },
           });

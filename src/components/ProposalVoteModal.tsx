@@ -20,7 +20,7 @@ import {
   VoteValue,
   castVote,
 } from "@grapple/shared";
-import { colors, spacing, typography, borderRadius } from "../theme/theme";
+import { colors, spacing, borderRadius } from "../theme";
 
 interface ProposalVoteModalProps {
   visible: boolean;

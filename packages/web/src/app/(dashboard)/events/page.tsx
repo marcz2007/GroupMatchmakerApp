@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys, getUserEventRooms } from "@grapple/shared";
+import { queryKeys, getUserEventRooms, formatDate } from "@grapple/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import styles from "./events.module.css";
@@ -56,11 +56,7 @@ export default function EventsPage() {
                 <span>{participant_count} participant{participant_count !== 1 ? "s" : ""}</span>
                 {event_room.starts_at && (
                   <span>
-                    {new Date(event_room.starts_at).toLocaleDateString()} at{" "}
-                    {new Date(event_room.starts_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDate(event_room.starts_at)}
                   </span>
                 )}
               </div>

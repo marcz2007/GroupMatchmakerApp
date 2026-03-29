@@ -4,6 +4,7 @@ import {
   Text,
   TextStyle,
   TouchableOpacity,
+  View,
   ViewStyle,
 } from "react-native";
 import { tw } from "../utils/tailwind";
@@ -119,46 +120,11 @@ export const Button: React.FC<ButtonProps> = ({
         />
       ) : (
         <>
-          {leftIcon && <span className="mr-2">{leftIcon}</span>}
+          {leftIcon && <View style={{ marginRight: 8 }}>{leftIcon}</View>}
           <Text style={textStyles}>{children}</Text>
-          {rightIcon && <span className="ml-2">{rightIcon}</span>}
+          {rightIcon && <View style={{ marginLeft: 8 }}>{rightIcon}</View>}
         </>
       )}
     </TouchableOpacity>
   );
 };
-
-// Example usage:
-/*
-<Button variant="primary" onPress={() => {}}>Primary Button</Button>
-<Button variant="secondary" onPress={() => {}}>Secondary Button</Button>
-<Button variant="text" onPress={() => {}}>Text Button</Button>
-<Button variant="link" onPress={() => {}}>Link Button</Button>
-<Button variant="ghost" onPress={() => {}}>Ghost Button</Button>
-<Button variant="danger" onPress={() => {}}>Delete</Button>
-<Button variant="success" onPress={() => {}}>Save</Button>
-<Button variant="warning" onPress={() => {}}>Warning</Button>
-
-// With icons
-<Button 
-  variant="primary" 
-  leftIcon={<Icon name="plus" />} 
-  onPress={() => {}}
->
-  Add Item
-</Button>
-
-// Loading state
-<Button loading variant="primary" onPress={() => {}}>Loading...</Button>
-
-// Disabled state
-<Button disabled variant="primary" onPress={() => {}}>Disabled</Button>
-
-// Full width
-<Button fullWidth variant="primary" onPress={() => {}}>Full Width</Button>
-
-// Different sizes
-<Button size="sm" variant="primary" onPress={() => {}}>Small</Button>
-<Button size="md" variant="primary" onPress={() => {}}>Medium</Button>
-<Button size="lg" variant="primary" onPress={() => {}}>Large</Button>
-*/

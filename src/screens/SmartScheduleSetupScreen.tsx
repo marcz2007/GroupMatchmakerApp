@@ -223,11 +223,11 @@ const SmartScheduleSetupScreen = () => {
         duration: 400,
         useNativeDriver: true,
       }).start();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating smart event:", error);
       Alert.alert(
         "Couldn't create event",
-        error?.message || "Something went wrong. Please try again."
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
     } finally {
       setIsCreating(false);

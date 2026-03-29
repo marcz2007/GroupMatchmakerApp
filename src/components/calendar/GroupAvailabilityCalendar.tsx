@@ -103,7 +103,7 @@ export const GroupAvailabilityCalendar: React.FC<Props> = ({ groupId }) => {
           return;
         }
 
-        const mappedMembers: GroupMember[] = (profileData || []).map((p: any) => ({
+        const mappedMembers: GroupMember[] = (profileData || []).map((p: Record<string, string | null>) => ({
           user_id: p.id,
           profiles: {
             first_name: p.first_name,

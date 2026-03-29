@@ -1,6 +1,6 @@
 import { supabase } from "@grapple/shared";
 
-export interface EventRoom {
+export interface EventSummaryRoom {
   id: string;
   proposal_id: string;
   group_id: string;
@@ -12,7 +12,7 @@ export interface EventRoom {
 }
 
 export interface EventWithDetails {
-  event_room: EventRoom;
+  event_room: EventSummaryRoom;
   group_name: string;
   participant_count: number;
   last_message: {
@@ -24,7 +24,7 @@ export interface EventWithDetails {
   is_expired: boolean;
 }
 
-export interface EventMessage {
+export interface EventChatMessage {
   id: string;
   content: string;
   created_at: string;
@@ -73,7 +73,7 @@ export async function getEventMessages(
   eventRoomId: string,
   limit: number = 50,
   offset: number = 0
-): Promise<EventMessage[]> {
+): Promise<EventChatMessage[]> {
   const { data, error } = await supabase.rpc("get_event_room_messages_v2", {
     p_event_room_id: eventRoomId,
     p_limit: limit,
@@ -91,10 +91,10 @@ export async function getEventMessages(
 /**
  * Send a message to an event room
  */
-export async function sendEventMessage(
+export async function sendEventChatMessage(
   eventRoomId: string,
   content: string
-): Promise<EventMessage> {
+): Promise<EventChatMessage> {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) {
     throw new Error("Not authenticated");
@@ -167,7 +167,7 @@ export async function getEventParticipants(eventRoomId: string): Promise<Array<{
     throw new Error(error.message || "Failed to fetch participants");
   }
 
-  return (data || []).map((p: any) => ({
+  return (data || []).map((p: Record<string, Record<string, string>>) => ({
     id: p.profiles.id,
     display_name: p.profiles.username || p.profiles.first_name || "Unknown",
     avatar_url: p.profiles.avatar_url,
@@ -180,7 +180,7 @@ export async function getEventParticipants(eventRoomId: string): Promise<Array<{
  */
 export function subscribeToEventMessages(
   eventRoomId: string,
-  onMessage: (message: EventMessage) => void
+  onMessage: (message: EventChatMessage) => void
 ) {
   const channel = supabase
     .channel(`event_messages:${eventRoomId}`)

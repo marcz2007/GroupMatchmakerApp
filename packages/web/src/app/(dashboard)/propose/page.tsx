@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys, getUserGroups, getPendingProposals } from "@grapple/shared";
+import { queryKeys, getUserGroups, getPendingProposals, formatDate } from "@grapple/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import styles from "./propose.module.css";
 
@@ -48,7 +48,7 @@ export default function ProposePage() {
                   </span>
                   {proposal.starts_at && (
                     <span>
-                      {new Date(proposal.starts_at).toLocaleDateString()}
+                      {formatDate(proposal.starts_at, true)}
                     </span>
                   )}
                 </div>

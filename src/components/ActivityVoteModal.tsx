@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { supabase } from "@grapple/shared";
-import { colors, spacing, typography } from "../theme/theme";
+import { colors, spacing, typography } from "../theme";
 
 interface ActivityVoteModalProps {
   visible: boolean;
@@ -44,7 +44,7 @@ const ActivityVoteModal = ({
       if (error) throw error;
 
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error submitting vote:", error);
       Alert.alert("Error", "Failed to submit vote");
     }

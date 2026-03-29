@@ -375,15 +375,11 @@ const ProposeScreen = () => {
 
       // Another haptic for success
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      console.error("Error launching idea:", {
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack,
-      });
+    } catch (error: unknown) {
+      console.error("Error launching idea:", error);
       Alert.alert(
         "Couldn't launch idea",
-        error?.message || "Something went wrong. Please try again."
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
 
       // Reset animation
@@ -427,11 +423,11 @@ const ProposeScreen = () => {
       }).start();
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating direct event:", error);
       Alert.alert(
         "Couldn't create event",
-        error?.message || "Something went wrong. Please try again."
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
     } finally {
       setCreatingDirectEvent(false);

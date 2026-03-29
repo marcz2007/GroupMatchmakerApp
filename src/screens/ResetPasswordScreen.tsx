@@ -72,8 +72,8 @@ const ResetPasswordScreen = () => {
           () => navigation.navigate("Login")
         );
       }
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to reset password.");
+    } catch (error: unknown) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to reset password.");
     } finally {
       setLoading(false);
     }

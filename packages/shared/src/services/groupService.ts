@@ -15,7 +15,7 @@ export async function getUserGroups(userId: string): Promise<Group[]> {
     .returns<{ groups: Group }[]>();
 
   if (fetchError) {
-    console.error("Error fetching groups:", fetchError);
+    console.error("[GroupService] getUserGroups failed:", fetchError);
     throw fetchError;
   }
 
@@ -47,7 +47,7 @@ export async function getGroupById(groupId: string): Promise<Group | null> {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("Error fetching group:", error);
+    console.error("[GroupService] getGroupById failed:", error);
     return null;
   }
 }
@@ -68,7 +68,7 @@ export const createGroup = async (groupData: {
     .single();
 
   if (groupError) {
-    console.error("Error creating group:", groupError);
+    console.error("[GroupService] createGroup failed:", groupError);
     throw groupError;
   }
 
@@ -81,7 +81,7 @@ export const createGroup = async (groupData: {
     .insert({ group_id: newGroup.id, user_id: groupData.created_by });
 
   if (memberError) {
-    console.error("Error adding creator to group:", memberError);
+    console.error("[GroupService] createGroup addMember failed:", memberError);
     throw memberError;
   }
 
@@ -94,7 +94,7 @@ export async function getGroupMemberCount(groupId: string): Promise<number> {
   });
 
   if (error) {
-    console.error("Error fetching group member count:", error);
+    console.error("[GroupService] getGroupMemberCount failed:", error);
     throw error;
   }
 

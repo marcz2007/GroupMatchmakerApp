@@ -4,6 +4,9 @@ import { Session, User } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
+/** Timeout in milliseconds before unblocking the app if Supabase init hangs */
+const AUTH_INIT_TIMEOUT_MS = 5000;
+
 interface Profile {
   id: string;
   username?: string;
@@ -84,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const timeout = setTimeout(() => {
       console.warn("[Auth] Supabase init timed out after 5s, unblocking app");
       setLoading(false);
-    }, 5000);
+    }, AUTH_INIT_TIMEOUT_MS);
 
     const {
       data: { subscription },

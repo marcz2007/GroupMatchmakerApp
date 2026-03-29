@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { supabase } from "@grapple/shared";
-import { colors, spacing, typography } from "../theme/theme";
+import { colors, spacing, typography } from "../theme";
 
 type GroupActionsScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -149,16 +149,12 @@ const GroupActionsScreen = () => {
         description: "",
         date: new Date(),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error suggesting activity:", error);
-      console.error("Error message:", error.message);
-      console.error("Error details:", error.details);
-      console.error("Error hint:", error.hint);
+      const message = error instanceof Error ? error.message : "Unknown error";
       Alert.alert(
         "Error",
-        `Failed to submit activity suggestion: ${
-          error.message || "Unknown error"
-        }`
+        `Failed to submit activity suggestion: ${message}`
       );
     }
   };

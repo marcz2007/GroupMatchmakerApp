@@ -33,7 +33,7 @@ import {
   supabase,
 } from "@grapple/shared";
 import { useAuth } from "../contexts/AuthContext";
-import { colors } from "../theme/theme";
+import { colors } from "../theme";
 
 // Define types for route and navigation
 type GroupDetailsScreenRouteProp = RouteProp<
@@ -96,7 +96,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [selectedImageData, setSelectedImageData] = useState<{
     uri: string;
-    asset: any;
+    asset: ImagePicker.ImagePickerAsset;
   } | null>(null);
 
   // State for bio editing
@@ -168,7 +168,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
         "Share Invite",
         `Share this link to invite others to "${nameForShare}": ${inviteLink}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert("Error", "Could not share invite link.");
     }
   };
@@ -227,7 +227,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
       }
 
       if (memberData && Array.isArray(memberData) && memberData.length > 0) {
-        const mappedMembers = memberData.map((profile: any) => ({
+        const mappedMembers = memberData.map((profile: Record<string, string | null>) => ({
           id: profile.id,
           username: profile.username || "Unknown User",
           first_name: profile.first_name,
@@ -255,10 +255,10 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
       } catch (messageCountError) {
         console.error("Error fetching group message count:", messageCountError);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (fetchVersionRef.current !== version) return; // Don't set error for stale fetch
       console.error("Failed to fetch group details:", err);
-      setError(err.message || "Could not load group information.");
+      setError(err instanceof Error ? err.message : "Could not load group information.");
     } finally {
       if (fetchVersionRef.current === version) {
         setIsLoading(false);
@@ -398,7 +398,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
         "[handleChoosePrimaryPicture] Image data set, modal should be visible:",
         { uri: imageUri, showModal: true }
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[handleChoosePrimaryPicture] Error selecting image:", err);
       Alert.alert("Error", "Could not select image. Please try again.");
     }
@@ -438,7 +438,7 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
         Alert.alert("Success", "Group description updated.");
       }
       setIsEditingBio(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save bio:", err);
       Alert.alert("Error", "Could not save description.");
     } finally {
@@ -952,36 +952,37 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
       setSelectedImageData(null);
       Alert.alert("Success", "Group picture updated!");
       console.log("[handleConfirmImageUpload] Process completed successfully.");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[handleConfirmImageUpload] Caught Error:", err);
 
       // Provide more specific error messages
       let errorMessage = "Could not change group picture.";
+      const errMsg = err instanceof Error ? err.message : "";
 
-      if (err.message.includes("Failed to read image file")) {
+      if (errMsg.includes("Failed to read image file")) {
         errorMessage =
           "Could not read the selected image. Please try selecting a different image.";
-      } else if (err.message.includes("HTTP error")) {
+      } else if (errMsg.includes("HTTP error")) {
         errorMessage =
           "Network error while processing image. Please check your connection and try again.";
       } else if (
-        err.message.includes("Storage bucket not accessible") ||
-        err.message.includes("Storage bucket not available")
+        errMsg.includes("Storage bucket not accessible") ||
+        errMsg.includes("Storage bucket not available")
       ) {
         errorMessage =
           "Storage configuration issue. Please check your Supabase setup.";
       } else if (
-        err.message.includes("storage") ||
-        err.message.includes("Storage")
+        errMsg.includes("storage") ||
+        errMsg.includes("Storage")
       ) {
         errorMessage = "Failed to upload image to storage. Please try again.";
-      } else if (err.message.includes("Network request failed")) {
+      } else if (errMsg.includes("Network request failed")) {
         errorMessage =
           "Network connection failed. Please check your internet connection and try again.";
-      } else if (err.message.includes("Image file too large")) {
-        errorMessage = err.message;
-      } else if (err.message) {
-        errorMessage = err.message;
+      } else if (errMsg.includes("Image file too large")) {
+        errorMessage = errMsg;
+      } else if (errMsg) {
+        errorMessage = errMsg;
       }
 
       Alert.alert("Error", errorMessage);
@@ -1179,66 +1180,6 @@ const GroupDetailsScreen = ({ groupIdProp, groupNameProp, isDesktopPane }: Group
       <View style={styles.section}>
         <GroupAvailabilityCalendar groupId={groupId} />
       </View>
-
-      {/* <View style={styles.section}>
-        <Text style={styles.sectionTitle}>AI Analysis</Text>
-        <View style={styles.toggleContainer}>
-          <Text style={styles.toggleLabel}>Enable AI Analysis</Text>
-          <Switch
-            value={enableAIAnalysis}
-            onValueChange={async (value) => {
-              try {
-                const { error } = await supabase
-                  .from("groups")
-                  .update({ enable_ai_analysis: value })
-                  .eq("id", groupId);
-
-                if (error) throw error;
-                setEnableAIAnalysis(value);
-              } catch (error) {
-                console.error("Error updating AI analysis setting:", error);
-                Alert.alert("Error", "Failed to update AI analysis setting");
-              }
-            }}
-            trackColor={{ false: "#767577", true: "#5762b7" }}
-            thumbColor={enableAIAnalysis ? "#f4f3f4" : "#f4f3f4"}
-          />
-        </View>
-
-        {!enableAIAnalysis ? (
-          <Text style={styles.settingDescription}>
-            Enable AI analysis to get insights about group communication
-            patterns and help find better matches for group members.
-          </Text>
-        ) : (
-          <View>
-            <Text style={styles.settingDescription}>
-              ✅ AI analysis is enabled for this group! Messages will be
-              analyzed to understand communication styles and preferences.
-            </Text>
-            <View style={styles.requirementsContainer}>
-              <Text style={styles.requirementsTitle}>How it works:</Text>
-              <Text style={styles.requirementText}>
-                • Messages sent in this group will be analyzed for communication
-                patterns
-              </Text>
-              <Text style={styles.requirementText}>
-                • Analysis helps match group members with compatible people
-              </Text>
-              <Text style={styles.requirementText}>
-                • Only works when both users and groups have AI analysis enabled
-              </Text>
-              <Text style={styles.requirementText}>
-                • Requires at least 5 messages per user to generate insights
-              </Text>
-            </View>
-            <Text style={styles.note}>
-              💡 Encourage group members to enable AI analysis in their profiles
-              and send messages to get the most out of this feature.
-            </Text>
-          </View>
-        )}
-      </View> */}
 
       {/* Event Rooms Section */}
       {eventRooms.length > 0 && (

@@ -83,63 +83,16 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ visible, onDismiss }
         await refreshProfile();
         onDismiss();
       }
-    } catch (error: any) {
-      if (error?.code !== "SIGN_IN_CANCELLED") {
-        Alert.alert("Error", error.message || "Google sign-in failed.");
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : null;
+      const code = (error as { code?: string })?.code;
+      if (code !== "SIGN_IN_CANCELLED") {
+        Alert.alert("Error", err?.message || "Google sign-in failed.");
       }
     } finally {
       setLoading(false);
     }
   };
-
-  // TODO: Uncomment when Apple Developer account is available
-  // const handleAppleUpgrade = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const AppleAuthentication = require("expo-apple-authentication");
-  //     const credential = await AppleAuthentication.signInAsync({
-  //       requestedScopes: [
-  //         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-  //         AppleAuthentication.AppleAuthenticationScope.EMAIL,
-  //       ],
-  //     });
-  //     if (!credential.identityToken) {
-  //       Alert.alert("Error", "Failed to get Apple identity token.");
-  //       return;
-  //     }
-  //     const { error } = await supabase.auth.signInWithIdToken({
-  //       provider: "apple",
-  //       token: credential.identityToken,
-  //     });
-  //     if (error) {
-  //       if (error.message.includes("already")) {
-  //         Alert.alert(
-  //           "Email Already Registered",
-  //           "This Apple account is already linked to an existing account. Please sign in instead."
-  //         );
-  //       } else {
-  //         Alert.alert("Error", error.message);
-  //       }
-  //       return;
-  //     }
-  //     // Mark as non-guest
-  //     const { data: { user } } = await supabase.auth.getUser();
-  //     if (user) {
-  //       await supabase
-  //         .from("profiles")
-  //         .update({ is_guest: false })
-  //         .eq("id", user.id);
-  //     }
-  //     await refreshProfile();
-  //     onDismiss();
-  //   } catch (error: any) {
-  //     if (error?.code !== "ERR_CANCELED") {
-  //       Alert.alert("Error", error.message || "Apple sign-in failed.");
-  //     }
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   return (
     <Modal
@@ -174,17 +127,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ visible, onDismiss }
               >
                 Continue with Google
               </Button>
-
-              {/* TODO: Uncomment when Apple Developer account is available */}
-              {/* {Platform.OS === "ios" && (
-                <Button
-                  variant="secondary"
-                  onPress={handleAppleUpgrade}
-                  fullWidth
-                >
-                  Continue with Apple
-                </Button>
-              )} */}
 
               <Button
                 variant="ghost"

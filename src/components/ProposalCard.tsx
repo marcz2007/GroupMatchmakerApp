@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { ProposalWithVotes, VoteValue } from "@grapple/shared";
-import { colors, spacing, borderRadius, typography } from "../theme/theme";
+import { colors, spacing, borderRadius } from "../theme";
 
 interface ProposalCardProps {
   proposal: ProposalWithVotes;

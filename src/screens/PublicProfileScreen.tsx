@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { supabase, Profile } from "@grapple/shared";
 import { commonStyles } from "../theme/commonStyles";
-import { borderRadius, colors, spacing, typography } from "../theme/theme";
+import { borderRadius, colors, spacing, typography } from "../theme";
 
 const { width: screenWidth } = Dimensions.get("window");
 

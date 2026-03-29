@@ -1,6 +1,9 @@
 import { initSupabase, getSupabase } from "@grapple/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Timeout in milliseconds for fetch requests to Supabase */
+const FETCH_TIMEOUT_MS = 15000;
+
 let _initialized = false;
 
 function ensureInit(): SupabaseClient {
@@ -33,7 +36,7 @@ function ensureInit(): SupabaseClient {
   // Timeout wrapper for fetch
   const fetchWithTimeout: typeof fetch = (input, init) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     return fetch(input, { ...init, signal: controller.signal }).finally(() =>
       clearTimeout(timeoutId)
     );
@@ -53,6 +56,6 @@ function ensureInit(): SupabaseClient {
 // Proxy that lazily initializes on first use
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
-    return (ensureInit() as any)[prop];
+    return (ensureInit() as unknown as Record<string | symbol, unknown>)[prop];
   },
 });

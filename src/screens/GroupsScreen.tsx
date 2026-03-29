@@ -84,7 +84,7 @@ const GroupsScreen = ({ onSelectGroup, selectedGroupId }: GroupsScreenProps = {}
       setNewGroupDescription("");
       setShowCreateForm(false);
       fetchGroups();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating group:", error);
     } finally {
       setIsCreating(false);

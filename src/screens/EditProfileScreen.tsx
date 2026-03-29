@@ -208,7 +208,7 @@ const EditProfileScreen = () => {
     return (first + last).toUpperCase() || "?";
   };
 
-  const saveField = async (field: string, value: any) => {
+  const saveField = async (field: string, value: string | string[] | null) => {
     try {
       setSavingField(field);
       if (!authUser) throw new Error("No user found");

@@ -11,6 +11,7 @@ import {
   sendEventMessage as sendMessage,
   subscribeToEventRoomMessages,
   EventRoomMessagesResult,
+  formatDate,
 } from "@grapple/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
@@ -157,11 +158,7 @@ export default function EventDetailPage() {
           <div className={styles.detail}>
             <span className={styles.detailLabel}>When</span>
             <span className={styles.detailValue}>
-              {new Date(eventRoom.starts_at).toLocaleDateString()} at{" "}
-              {new Date(eventRoom.starts_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {formatDate(eventRoom.starts_at)}
             </span>
           </div>
         )}

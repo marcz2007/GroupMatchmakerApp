@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../theme";
@@ -21,11 +21,8 @@ import { usePublicEventDetails, useJoinEventRoom } from "../hooks/queries";
 
 const EventDetailScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const route = useRoute<any>();
-  const { eventRoomId, eventDetails: passedDetails } = route.params as {
-    eventRoomId: string;
-    eventDetails?: any;
-  };
+  const route = useRoute<RouteProp<RootStackParamList, "EventDetail">>();
+  const { eventRoomId, eventDetails: passedDetails } = route.params;
 
   const {
     data: details,
@@ -74,8 +71,8 @@ const EventDetailScreen = () => {
       await Share.share({
         message: `Join us for ${details.event_room.title}${dateText}! ${url}`,
       });
-    } catch (error: any) {
-      if (error.message !== "User did not share") {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== "User did not share") {
         Alert.alert("Error", "Could not share event");
       }
     }
@@ -90,8 +87,8 @@ const EventDetailScreen = () => {
           title: details?.event_room.title,
         });
       },
-      onError: (error: any) => {
-        Alert.alert("Error", error?.message || "Could not join event");
+      onError: (error: unknown) => {
+        Alert.alert("Error", error instanceof Error ? error.message : "Could not join event");
       },
     });
   };

@@ -3,12 +3,12 @@ import { StyleSheet } from "react-native";
 // Define a type for the template literal tag function
 type TailwindFunction = (
   strings: TemplateStringsArray,
-  ...values: any[]
-) => any;
+  ...values: unknown[]
+) => Record<string, unknown>;
 
 // Create a function that converts Tailwind classes to React Native styles
-const createTailwindStyle = (classes: string): any => {
-  const styles: { [key: string]: any } = {};
+const createTailwindStyle = (classes: string): Record<string, unknown> => {
+  const styles: { [key: string]: string | number } = {};
 
   // Split classes into individual class names
   const classNames = classes.split(" ");

@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDisplayName } from "@grapple/shared";
 import styles from "./Sidebar.module.css";
 
 const NAV_ITEMS = [
@@ -49,11 +50,11 @@ export default function Sidebar() {
               />
             ) : (
               <div className={styles.avatarPlaceholder}>
-                {(profile.username || profile.first_name || "?")[0].toUpperCase()}
+                {getDisplayName(profile.username, profile.first_name)[0].toUpperCase()}
               </div>
             )}
             <span className={styles.username}>
-              {profile.username || profile.first_name || "User"}
+              {getDisplayName(profile.username, profile.first_name)}
             </span>
           </div>
         )}

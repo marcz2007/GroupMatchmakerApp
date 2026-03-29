@@ -26,7 +26,7 @@ const SignupScreen = () => {
   const [oauthLoading, setOauthLoading] = useState(false);
   const navigation = useNavigation<RootStackNavigationProp<"Signup">>();
 
-  const debugAlert = (title: string, data: any) => {
+  const debugAlert = (title: string, data: unknown) => {
     if (DEBUG_AUTH) {
       Alert.alert(title, JSON.stringify(data, null, 2));
     }
@@ -66,45 +66,15 @@ const SignupScreen = () => {
           Alert.alert("Google Sign-Up Error", error.message);
         }
       }
-    } catch (error: any) {
-      if (error?.code !== "SIGN_IN_CANCELLED") {
-        Alert.alert("Error", error.message || "Google sign-up failed.");
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err?.code !== "SIGN_IN_CANCELLED") {
+        Alert.alert("Error", err?.message || "Google sign-up failed.");
       }
     } finally {
       setOauthLoading(false);
     }
   };
-
-  // TODO: Uncomment when Apple Developer account is available
-  // const handleAppleSignUp = async () => {
-  //   setOauthLoading(true);
-  //   try {
-  //     const AppleAuthentication = require("expo-apple-authentication");
-  //     const credential = await AppleAuthentication.signInAsync({
-  //       requestedScopes: [
-  //         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-  //         AppleAuthentication.AppleAuthenticationScope.EMAIL,
-  //       ],
-  //     });
-  //     if (!credential.identityToken) {
-  //       Alert.alert("Error", "Failed to get Apple identity token.");
-  //       return;
-  //     }
-  //     const { error } = await supabase.auth.signInWithIdToken({
-  //       provider: "apple",
-  //       token: credential.identityToken,
-  //     });
-  //     if (error) {
-  //       Alert.alert("Apple Sign-Up Error", error.message);
-  //     }
-  //   } catch (error: any) {
-  //     if (error?.code !== "ERR_CANCELED") {
-  //       Alert.alert("Error", error.message || "Apple sign-up failed.");
-  //     }
-  //   } finally {
-  //     setOauthLoading(false);
-  //   }
-  // };
 
   const handleSignup = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -181,9 +151,10 @@ const SignupScreen = () => {
           () => navigation.navigate("Login")
         );
       }
-    } catch (error: any) {
-      debugAlert("Unexpected error", { message: error.message });
-      Alert.alert("Signup Error", error.message || "An unexpected error occurred.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+      debugAlert("Unexpected error", { message });
+      Alert.alert("Signup Error", message);
     } finally {
       setLoading(false);
     }
@@ -204,18 +175,6 @@ const SignupScreen = () => {
       >
         {oauthLoading ? <ActivityIndicator color="#fff" size="small" /> : "Continue with Google"}
       </Button>
-
-      {/* TODO: Uncomment when Apple Developer account is available */}
-      {/* {Platform.OS === "ios" && (
-        <Button
-          variant="secondary"
-          onPress={handleAppleSignUp}
-          fullWidth
-          disabled={isDisabled}
-        >
-          Continue with Apple
-        </Button>
-      )} */}
 
       <View style={styles.divider}>
         <View style={styles.dividerLine} />

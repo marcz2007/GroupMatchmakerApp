@@ -124,7 +124,7 @@ export async function refreshCalendarAndSync(
     );
 
     if (refreshError) {
-      console.error("Failed to refresh calendar:", refreshError);
+      console.error("[SchedulingService] refreshCalendarAndSync failed:", refreshError);
       throw new Error("Failed to refresh calendar data");
     }
   }

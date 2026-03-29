@@ -69,9 +69,9 @@ const AddUserToGroupScreen = () => {
 
       if (error) throw error;
       setSearchResults(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error searching users:", error);
-      Alert.alert("Search Error", error.message || "Could not find users.");
+      Alert.alert("Search Error", error instanceof Error ? error.message : "Could not find users.");
       setSearchResults([]);
     } finally {
       setIsLoading(false);
@@ -91,11 +91,11 @@ const AddUserToGroupScreen = () => {
       Alert.alert("Success", `${username} has been added to ${groupName}.`);
       // Remove user from search results
       setSearchResults((prev) => prev.filter((u) => u.id !== userId));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding user to group:", error);
       Alert.alert(
         "Error",
-        error.message || `Could not add ${username} to the group.`
+        error instanceof Error ? error.message : `Could not add ${username} to the group.`
       );
     } finally {
       setIsAddingUser(null);

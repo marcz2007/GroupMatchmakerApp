@@ -72,7 +72,7 @@ export async function getGroupProposals(
   });
 
   if (error) {
-    console.error("Error fetching group proposals:", error);
+    console.error("[ProposalService] getGroupProposals failed:", error);
     throw error;
   }
 
@@ -87,7 +87,7 @@ export async function getProposalWithVotes(
   });
 
   if (error) {
-    console.error("Error fetching proposal:", error);
+    console.error("[ProposalService] getProposalWithVotes failed:", error);
     throw error;
   }
 
@@ -111,7 +111,7 @@ export async function createProposal(
   });
 
   if (error) {
-    console.error("Error creating proposal:", {
+    console.error("[ProposalService] createProposal failed:", {
       message: error.message,
       code: error.code,
       details: error.details,
@@ -164,7 +164,7 @@ export async function updateProposal(
     .single();
 
   if (error) {
-    console.error("Error updating proposal:", error);
+    console.error("[ProposalService] updateProposal failed:", error);
     throw error;
   }
 
@@ -178,7 +178,7 @@ export async function deleteProposal(proposalId: string): Promise<void> {
     .eq("id", proposalId);
 
   if (error) {
-    console.error("Error deleting proposal:", error);
+    console.error("[ProposalService] deleteProposal failed:", error);
     throw error;
   }
 }
@@ -193,7 +193,7 @@ export async function castVote(
   });
 
   if (error) {
-    console.error("Error casting vote:", error);
+    console.error("[ProposalService] castVote failed:", error);
     throw error;
   }
 
@@ -213,7 +213,7 @@ export async function removeVote(proposalId: string): Promise<void> {
     .eq("user_id", user.user.id);
 
   if (error) {
-    console.error("Error removing vote:", error);
+    console.error("[ProposalService] removeVote failed:", error);
     throw error;
   }
 }
@@ -247,7 +247,7 @@ export async function getPendingProposals(): Promise<PendingProposal[]> {
   const { data, error } = await supabase.rpc("get_pending_proposals_for_user");
 
   if (error) {
-    console.error("Error fetching pending proposals:", error);
+    console.error("[ProposalService] getPendingProposals failed:", error);
     throw error;
   }
 

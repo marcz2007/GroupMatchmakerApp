@@ -18,7 +18,7 @@ import * as Haptics from "expo-haptics";
 import { format, formatDistanceToNow } from "date-fns";
 import { usePendingProposalModal } from "../hooks/queries";
 import { castVote, VoteValue } from "@grapple/shared";
-import { colors, spacing, borderRadius } from "../theme/theme";
+import { colors, spacing, borderRadius } from "../theme";
 
 const PendingProposalModal: React.FC = () => {
   const { currentProposal, dismissCurrent, refreshPending, lockCurrent } =

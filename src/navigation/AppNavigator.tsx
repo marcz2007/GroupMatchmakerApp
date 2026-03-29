@@ -25,6 +25,9 @@ import BottomTabNavigator from "./BottomTabNavigator";
 // Import theme
 import { colors } from "../theme";
 
+// Import types
+import { PublicEventDetails } from "../services/eventRoomService";
+
 // Define updated param list for Grapple Lite
 export type RootStackParamList = {
   AuthLoading: undefined;
@@ -43,7 +46,7 @@ export type RootStackParamList = {
   GroupActions: { groupId: string; groupName: string };
   EventRoom: { eventRoomId: string; title?: string };
   EventChat: { eventRoomId: string };
-  EventDetail: { eventRoomId: string; eventDetails?: any };
+  EventDetail: { eventRoomId: string; eventDetails?: PublicEventDetails };
   CreateProposal: { groupId: string; groupName: string };
   GroupAvailability: { groupId: string; groupName: string };
   SmartScheduleSetup: { title: string; location: string };

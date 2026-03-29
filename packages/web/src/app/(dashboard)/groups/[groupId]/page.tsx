@@ -3,7 +3,7 @@
 import React from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys, getGroupById, getGroupProposals } from "@grapple/shared";
+import { queryKeys, getGroupById, getGroupProposals, formatDate } from "@grapple/shared";
 import Link from "next/link";
 import styles from "./groupDetail.module.css";
 
@@ -92,11 +92,7 @@ export default function GroupDetailPage() {
 
                 {proposal.starts_at && (
                   <span className={styles.proposalDate}>
-                    {new Date(proposal.starts_at).toLocaleDateString()} at{" "}
-                    {new Date(proposal.starts_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDate(proposal.starts_at)}
                   </span>
                 )}
               </div>

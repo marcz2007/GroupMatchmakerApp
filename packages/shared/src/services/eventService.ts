@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
+import { getDisplayName } from "../utils";
 
-export interface EventRoom {
+export interface EventSummaryRoom {
   id: string;
   proposal_id: string;
   group_id: string;
@@ -12,7 +13,7 @@ export interface EventRoom {
 }
 
 export interface EventWithDetails {
-  event_room: EventRoom;
+  event_room: EventSummaryRoom;
   group_name: string;
   participant_count: number;
   last_message: {
@@ -24,7 +25,7 @@ export interface EventWithDetails {
   is_expired: boolean;
 }
 
-export interface EventMessage {
+export interface EventChatMessage {
   id: string;
   content: string;
   created_at: string;
@@ -40,7 +41,7 @@ export async function getUserEvents(): Promise<EventWithDetails[]> {
   const { data, error } = await supabase.rpc("get_user_events_with_details");
 
   if (error) {
-    console.error("Error fetching user events:", error);
+    console.error("[EventService] getUserEvents failed:", error);
     throw new Error(error.message || "Failed to fetch events");
   }
 
@@ -53,7 +54,7 @@ export async function getEventDetails(eventRoomId: string): Promise<EventWithDet
   });
 
   if (error) {
-    console.error("Error fetching event details:", error);
+    console.error("[EventService] getEventDetails failed:", error);
     throw new Error(error.message || "Failed to fetch event details");
   }
 
@@ -64,7 +65,7 @@ export async function getEventMessages(
   eventRoomId: string,
   limit: number = 50,
   offset: number = 0
-): Promise<EventMessage[]> {
+): Promise<EventChatMessage[]> {
   const { data, error } = await supabase.rpc("get_event_room_messages_v2", {
     p_event_room_id: eventRoomId,
     p_limit: limit,
@@ -72,17 +73,17 @@ export async function getEventMessages(
   });
 
   if (error) {
-    console.error("Error fetching event messages:", error);
+    console.error("[EventService] getEventMessages failed:", error);
     throw new Error(error.message || "Failed to fetch messages");
   }
 
   return data?.messages || [];
 }
 
-export async function sendEventMessage(
+export async function sendEventChatMessage(
   eventRoomId: string,
   content: string
-): Promise<EventMessage> {
+): Promise<EventChatMessage> {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) {
     throw new Error("Not authenticated");
@@ -104,7 +105,7 @@ export async function sendEventMessage(
     .single();
 
   if (error) {
-    console.error("Error sending message:", error);
+    console.error("[EventService] sendEventChatMessage failed:", error);
     throw new Error(error.message || "Failed to send message");
   }
 
@@ -147,21 +148,24 @@ export async function getEventParticipants(eventRoomId: string): Promise<Array<{
     .eq("event_room_id", eventRoomId);
 
   if (error) {
-    console.error("Error fetching participants:", error);
+    console.error("[EventService] getEventParticipants failed:", error);
     throw new Error(error.message || "Failed to fetch participants");
   }
 
-  return (data || []).map((p: any) => ({
-    id: p.profiles.id,
-    display_name: p.profiles.username || p.profiles.first_name || "Unknown",
-    avatar_url: p.profiles.avatar_url,
-    joined_at: p.joined_at,
-  }));
+  return (data || []).map((p) => {
+    const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
+    return {
+      id: profile.id,
+      display_name: getDisplayName(profile.username, profile.first_name),
+      avatar_url: profile.avatar_url,
+      joined_at: p.joined_at,
+    };
+  });
 }
 
 export function subscribeToEventMessages(
   eventRoomId: string,
-  onMessage: (message: EventMessage) => void
+  onMessage: (message: EventChatMessage) => void
 ) {
   const channel = supabase
     .channel(`event_messages:${eventRoomId}`)
@@ -186,7 +190,7 @@ export function subscribeToEventMessages(
           created_at: payload.new.created_at,
           user: {
             id: profile?.id || payload.new.user_id,
-            display_name: profile?.username || profile?.first_name || "Unknown",
+            display_name: getDisplayName(profile?.username, profile?.first_name),
             avatar_url: profile?.avatar_url || null,
           },
           is_system: false,
@@ -230,7 +234,7 @@ export async function hasActiveEvents(): Promise<boolean> {
   const { data, error } = await supabase.rpc("get_user_event_count");
 
   if (error) {
-    console.error("Error checking active events:", error);
+    console.error("[EventService] hasActiveEvents failed:", error);
     return false;
   }
 
@@ -265,7 +269,7 @@ export async function voteToChatExtend(
   });
 
   if (error) {
-    console.error("Error voting to extend chat:", error);
+    console.error("[EventService] voteToChatExtend failed:", error);
     throw new Error(error.message || "Failed to vote");
   }
 
@@ -280,7 +284,7 @@ export async function getChatExtensionStatus(
   });
 
   if (error) {
-    console.error("Error fetching chat extension status:", error);
+    console.error("[EventService] getChatExtensionStatus failed:", error);
     throw new Error(error.message || "Failed to fetch extension status");
   }
 

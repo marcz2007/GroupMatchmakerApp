@@ -28,10 +28,13 @@ const webNoOpLock = async (
   return await fn();
 };
 
+/** Timeout in milliseconds for fetch requests to Supabase */
+const FETCH_TIMEOUT_MS = 15000;
+
 // On web, browser fetch() has no default timeout
 const fetchWithTimeout: typeof fetch = (input, init) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   return fetch(input, { ...init, signal: controller.signal }).finally(() =>
     clearTimeout(timeoutId)
   );

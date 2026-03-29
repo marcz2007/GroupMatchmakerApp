@@ -21,7 +21,7 @@ const DateTimePicker = Platform.OS !== "web"
   : null;
 import { addHours } from "date-fns";
 import { createProposal, getGroupMemberCount } from "@grapple/shared";
-import { colors, spacing, borderRadius } from "../theme/theme";
+import { colors, spacing, borderRadius } from "../theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type CreateProposalScreenRouteProp = RouteProp<

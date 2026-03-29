@@ -23,7 +23,7 @@ export async function getProfileById(profileId: string): Promise<User | null> {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("Error fetching profile:", error);
+    console.error("[UserService] getProfileById failed:", error);
     return null;
   }
 }
@@ -38,7 +38,7 @@ export async function getProfilesByIds(userIds: string[]): Promise<User[]> {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error("Error fetching profiles:", error);
+    console.error("[UserService] getProfilesByIds failed:", error);
     return [];
   }
 }
@@ -58,7 +58,7 @@ export async function updateUserProfile(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("Error updating user profile:", error);
+    console.error("[UserService] updateUserProfile failed:", error);
     return null;
   }
 }

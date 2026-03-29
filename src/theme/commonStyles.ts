@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { borderRadius, colors, spacing, typography } from "./theme";
+import { borderRadius, colors, spacing, typography } from "./index";
 
 export const commonStyles = StyleSheet.create({
   container: {

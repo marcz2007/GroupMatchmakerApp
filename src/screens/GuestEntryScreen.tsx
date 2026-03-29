@@ -52,9 +52,10 @@ const GuestEntryScreen = () => {
           Alert.alert("Google Sign-In Error", error.message);
         }
       }
-    } catch (error: any) {
-      if (error?.code !== "SIGN_IN_CANCELLED") {
-        Alert.alert("Error", error.message || "Google sign-in failed.");
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err?.code !== "SIGN_IN_CANCELLED") {
+        Alert.alert("Error", err?.message || "Google sign-in failed.");
       }
     } finally {
       setOauthLoading(false);
@@ -122,8 +123,8 @@ const GuestEntryScreen = () => {
       }
 
       // Navigation auto-transitions to AppStack via AuthContext
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "An unexpected error occurred.");
+    } catch (error: unknown) {
+      Alert.alert("Error", error instanceof Error ? error.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
