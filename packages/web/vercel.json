@@ -1,3 +1,5 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && yarn install --ignore-engines && cd packages/web && npx next build",
+  "installCommand": "echo 'skipping - handled in buildCommand'"
 }
