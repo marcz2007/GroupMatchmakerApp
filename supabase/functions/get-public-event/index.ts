@@ -120,6 +120,50 @@ serve(async (req) => {
       userName = userProfile?.display_name || null;
     }
 
+    // For poll-mode events, fetch the options with YES vote counts
+    let pollOptions: Array<{
+      id: string;
+      starts_at: string;
+      ends_at: string;
+      yes_count: number;
+      is_selected: boolean;
+    }> | null = null;
+
+    if (eventRoom.scheduling_mode === "poll") {
+      const { data: candidates } = await supabase
+        .from("scheduling_candidate_times")
+        .select("id, candidate_start, candidate_end, is_selected")
+        .eq("event_room_id", eventRoomId)
+        .order("candidate_start", { ascending: true });
+
+      if (candidates && candidates.length > 0) {
+        const candidateIds = candidates.map((c: any) => c.id);
+        const { data: votes } = await supabase
+          .from("poll_votes")
+          .select("candidate_time_id, vote")
+          .in("candidate_time_id", candidateIds)
+          .eq("vote", "YES");
+
+        const yesCounts = new Map<string, number>();
+        if (votes) {
+          for (const v of votes) {
+            yesCounts.set(
+              v.candidate_time_id,
+              (yesCounts.get(v.candidate_time_id) || 0) + 1
+            );
+          }
+        }
+
+        pollOptions = candidates.map((c: any) => ({
+          id: c.id,
+          starts_at: c.candidate_start,
+          ends_at: c.candidate_end,
+          yes_count: yesCounts.get(c.id) || 0,
+          is_selected: c.is_selected || false,
+        }));
+      }
+    }
+
     // Return sanitized public data — no user IDs, no emails
     const response: Record<string, any> = {
       title: eventRoom.title,
@@ -136,6 +180,7 @@ serve(async (req) => {
       scheduling_mode: eventRoom.scheduling_mode || "fixed",
       scheduling_status: eventRoom.scheduling_status || "none",
       scheduling_deadline: eventRoom.scheduling_deadline || null,
+      poll_options: pollOptions,
     };
 
     return new Response(JSON.stringify(response), {
