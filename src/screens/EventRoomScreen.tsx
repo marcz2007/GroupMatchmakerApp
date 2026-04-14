@@ -31,6 +31,7 @@ import {
 import { colors, spacing, borderRadius } from "../theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
+import PollVotingBanner from "../components/PollVotingBanner";
 
 type EventRoomScreenRouteProp = RouteProp<RootStackParamList, "EventRoom">;
 type EventRoomScreenNavigationProp = StackNavigationProp<
@@ -334,6 +335,17 @@ const EventRoomScreen: React.FC = () => {
             eventRoomId={eventRoomId}
             compact
             onTimeChanged={() => {
+              loadEventRoom();
+              loadMessages();
+            }}
+          />
+        </View>
+      )}
+      {eventRoom?.scheduling_mode === "poll" && (
+        <View style={styles.schedulingBannerContainer}>
+          <PollVotingBanner
+            eventRoomId={eventRoomId}
+            onStatusChange={() => {
               loadEventRoom();
               loadMessages();
             }}

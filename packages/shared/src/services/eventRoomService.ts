@@ -23,7 +23,7 @@ export interface EventRoom {
   ends_at: string | null;
   created_at: string;
   created_by?: string | null;
-  scheduling_mode?: "fixed" | "smart";
+  scheduling_mode?: "fixed" | "smart" | "poll";
   scheduling_status?: "none" | "collecting" | "scheduled" | "failed";
   scheduling_deadline?: string | null;
 }
