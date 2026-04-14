@@ -117,6 +117,8 @@ export default function NewEventPage() {
   const [slotHour, setSlotHour] = useState(18);
   const [slotMinute, setSlotMinute] = useState(0);
   const [duration, setDuration] = useState(60);
+  const [minSyncedEnabled, setMinSyncedEnabled] = useState(false);
+  const [minSyncedUsers, setMinSyncedUsers] = useState(3);
 
   // Poll-specific
   const [pollOptions, setPollOptions] = useState<PollOptionDraft[]>(() => [
@@ -213,6 +215,7 @@ export default function NewEventPage() {
           dateRangeEnd: toInputDate(dateRangeEnd),
           schedulingDeadline: deadline.toISOString(),
           slots,
+          minSyncedUsers: minSyncedEnabled ? minSyncedUsers : undefined,
         });
 
         setCreatedEventId(result.event_room_id);
@@ -431,6 +434,32 @@ export default function NewEventPage() {
                 ))}
               </div>
             </div>
+          </section>
+
+          <section className={styles.section}>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={minSyncedEnabled}
+                onChange={(e) => setMinSyncedEnabled(e.target.checked)}
+              />
+              <span>Finalize early once enough people have synced</span>
+            </label>
+            {minSyncedEnabled && (
+              <div className={styles.minVotesRow}>
+                <span className={styles.hint}>Minimum synced participants</span>
+                <input
+                  type="number"
+                  className={styles.minVotesInput}
+                  value={minSyncedUsers}
+                  min={1}
+                  max={100}
+                  onChange={(e) =>
+                    setMinSyncedUsers(Math.max(1, Number(e.target.value) || 1))
+                  }
+                />
+              </div>
+            )}
           </section>
         </>
       ) : (

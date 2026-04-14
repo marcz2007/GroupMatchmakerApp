@@ -53,6 +53,7 @@ export async function createSmartEvent(params: {
   dateRangeEnd: string;
   schedulingDeadline?: string;
   slots: SchedulingSlot[];
+  minSyncedUsers?: number;
 }) {
   const { data, error } = await supabase.rpc("create_smart_event", {
     p_title: params.title,
@@ -61,6 +62,7 @@ export async function createSmartEvent(params: {
     p_date_range_end: params.dateRangeEnd,
     p_scheduling_deadline: params.schedulingDeadline || null,
     p_slots: params.slots,
+    p_min_synced_users: params.minSyncedUsers ?? null,
   });
 
   if (error) throw error;
@@ -70,6 +72,7 @@ export async function createSmartEvent(params: {
     scheduling_mode: string;
     scheduling_status: string;
     scheduling_deadline: string;
+    min_synced_users: number | null;
     candidate_count: number;
   };
 }
