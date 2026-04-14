@@ -21,8 +21,33 @@ export default function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const { user } = useAuth();
   const [messageInput, setMessageInput] = useState("");
+  const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/event/${eventId}`;
+    const shareData = {
+      title: eventRoom?.title || "Join my Grapple event",
+      text: `Join me for ${eventRoom?.title || "this event"} on Grapple`,
+      url: shareUrl,
+    };
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard copy
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus("copied");
+      setTimeout(() => setShareStatus("idle"), 2000);
+    } catch {
+      // Clipboard API not available — no-op
+    }
+  };
 
   const { data: eventRoom } = useQuery({
     queryKey: queryKeys.eventRoomDetail(eventId),
@@ -92,12 +117,20 @@ export default function EventDetailPage() {
       <div className={styles.chatArea}>
         <div className={styles.chatHeader}>
           <Link href="/events" className={styles.back}>←</Link>
-          <div>
+          <div className={styles.chatHeaderTitle}>
             <h2 className={styles.title}>{eventRoom?.title || "Event"}</h2>
             <span className={styles.participantCount}>
               {participants.length} participant{participants.length !== 1 ? "s" : ""}
             </span>
           </div>
+          <button
+            type="button"
+            className={styles.shareButton}
+            onClick={handleShare}
+            aria-label="Share event"
+          >
+            {shareStatus === "copied" ? "Link copied!" : "Share"}
+          </button>
         </div>
 
         <div className={styles.messages}>

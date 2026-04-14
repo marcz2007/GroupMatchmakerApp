@@ -1,0 +1,179 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-background);
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 20px;
+  padding: 32px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.groupBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--color-primary-muted);
+  color: var(--color-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+}
+
+.creator {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-divider);
+}
+
+.label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.value {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.description {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.form {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.formSubtitle {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.input {
+  padding: 12px 16px;
+  background: var(--color-surface-light);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--color-primary);
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.primaryButton {
+  padding: 14px 20px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.primaryButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  padding: 12px 20px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--color-primary);
+  border-radius: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.successBox {
+  margin-top: 24px;
+  padding: 24px;
+  background: var(--color-primary-muted);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.successTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.error {
+  font-size: 13px;
+  color: var(--color-error);
+}
+
+.fineprint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
