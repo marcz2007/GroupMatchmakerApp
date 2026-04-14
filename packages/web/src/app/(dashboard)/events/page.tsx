@@ -20,6 +20,9 @@ export default function EventsPage() {
     <div>
       <div className={styles.header}>
         <h1 className={styles.title}>Events</h1>
+        <Link href="/events/new" className={styles.newButton}>
+          + New event
+        </Link>
       </div>
 
       {isLoading ? (
@@ -28,8 +31,12 @@ export default function EventsPage() {
         <div className={styles.empty}>
           <p className={styles.emptyText}>No events yet</p>
           <p className={styles.emptySubtext}>
-            Events are created when proposals reach their vote threshold.
+            Find the best time for your group — we&apos;ll pick the slot that
+            works for everyone.
           </p>
+          <Link href="/events/new" className={styles.emptyCta}>
+            Find best time
+          </Link>
         </div>
       ) : (
         <div className={styles.list}>
