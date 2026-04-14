@@ -12,4 +12,6 @@ export const queryKeys = {
   eventRoomParticipants: (id: string) => ["eventRoom", "participants", id] as const,
   publicEventDetails: (id: string) => ["eventRoom", "public", id] as const,
   smartSchedulingStatus: (id: string) => ["scheduling", id] as const,
+  notifications: () => ["notifications", "list"] as const,
+  notificationUnreadCount: () => ["notifications", "unreadCount"] as const,
 } as const;

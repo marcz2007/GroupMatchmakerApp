@@ -3,6 +3,7 @@
 import React from "react";
 import Sidebar from "@/components/Sidebar";
 import AuthGuard from "@/components/AuthGuard";
+import NotificationsBell from "@/components/NotificationsBell";
 import styles from "./dashboard.module.css";
 
 export default function DashboardLayout({
@@ -14,7 +15,12 @@ export default function DashboardLayout({
     <AuthGuard>
       <div className={styles.layout}>
         <Sidebar />
-        <main className={styles.main}>{children}</main>
+        <div className={styles.contentColumn}>
+          <div className={styles.topBar}>
+            <NotificationsBell />
+          </div>
+          <main className={styles.main}>{children}</main>
+        </div>
       </div>
     </AuthGuard>
   );

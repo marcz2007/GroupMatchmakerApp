@@ -115,3 +115,12 @@ export type {
   PollOptionInput,
   PollStatus,
 } from "./services/schedulingService";
+
+// Services - Notifications
+export {
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationsRead,
+  subscribeToNotifications,
+} from "./services/notificationService";
+export type { Notification } from "./services/notificationService";
