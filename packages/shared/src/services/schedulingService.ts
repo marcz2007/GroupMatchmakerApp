@@ -22,9 +22,12 @@ export interface SyncedUser {
   synced_at: string;
 }
 
+export type SchedulingMode = "fixed" | "smart" | "poll";
+export type SchedulingStatus = "none" | "collecting" | "scheduled" | "failed";
+
 export interface SmartSchedulingStatus {
-  scheduling_mode: "fixed" | "smart";
-  scheduling_status: "none" | "collecting" | "scheduled" | "failed";
+  scheduling_mode: SchedulingMode;
+  scheduling_status: SchedulingStatus;
   date_range_start: string | null;
   date_range_end: string | null;
   scheduling_deadline: string | null;
@@ -153,4 +156,99 @@ export function formatTimeSlot(slot: SchedulingSlot): string {
   const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
   const displayMinutes = minutes > 0 ? `:${String(minutes).padStart(2, "0")}` : "";
   return `${day} ${displayHour}${displayMinutes} ${period}`;
+}
+
+// ============================================
+// POLL SCHEDULING (specific datetime options)
+// ============================================
+
+export interface PollOptionInput {
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface PollOption {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  is_selected: boolean;
+  yes_count: number;
+  no_count: number;
+  my_vote: "YES" | "NO" | null;
+}
+
+export interface PollStatus {
+  scheduling_mode: SchedulingMode;
+  scheduling_status: SchedulingStatus;
+  scheduling_deadline: string | null;
+  poll_min_votes: number | null;
+  selected_slot_id: string | null;
+  total_participants: number;
+  options: PollOption[];
+}
+
+export async function createPollEvent(params: {
+  title: string;
+  description?: string;
+  schedulingDeadline?: string;
+  minVotes?: number;
+  options: PollOptionInput[];
+}) {
+  const { data, error } = await supabase.rpc("create_poll_event", {
+    p_title: params.title,
+    p_description: params.description || null,
+    p_scheduling_deadline: params.schedulingDeadline || null,
+    p_min_votes: params.minVotes ?? null,
+    p_options: params.options,
+  });
+
+  if (error) throw error;
+  return data as {
+    event_room_id: string;
+    title: string;
+    scheduling_mode: string;
+    scheduling_status: string;
+    scheduling_deadline: string;
+    option_count: number;
+  };
+}
+
+export async function castPollVote(
+  eventRoomId: string,
+  candidateTimeId: string,
+  vote: "YES" | "NO"
+) {
+  const { data, error } = await supabase.rpc("cast_poll_vote", {
+    p_event_room_id: eventRoomId,
+    p_candidate_time_id: candidateTimeId,
+    p_vote: vote,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean };
+}
+
+export async function getPollStatus(eventRoomId: string): Promise<PollStatus> {
+  const { data, error } = await supabase.rpc("get_poll_status", {
+    p_event_room_id: eventRoomId,
+  });
+
+  if (error) throw error;
+  return data as PollStatus;
+}
+
+export async function finalizePollEvent(eventRoomId: string) {
+  const { data, error } = await supabase.rpc("finalize_poll_event", {
+    p_event_room_id: eventRoomId,
+  });
+
+  if (error) throw error;
+  return data as {
+    success?: boolean;
+    already_finalized?: boolean;
+    selected_id?: string;
+    starts_at?: string;
+    yes_count?: number;
+    reason?: string;
+  };
 }

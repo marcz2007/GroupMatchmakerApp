@@ -196,6 +196,148 @@
   color: var(--color-primary);
 }
 
+.modeToggle {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modeButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--color-surface-light);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.modeButton:hover {
+  border-color: var(--color-primary-border);
+}
+
+.modeButtonSelected {
+  background: var(--color-primary-muted);
+  border-color: var(--color-primary);
+}
+
+.modeTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.modeSubtitle {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+.pollOptionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pollOptionCard {
+  padding: 14px;
+  background: var(--color-surface-light);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pollOptionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pollOptionIndex {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.removeButton {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-error);
+  padding: 4px 8px;
+}
+
+.removeButton:hover {
+  opacity: 0.8;
+}
+
+.pollOptionRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.addOptionButton {
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px dashed var(--color-primary-border);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.addOptionButton:hover {
+  background: var(--color-primary-muted);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.checkboxRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.minVotesRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.minVotesInput {
+  width: 80px;
+  padding: 10px 12px;
+  background: var(--color-surface-light);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  outline: none;
+}
+
+.minVotesInput:focus {
+  border-color: var(--color-primary);
+}
+
 .summary {
   display: flex;
   align-items: center;

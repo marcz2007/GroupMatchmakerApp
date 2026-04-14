@@ -99,10 +99,19 @@ export {
   refreshCalendarAndSync,
   getDayName,
   formatTimeSlot,
+  createPollEvent,
+  castPollVote,
+  getPollStatus,
+  finalizePollEvent,
 } from "./services/schedulingService";
 export type {
   SchedulingSlot,
   CandidateTime,
   SyncedUser,
   SmartSchedulingStatus,
+  SchedulingMode,
+  SchedulingStatus,
+  PollOption,
+  PollOptionInput,
+  PollStatus,
 } from "./services/schedulingService";
