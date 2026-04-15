@@ -31,6 +31,30 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "group-matchmaker-app-web.vercel.app",
+              "pathPrefix": "/event/"
+            },
+            {
+              "scheme": "https",
+              "host": "group-matchmaker-app-web.vercel.app",
+              "pathPrefix": "/group/invite/"
+            },
+            {
+              "scheme": "https",
+              "host": "group-matchmaker-app-web.vercel.app",
+              "pathPrefix": "/reset-password"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -69,5 +93,11 @@
     "updates": {
       "url": "https://u.expo.dev/876034cd-48d2-4305-8754-741f1efd638f"
     }
+  },
+  "_iosUniversalLinksTemplate": {
+    "_comment": "PARKED: iOS Universal Links config. Activate this when you pay for the Apple Developer account. Steps: (1) Copy `associatedDomains` into expo.ios above (as a sibling of `bundleIdentifier`). (2) Set APPLE_TEAM_ID on Vercel (Settings → Environment Variables). Optionally set APPLE_BUNDLE_ID if you ever change the bundle. (3) Redeploy the web app so /.well-known/apple-app-site-association starts serving the JSON (route handler at packages/web/src/app/api/well-known/apple-app-site-association/route.ts). (4) Run `eas build --platform ios --profile production` — associatedDomains is a native entitlement, so an OTA update via expo-updates WILL NOT pick it up, you need a fresh native build submitted to TestFlight/App Store. (5) Wait a few minutes after the new build is installed on a device — iOS fetches the AASA file asynchronously the first time. This root-level key is ignored by Expo's config loader since it only reads the `expo` object.",
+    "associatedDomains": [
+      "applinks:group-matchmaker-app-web.vercel.app"
+    ]
   }
 }
