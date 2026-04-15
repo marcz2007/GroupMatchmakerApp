@@ -228,7 +228,7 @@ const PollSetupScreen = () => {
 
   const handleShareInviteLink = async () => {
     if (!createdEventId) return;
-    const url = `https://group-matchmaker-app.vercel.app/event/${createdEventId}`;
+    const url = `https://group-matchmaker-app-web.vercel.app/event/${createdEventId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);

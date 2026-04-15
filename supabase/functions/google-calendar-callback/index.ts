@@ -122,7 +122,7 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
   }
 }
 
-const WEB_APP_URL = "https://group-matchmaker-app.vercel.app";
+const WEB_APP_URL = "https://group-matchmaker-app-web.vercel.app";
 
 function parseState(state: string): { isWeb: boolean; returnPath: string } {
   // State format: "uuid:platform" or "uuid:platform:base64returnPath"

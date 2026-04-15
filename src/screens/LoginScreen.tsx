@@ -159,7 +159,7 @@ const LoginScreen = () => {
 
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: "https://group-matchmaker-app.vercel.app",
+        redirectTo: "https://group-matchmaker-app-web.vercel.app",
       });
 
       debugAlert("Reset response", {

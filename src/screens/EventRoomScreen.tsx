@@ -73,7 +73,7 @@ const EventRoomScreen: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    const url = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);

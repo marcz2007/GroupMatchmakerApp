@@ -65,7 +65,7 @@ const EventDetailScreen = () => {
 
   const handleShare = async () => {
     if (!details) return;
-    const url = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    const url = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
     const eventDate = formatDate(details.event_room.starts_at);
     const dateText = eventDate ? ` on ${eventDate}` : "";
     try {

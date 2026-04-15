@@ -122,7 +122,7 @@ serve(async (req) => {
           ${
             notification.event_room_id
               ? `<p style="margin: 24px 0 0;">
-                  <a href="https://group-matchmaker-app.vercel.app/event/${notification.event_room_id}"
+                  <a href="https://group-matchmaker-app-web.vercel.app/event/${notification.event_room_id}"
                      style="display: inline-block; padding: 10px 18px; background: #5762b7; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
                     View event
                   </a>

@@ -130,7 +130,7 @@ const EventChatScreen = ({ eventRoomIdProp, isDesktopPane }: EventChatScreenProp
   };
 
   const handleCopyLink = async () => {
-    const link = `https://group-matchmaker-app.vercel.app/event/${eventRoomId}`;
+    const link = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await Share.share({ message: link });

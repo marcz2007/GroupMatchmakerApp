@@ -36,7 +36,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     "groupmatchmakerapp://",
     "https://nqtycfrgzjiehatokmfn.supabase.co",
-    "https://group-matchmaker-app.vercel.app",
+    "https://group-matchmaker-app-web.vercel.app",
   ],
   config: {
     screens: {

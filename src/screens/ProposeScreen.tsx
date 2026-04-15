@@ -455,7 +455,7 @@ const ProposeScreen = () => {
 
   const handleShareInviteLink = async () => {
     if (!directEventRoomId) return;
-    const url = `https://group-matchmaker-app.vercel.app/event/${directEventRoomId}`;
+    const url = `https://group-matchmaker-app-web.vercel.app/event/${directEventRoomId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);
