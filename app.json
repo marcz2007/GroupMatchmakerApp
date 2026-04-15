@@ -27,7 +27,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.marcz2007.GroupMatchmakerApp"
+      "package": "com.marcz2007.GroupMatchmakerApp",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -54,7 +58,16 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      ["@react-native-google-signin/google-signin", { "iosUrlScheme": "com.googleusercontent.apps.537397372254-2gruob2oguontpaojcm52uel30bnecb5" }]
-    ]
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.537397372254-2gruob2oguontpaojcm52uel30bnecb5"
+        }
+      ]
+    ],
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/876034cd-48d2-4305-8754-741f1efd638f"
+    }
   }
 }
