@@ -85,16 +85,29 @@ serve(async (req) => {
         );
       }
 
-      // Check if a profile with this email already exists
+      // Check if a profile with this email already exists. We only
+      // reuse it if it's already marked as a guest. Refusing to match
+      // real accounts by plaintext email prevents an attacker from
+      // RSVPing (and subsequently voting) as another user just by
+      // knowing their address.
       const { data: existingProfile } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, is_guest")
         .eq("email", guest_email.toLowerCase().trim())
         .single();
 
-      if (existingProfile) {
-        // Reuse the existing user — don't create a duplicate
+      if (existingProfile && existingProfile.is_guest === true) {
+        // Reuse the existing guest — don't create a duplicate
         userId = existingProfile.id;
+      } else if (existingProfile && existingProfile.is_guest !== true) {
+        // Email belongs to a real account. Require them to sign in.
+        return new Response(
+          JSON.stringify({
+            error:
+              "This email already has an account. Please sign in to RSVP.",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       } else {
         // Create an anonymous auth user, then create their profile
         const { data: anonAuth, error: anonError } = await supabase.auth.admin.createUser({

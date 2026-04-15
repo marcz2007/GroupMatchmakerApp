@@ -74,12 +74,16 @@ serve(async (req) => {
         if (user) return user.id;
       }
       if (guest_email) {
+        // Only accept guest_email for profiles actually marked as
+        // guests. Refusing to match real accounts by plaintext email
+        // prevents an attacker from voting as another user just by
+        // knowing their address.
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, is_guest")
           .eq("email", guest_email.toLowerCase().trim())
           .single();
-        if (profile) return profile.id;
+        if (profile && profile.is_guest === true) return profile.id;
       }
       return null;
     })();
