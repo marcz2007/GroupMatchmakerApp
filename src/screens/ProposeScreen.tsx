@@ -113,6 +113,8 @@ const ProposeScreen = () => {
 
   // Smart scheduling toggle
   const [smartScheduling, setSmartScheduling] = useState(false);
+  // Poll voting toggle — mutually exclusive with smart
+  const [pollVoting, setPollVoting] = useState(false);
 
   // Advanced settings state
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -233,6 +235,13 @@ const ProposeScreen = () => {
   const handleDetailsNext = () => {
     if (smartScheduling) {
       navigation.navigate("SmartScheduleSetup", {
+        title: ideaTitle.trim(),
+        location: location || "",
+      });
+      return;
+    }
+    if (pollVoting) {
+      navigation.navigate("PollSetup", {
         title: ideaTitle.trim(),
         location: location || "",
       });
@@ -790,24 +799,28 @@ const ProposeScreen = () => {
               <IdeaPill title={ideaTitle} animateIn={true} large />
             </View>
 
-            {/* Detail chips — hide date/time when smart scheduling is on */}
+            {/* Detail chips — hide date/time when smart scheduling or polling is on */}
             <View style={styles.chipsContainer}>
               <DetailChips
-                date={smartScheduling ? null : date}
-                time={smartScheduling ? null : time}
+                date={smartScheduling || pollVoting ? null : date}
+                time={smartScheduling || pollVoting ? null : time}
                 location={location}
                 onDateChange={setDate}
                 onTimeChange={setTime}
                 onLocationChange={setLocation}
                 minimumDate={votingDeadline && votingDeadline > new Date() ? votingDeadline : undefined}
-                hideDatetime={smartScheduling}
+                hideDatetime={smartScheduling || pollVoting}
               />
             </View>
 
             {/* Find best time toggle */}
             <TouchableOpacity
               style={[styles.smartToggle, smartScheduling && styles.smartToggleActive]}
-              onPress={() => setSmartScheduling(!smartScheduling)}
+              onPress={() => {
+                const next = !smartScheduling;
+                setSmartScheduling(next);
+                if (next) setPollVoting(false);
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.smartToggleLeft}>
@@ -829,9 +842,50 @@ const ProposeScreen = () => {
               </View>
               <Switch
                 value={smartScheduling}
-                onValueChange={setSmartScheduling}
+                onValueChange={(val) => {
+                  setSmartScheduling(val);
+                  if (val) setPollVoting(false);
+                }}
                 trackColor={{ false: "rgba(255,255,255,0.1)", true: "rgba(87,98,183,0.4)" }}
                 thumbColor={smartScheduling ? colors.primary : "#888"}
+              />
+            </TouchableOpacity>
+
+            {/* Poll voting toggle */}
+            <TouchableOpacity
+              style={[styles.smartToggle, pollVoting && styles.smartToggleActive]}
+              onPress={() => {
+                const next = !pollVoting;
+                setPollVoting(next);
+                if (next) setSmartScheduling(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.smartToggleLeft}>
+                <Ionicons
+                  name="checkbox-outline"
+                  size={18}
+                  color={pollVoting ? colors.primary : colors.text.tertiary}
+                />
+                <View style={{ marginLeft: spacing.sm }}>
+                  <Text style={[styles.smartToggleText, pollVoting && styles.smartToggleTextActive]}>
+                    Poll specific dates
+                  </Text>
+                  <Text style={styles.smartToggleHint}>
+                    {pollVoting
+                      ? "Everyone votes on exact date/time options"
+                      : "Pick a few specific dates, let people vote"}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={pollVoting}
+                onValueChange={(val) => {
+                  setPollVoting(val);
+                  if (val) setSmartScheduling(false);
+                }}
+                trackColor={{ false: "rgba(255,255,255,0.1)", true: "rgba(87,98,183,0.4)" }}
+                thumbColor={pollVoting ? colors.primary : "#888"}
               />
             </TouchableOpacity>
 

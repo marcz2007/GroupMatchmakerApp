@@ -10,6 +10,7 @@ import EventRoomScreen from "../screens/EventRoomScreen";
 import EventChatScreen from "../screens/EventChatScreen";
 import EventDetailScreen from "../screens/EventDetailScreen";
 import SmartScheduleSetupScreen from "../screens/SmartScheduleSetupScreen";
+import PollSetupScreen from "../screens/PollSetupScreen";
 import GroupActionsScreen from "../screens/GroupActionsScreen";
 import GroupDetailsScreen from "../screens/GroupDetailsScreen";
 import GroupsScreen from "../screens/GroupsScreen";
@@ -50,6 +51,7 @@ export type RootStackParamList = {
   CreateProposal: { groupId: string; groupName: string };
   GroupAvailability: { groupId: string; groupName: string };
   SmartScheduleSetup: { title: string; location: string };
+  PollSetup: { title: string; location: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -152,6 +154,11 @@ const AppStack = () => (
     <Stack.Screen
       name="SmartScheduleSetup"
       component={SmartScheduleSetupScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="PollSetup"
+      component={PollSetupScreen}
       options={{ headerShown: false }}
     />
     <Stack.Screen
