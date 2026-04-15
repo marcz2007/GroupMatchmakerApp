@@ -13,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import { formatDistanceToNow } from "date-fns";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
+import NotificationsBell from "../components/NotificationsBell";
 import {
   getUserEvents,
   subscribeToUserEvents,
@@ -186,6 +187,7 @@ const EventsListScreen = ({ onSelectEvent, selectedEventId }: EventsListScreenPr
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Events</Text>
+          <NotificationsBell />
         </View>
 
         {/* Events List */}
@@ -225,6 +227,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
