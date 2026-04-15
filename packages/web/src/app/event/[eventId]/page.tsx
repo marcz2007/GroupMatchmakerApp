@@ -63,10 +63,19 @@ export default function PublicEventPage() {
   // RSVP form state
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [syncCalendar, setSyncCalendar] = useState(true);
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+
+  // Calendar return-from-OAuth banner state. We read the query params
+  // from window.location inside a useEffect (rather than using
+  // useSearchParams) so we don't need to wrap the page in a Suspense
+  // boundary for Next 15's prerender rules.
+  const [calendarBanner, setCalendarBanner] = useState<
+    { kind: "success" | "error"; message: string } | null
+  >(null);
 
   // Poll vote state
   const [myVotes, setMyVotes] = useState<VoteState>({});
@@ -109,6 +118,90 @@ export default function PublicEventPage() {
     fetchEvent();
   }, [fetchEvent]);
 
+  // Capture the calendar-return query params into component state, then
+  // strip them from the URL so a refresh doesn't keep showing the banner.
+  // Also restore `submittedEmail` from localStorage so poll voting still
+  // works after the OAuth round-trip (we lose component state when the
+  // browser redirects out to Google).
+  useEffect(() => {
+    if (!eventId) return;
+    try {
+      const stored = localStorage.getItem(`grapple.rsvp.${eventId}`);
+      if (stored) setSubmittedEmail(stored);
+    } catch {
+      // localStorage disabled — poll voting post-OAuth just won't work.
+    }
+
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("calendar_connected") === "true") {
+      setCalendarBanner({
+        kind: "success",
+        message:
+          "Your Google Calendar is now synced — we'll use your availability to pick the best time.",
+      });
+      router.replace(`/event/${eventId}`);
+    } else if (params.get("calendar_error")) {
+      setCalendarBanner({
+        kind: "error",
+        message:
+          "We couldn't connect your calendar. You're still RSVP'd — you can try again any time.",
+      });
+      router.replace(`/event/${eventId}`);
+    }
+    // We only want this to run once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startCalendarOAuth = useCallback(
+    async (userId: string): Promise<boolean> => {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) return false;
+
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/google-calendar-auth`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}`,
+            },
+            body: JSON.stringify({
+              userId,
+              platform: "web",
+              returnPath: `/event/${eventId}`,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            "google-calendar-auth failed with status",
+            response.status
+          );
+          return false;
+        }
+
+        const data = await response.json();
+        if (!data?.authUrl) {
+          console.error("google-calendar-auth returned no authUrl", data);
+          return false;
+        }
+
+        // Full-page redirect to Google — on return the callback redirects
+        // back here with ?calendar_connected=true.
+        window.location.href = data.authUrl;
+        return true;
+      } catch (err) {
+        console.error("Failed to start calendar OAuth:", err);
+        return false;
+      }
+    },
+    [eventId]
+  );
+
   const handleGuestRsvp = async (e: React.FormEvent) => {
     e.preventDefault();
     setRsvpError(null);
@@ -147,8 +240,33 @@ export default function PublicEventPage() {
         throw new Error(body.error || "Failed to RSVP");
       }
 
+      const body = await response.json().catch(() => ({}));
+      const userId: string | undefined = body?.user_id;
+      const alreadyConnected: boolean = body?.calendar_connected === true;
+
       setSubmittedEmail(cleanEmail);
+      try {
+        localStorage.setItem(`grapple.rsvp.${eventId}`, cleanEmail);
+      } catch {
+        // localStorage may be unavailable — non-fatal.
+      }
       setRsvpSuccess(true);
+
+      // If the user ticked "Sync my Google Calendar" and they don't
+      // already have one connected, kick off OAuth. This is a full-page
+      // redirect — the callback will land us back on this event page
+      // with ?calendar_connected=true.
+      if (syncCalendar && userId && !alreadyConnected) {
+        const started = await startCalendarOAuth(userId);
+        if (started) return; // redirecting — stop work here
+        // On failure we fall through to the normal success UI.
+        setCalendarBanner({
+          kind: "error",
+          message:
+            "We couldn't start the calendar sync. You're RSVP'd — try again from the event page if needed.",
+        });
+      }
+
       // Refetch to reveal poll options with the new participant included
       await fetchEvent();
     } catch (err) {
@@ -270,6 +388,18 @@ export default function PublicEventPage() {
           )}
         </header>
 
+        {calendarBanner && (
+          <div
+            className={
+              calendarBanner.kind === "success"
+                ? styles.calendarBannerSuccess
+                : styles.calendarBannerError
+            }
+          >
+            {calendarBanner.message}
+          </div>
+        )}
+
         {event.description && (
           <section className={styles.section}>
             <p className={styles.description}>{event.description}</p>
@@ -344,6 +474,19 @@ export default function PublicEventPage() {
               disabled={rsvpSubmitting}
               required
             />
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={syncCalendar}
+                onChange={(e) => setSyncCalendar(e.target.checked)}
+                disabled={rsvpSubmitting}
+              />
+              <span className={styles.checkboxLabel}>
+                Sync my Google Calendar so Grapple can find a time that works
+                for everyone.
+              </span>
+            </label>
             {rsvpError && <p className={styles.error}>{rsvpError}</p>}
             <button
               type="submit"
@@ -351,9 +494,13 @@ export default function PublicEventPage() {
               disabled={rsvpSubmitting}
             >
               {rsvpSubmitting
-                ? "Joining..."
+                ? syncCalendar
+                  ? "Joining & connecting calendar..."
+                  : "Joining..."
                 : isPoll
                 ? "Continue to vote"
+                : syncCalendar
+                ? "Count me in & connect calendar"
                 : "Count me in"}
             </button>
             <p className={styles.fineprint}>

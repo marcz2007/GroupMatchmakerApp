@@ -142,6 +142,74 @@ function parseState(state: string): { isWeb: boolean; returnPath: string } {
   return { isWeb, returnPath };
 }
 
+// Extract an event_room_id (UUID) from a returnPath like "/event/<uuid>".
+// Returns null for any other return path. We use this so that when a guest
+// (or any user) connects a calendar mid-RSVP, we can immediately mark them
+// as synced for that specific event — which makes their availability count
+// towards `min_synced_users` and lets the smart-scheduling trigger finalize
+// without waiting for the deadline cron.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function extractEventRoomId(returnPath: string): string | null {
+  if (!returnPath) return null;
+  const match = returnPath.match(/\/event\/([^/?#]+)/);
+  if (!match) return null;
+  const candidate = match[1];
+  return UUID_RE.test(candidate) ? candidate : null;
+}
+
+// If the caller came from an /event/<id> page, mark them as synced for
+// that event so smart scheduling can finalize early. Idempotent — the
+// UNIQUE(event_room_id, user_id) constraint turns re-invocations into
+// updated synced_at timestamps.
+async function markEventSyncIfApplicable(
+  userId: string,
+  returnPath: string
+): Promise<void> {
+  const eventRoomId = extractEventRoomId(returnPath);
+  if (!eventRoomId) return;
+
+  try {
+    // Only record a sync if this user is actually a participant in that
+    // event. This prevents someone from poisoning another event's sync
+    // count by crafting a returnPath that points at an unrelated event.
+    const { data: participant, error: participantError } = await supabase
+      .from("event_room_participants")
+      .select("user_id")
+      .eq("event_room_id", eventRoomId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (participantError || !participant) {
+      console.log(
+        "Skipping scheduling_calendar_syncs insert — user is not a participant",
+        { userId, eventRoomId, error: participantError?.message }
+      );
+      return;
+    }
+
+    const { error: syncError } = await supabase
+      .from("scheduling_calendar_syncs")
+      .upsert(
+        {
+          event_room_id: eventRoomId,
+          user_id: userId,
+          calendar_provider: "google",
+          synced_at: new Date().toISOString(),
+        },
+        { onConflict: "event_room_id,user_id" }
+      );
+
+    if (syncError) {
+      console.error("Error upserting scheduling_calendar_syncs:", syncError);
+    } else {
+      console.log("Recorded scheduling_calendar_syncs", { userId, eventRoomId });
+    }
+  } catch (err) {
+    console.error("Unexpected error in markEventSyncIfApplicable:", err);
+  }
+}
+
 function createResponse(message: string, redirectUrl: string, success: boolean, isWeb: boolean, returnPath?: string) {
   // For web: redirect straight to the web app — user returns to the event they came from
   if (isWeb) {
@@ -326,6 +394,11 @@ serve(async (req: Request) => {
     // Fetch and store initial busy times
     console.log("Fetching initial busy times...");
     await fetchAndStoreBusyTimes(tokenData.access_token, userId);
+
+    // If the OAuth flow was kicked off from a public event RSVP, record
+    // a scheduling_calendar_syncs row so the event's min_synced_users
+    // finalization trigger counts this participant.
+    await markEventSyncIfApplicable(userId, returnPath);
 
     console.log("Profile updated successfully");
     console.log("=== Google Calendar Callback Function Completed Successfully ===");

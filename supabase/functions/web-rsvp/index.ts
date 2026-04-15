@@ -161,10 +161,22 @@ serve(async (req) => {
       );
     }
 
+    // Look up calendar_connected so the client can decide whether to
+    // prompt the guest (or logged-in user) to connect their calendar.
+    // This is cheap — one row lookup on a small table — and saves the
+    // client an extra round trip.
+    const { data: profileAfter } = await supabase
+      .from("profiles")
+      .select("calendar_connected")
+      .eq("id", userId)
+      .single();
+
     return new Response(
       JSON.stringify({
         success: true,
         event_title: eventRoom.title,
+        user_id: userId,
+        calendar_connected: profileAfter?.calendar_connected ?? false,
         message: "You're in!",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
