@@ -51,14 +51,7 @@ BEGIN
       AND vote = 'YES';
 
     IF v_candidate_yes_count >= v_min_votes THEN
-        PERFORM net.http_post(
-            url := get_supabase_url() || '/functions/v1/run-poll-finalization',
-            headers := jsonb_build_object(
-                'Content-Type', 'application/json',
-                'Authorization', 'Bearer ' || get_service_role_key()
-            ),
-            body := jsonb_build_object('eventRoomId', v_event_room_id)
-        );
+        PERFORM finalize_poll_event(v_event_room_id);
     END IF;
 
     RETURN NEW;
