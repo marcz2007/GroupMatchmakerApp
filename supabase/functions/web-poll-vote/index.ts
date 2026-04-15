@@ -47,13 +47,50 @@ serve(async (req) => {
       }
     }
 
-    // Verify the event exists, is a poll, and is still collecting
-    const { data: eventRoom, error: eventError } = await supabase
+    // Kick off event lookup, candidate validation, and (if possible)
+    // user resolution in parallel — none of them depend on each other.
+    const candidateIds = votes.map((v) => v.candidate_time_id);
+
+    const eventPromise = supabase
       .from("event_rooms")
       .select("id, scheduling_mode, scheduling_status")
       .eq("id", event_room_id)
       .single();
 
+    const candidatesPromise = supabase
+      .from("scheduling_candidate_times")
+      .select("id")
+      .eq("event_room_id", event_room_id)
+      .in("id", candidateIds);
+
+    const userPromise: Promise<string | null> = (async () => {
+      if (authHeader) {
+        const supabaseUser = createClient(
+          supabaseUrl,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: { user } } = await supabaseUser.auth.getUser();
+        if (user) return user.id;
+      }
+      if (guest_email) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", guest_email.toLowerCase().trim())
+          .single();
+        if (profile) return profile.id;
+      }
+      return null;
+    })();
+
+    const [eventResult, candidatesResult, userId] = await Promise.all([
+      eventPromise,
+      candidatesPromise,
+      userPromise,
+    ]);
+
+    const { data: eventRoom, error: eventError } = eventResult;
     if (eventError || !eventRoom) {
       return new Response(
         JSON.stringify({ error: "Event not found" }),
@@ -73,26 +110,6 @@ serve(async (req) => {
         JSON.stringify({ error: "Voting is closed for this event" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    // Resolve the voter's user_id
-    let userId: string | null = null;
-
-    if (authHeader) {
-      const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user } } = await supabaseUser.auth.getUser();
-      if (user) userId = user.id;
-    }
-
-    if (!userId && guest_email) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", guest_email.toLowerCase().trim())
-        .single();
-      if (profile) userId = profile.id;
     }
 
     if (!userId) {
@@ -117,15 +134,10 @@ serve(async (req) => {
       );
     }
 
-    // Validate candidate_time_ids all belong to this event
-    const candidateIds = votes.map((v) => v.candidate_time_id);
-    const { data: validCandidates } = await supabase
-      .from("scheduling_candidate_times")
-      .select("id")
-      .eq("event_room_id", event_room_id)
-      .in("id", candidateIds);
-
-    const validIdSet = new Set((validCandidates || []).map((c: any) => c.id));
+    // Filter to candidate_time_ids that actually belong to this event
+    const validIdSet = new Set(
+      (candidatesResult.data || []).map((c: { id: string }) => c.id)
+    );
     const validVotes = votes.filter((v) => validIdSet.has(v.candidate_time_id));
 
     if (validVotes.length === 0) {

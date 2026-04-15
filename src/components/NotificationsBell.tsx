@@ -11,8 +11,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing } from "../theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
-const POLL_INTERVAL_MS = 60_000;
-
 const NotificationsBell: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
@@ -31,13 +29,6 @@ const NotificationsBell: React.FC = () => {
   useEffect(() => {
     loadCount();
   }, [loadCount]);
-
-  // Periodic refresh as a fallback
-  useEffect(() => {
-    if (!user?.id) return;
-    const interval = setInterval(loadCount, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [user?.id, loadCount]);
 
   // Realtime: increment on new notification
   useEffect(() => {

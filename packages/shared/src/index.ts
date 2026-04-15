@@ -1,5 +1,12 @@
 // Utils
-export { getDisplayName, pluralize, formatDate } from "./utils";
+export {
+  getDisplayName,
+  pluralize,
+  formatDate,
+  formatDuration,
+  formatTime12,
+  formatPollOptionTime,
+} from "./utils";
 
 // Supabase client
 export { initSupabase, getSupabase, supabase } from "./supabase";

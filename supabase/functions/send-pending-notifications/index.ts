@@ -95,15 +95,20 @@ serve(async (req) => {
       }
     }
 
+    // Send emails concurrently with a bounded concurrency. Resend
+    // accepts parallel requests, and waiting for each response
+    // sequentially is the biggest latency hog in this function.
+    const CONCURRENCY = 8;
     let sent = 0;
     let skipped = 0;
     const deliveredIds: string[] = [];
 
-    for (const notification of pending as NotificationRow[]) {
+    const sendOne = async (
+      notification: NotificationRow
+    ): Promise<string | null> => {
       const recipient = emailByUser.get(notification.user_id);
       if (!recipient) {
-        skipped++;
-        continue;
+        return null;
       }
 
       const subject = notification.title || "Grapple update";
@@ -142,14 +147,33 @@ serve(async (req) => {
       });
 
       if (response.ok) {
-        sent++;
-        deliveredIds.push(notification.id);
-      } else {
-        const err = await response.text().catch(() => "");
-        console.error(
-          `[send-pending-notifications] Resend failed for ${notification.id}: ${err}`
-        );
-        skipped++;
+        return notification.id;
+      }
+      const err = await response.text().catch(() => "");
+      console.error(
+        `[send-pending-notifications] Resend failed for ${notification.id}: ${err}`
+      );
+      return null;
+    };
+
+    const pendingRows = pending as NotificationRow[];
+    for (let i = 0; i < pendingRows.length; i += CONCURRENCY) {
+      const chunk = pendingRows.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(chunk.map(sendOne));
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === "fulfilled" && result.value) {
+          sent++;
+          deliveredIds.push(result.value);
+        } else {
+          if (result.status === "rejected") {
+            console.error(
+              `[send-pending-notifications] send threw for ${chunk[j].id}:`,
+              result.reason
+            );
+          }
+          skipped++;
+        }
       }
     }
 

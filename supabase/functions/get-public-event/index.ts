@@ -24,24 +24,52 @@ serve(async (req) => {
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Optionally resolve the authenticated user (if token provided)
-    let authUserId: string | null = null;
+    // Run event lookup, auth user resolution, and participant lookup in
+    // parallel — none of them depend on each other. Poll candidates only
+    // depend on event_room_id, so they can go too.
     const authHeader = req.headers.get("Authorization");
-    if (authHeader) {
-      const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user } } = await supabaseUser.auth.getUser();
-      if (user) authUserId = user.id;
-    }
 
-    // Fetch event room with group info
-    const { data: eventRoom, error: eventError } = await supabase
+    const eventPromise = supabase
       .from("event_rooms")
       .select("id, title, description, starts_at, ends_at, created_at, group_id, created_by, scheduling_mode, scheduling_status, scheduling_deadline")
       .eq("id", eventRoomId)
       .single();
 
+    const authUserPromise: Promise<string | null> = (async () => {
+      if (!authHeader) return null;
+      const supabaseUser = createClient(
+        supabaseUrl,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user } } = await supabaseUser.auth.getUser();
+      return user?.id ?? null;
+    })();
+
+    const participantsPromise = supabase
+      .from("event_room_participants")
+      .select("user_id, joined_at")
+      .eq("event_room_id", eventRoomId);
+
+    const candidatesPromise = supabase
+      .from("scheduling_candidate_times")
+      .select("id, candidate_start, candidate_end, is_selected")
+      .eq("event_room_id", eventRoomId)
+      .order("candidate_start", { ascending: true });
+
+    const [
+      eventResult,
+      authUserId,
+      participantsResult,
+      candidatesResult,
+    ] = await Promise.all([
+      eventPromise,
+      authUserPromise,
+      participantsPromise,
+      candidatesPromise,
+    ]);
+
+    const { data: eventRoom, error: eventError } = eventResult;
     if (eventError || !eventRoom) {
       return new Response(
         JSON.stringify({ error: "Event not found" }),
@@ -49,47 +77,81 @@ serve(async (req) => {
       );
     }
 
-    // Fetch group name (only if event has a group)
-    let groupName: string | null = null;
-    if (eventRoom.group_id) {
-      const { data: group } = await supabase
-        .from("groups")
-        .select("name")
-        .eq("id", eventRoom.group_id)
-        .single();
-      groupName = group?.name || null;
-    }
+    const participants = participantsResult.data;
 
-    // Fetch creator name using created_by column
-    let creatorName: string | null = null;
-    if (eventRoom.created_by) {
-      const { data: creator } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", eventRoom.created_by)
-        .single();
-      creatorName = creator?.display_name || null;
-    }
+    // Fan out: group, creator, participant profiles, user profile, poll
+    // votes — all independent, all run in parallel.
+    const groupPromise = eventRoom.group_id
+      ? supabase
+          .from("groups")
+          .select("name")
+          .eq("id", eventRoom.group_id)
+          .single()
+      : null;
 
-    // Fetch participants with display names
-    const { data: participants } = await supabase
-      .from("event_room_participants")
-      .select("user_id, joined_at")
-      .eq("event_room_id", eventRoomId);
+    const creatorPromise = eventRoom.created_by
+      ? supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", eventRoom.created_by)
+          .single()
+      : null;
+
+    const participantProfilesPromise =
+      participants && participants.length > 0
+        ? supabase
+            .from("profiles")
+            .select("display_name")
+            .in(
+              "id",
+              participants.map((p: { user_id: string }) => p.user_id)
+            )
+        : null;
+
+    const userProfilePromise = authUserId
+      ? supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", authUserId)
+          .single()
+      : null;
+
+    const isPollMode = eventRoom.scheduling_mode === "poll";
+    const candidates = candidatesResult.data;
+    const votesPromise =
+      isPollMode && candidates && candidates.length > 0
+        ? supabase
+            .from("poll_votes")
+            .select("candidate_time_id, vote")
+            .in(
+              "candidate_time_id",
+              candidates.map((c: { id: string }) => c.id)
+            )
+            .eq("vote", "YES")
+        : null;
+
+    const [
+      groupResult,
+      creatorResult,
+      participantProfilesResult,
+      userProfileResult,
+      votesResult,
+    ] = await Promise.all([
+      groupPromise,
+      creatorPromise,
+      participantProfilesPromise,
+      userProfilePromise,
+      votesPromise,
+    ]);
+
+    const groupName = groupResult?.data?.name ?? null;
+    const creatorName = creatorResult?.data?.display_name ?? null;
 
     const participantNames: string[] = [];
-    if (participants && participants.length > 0) {
-      const userIds = participants.map((p: any) => p.user_id);
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .in("id", userIds);
-
-      if (profiles) {
-        for (const profile of profiles) {
-          if (profile.display_name) {
-            participantNames.push(profile.display_name);
-          }
+    if (participantProfilesResult?.data) {
+      for (const profile of participantProfilesResult.data) {
+        if (profile.display_name) {
+          participantNames.push(profile.display_name);
         }
       }
     }
@@ -107,20 +169,13 @@ serve(async (req) => {
       isExpired = new Date(eventRoom.created_at).getTime() + H72 <= now.getTime();
     }
 
-    // Check if the authenticated user has already RSVP'd
-    let alreadyRsvpd = false;
-    let userName: string | null = null;
-    if (authUserId && participants) {
-      alreadyRsvpd = participants.some((p: any) => p.user_id === authUserId);
-      const { data: userProfile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", authUserId)
-        .single();
-      userName = userProfile?.display_name || null;
-    }
+    const alreadyRsvpd =
+      !!authUserId &&
+      !!participants &&
+      participants.some((p: { user_id: string }) => p.user_id === authUserId);
+    const userName = userProfileResult?.data?.display_name ?? null;
 
-    // For poll-mode events, fetch the options with YES vote counts
+    // For poll-mode events, assemble options with YES vote counts
     let pollOptions: Array<{
       id: string;
       starts_at: string;
@@ -129,39 +184,31 @@ serve(async (req) => {
       is_selected: boolean;
     }> | null = null;
 
-    if (eventRoom.scheduling_mode === "poll") {
-      const { data: candidates } = await supabase
-        .from("scheduling_candidate_times")
-        .select("id, candidate_start, candidate_end, is_selected")
-        .eq("event_room_id", eventRoomId)
-        .order("candidate_start", { ascending: true });
-
-      if (candidates && candidates.length > 0) {
-        const candidateIds = candidates.map((c: any) => c.id);
-        const { data: votes } = await supabase
-          .from("poll_votes")
-          .select("candidate_time_id, vote")
-          .in("candidate_time_id", candidateIds)
-          .eq("vote", "YES");
-
-        const yesCounts = new Map<string, number>();
-        if (votes) {
-          for (const v of votes) {
-            yesCounts.set(
-              v.candidate_time_id,
-              (yesCounts.get(v.candidate_time_id) || 0) + 1
-            );
-          }
+    if (isPollMode && candidates && candidates.length > 0) {
+      const yesCounts = new Map<string, number>();
+      if (votesResult?.data) {
+        for (const v of votesResult.data) {
+          yesCounts.set(
+            v.candidate_time_id,
+            (yesCounts.get(v.candidate_time_id) || 0) + 1
+          );
         }
+      }
 
-        pollOptions = candidates.map((c: any) => ({
+      pollOptions = candidates.map(
+        (c: {
+          id: string;
+          candidate_start: string;
+          candidate_end: string;
+          is_selected: boolean | null;
+        }) => ({
           id: c.id,
           starts_at: c.candidate_start,
           ends_at: c.candidate_end,
           yes_count: yesCounts.get(c.id) || 0,
           is_selected: c.is_selected || false,
-        }));
-      }
+        })
+      );
     }
 
     // Return sanitized public data — no user IDs, no emails

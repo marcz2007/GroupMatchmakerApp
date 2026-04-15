@@ -35,6 +35,13 @@ const NotificationsInboxScreen = () => {
     try {
       const data = await getNotifications();
       setItems(data);
+      if (data.some((n) => !n.read)) {
+        try {
+          await markNotificationsRead();
+        } catch (error) {
+          console.error("[NotificationsInbox] mark-read failed:", error);
+        }
+      }
     } catch (error) {
       console.error("[NotificationsInbox] load failed:", error);
     } finally {
@@ -55,17 +62,6 @@ const NotificationsInboxScreen = () => {
     });
     return unsubscribe;
   }, [user?.id]);
-
-  // Mark everything read when opening the screen
-  useEffect(() => {
-    (async () => {
-      try {
-        await markNotificationsRead();
-      } catch (error) {
-        console.error("[NotificationsInbox] mark-read failed:", error);
-      }
-    })();
-  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);

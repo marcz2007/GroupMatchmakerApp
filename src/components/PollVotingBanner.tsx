@@ -12,7 +12,7 @@ import {
   getPollStatus,
   castPollVote,
   PollStatus,
-  PollOption,
+  formatPollOptionTime,
 } from "@grapple/shared";
 import { colors, spacing, borderRadius, typography } from "../theme";
 
@@ -22,25 +22,6 @@ const POLL_REFRESH_MS = 30_000;
 interface PollVotingBannerProps {
   eventRoomId: string;
   onStatusChange?: () => void;
-}
-
-function formatOptionDateTime(option: PollOption): string {
-  try {
-    const start = new Date(option.starts_at);
-    const dateStr = start.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-    const timeStr = start.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    return `${dateStr} · ${timeStr}`;
-  } catch {
-    return option.starts_at;
-  }
 }
 
 const PollVotingBanner: React.FC<PollVotingBannerProps> = ({
@@ -55,7 +36,13 @@ const PollVotingBanner: React.FC<PollVotingBannerProps> = ({
   const loadStatus = useCallback(async () => {
     try {
       const data = await getPollStatus(eventRoomId);
-      setStatus(data);
+      setStatus((prev) => {
+        // Skip re-render if nothing actually changed on the server.
+        if (prev && JSON.stringify(prev) === JSON.stringify(data)) {
+          return prev;
+        }
+        return data;
+      });
       setLoadError(false);
     } catch (error) {
       console.error("[PollBanner] Error loading poll status:", error);
@@ -134,7 +121,7 @@ const PollVotingBanner: React.FC<PollVotingBannerProps> = ({
         <View style={styles.winningCard}>
           <Text style={styles.winningLabel}>Selected time</Text>
           <Text style={styles.winningValue}>
-            {formatOptionDateTime(winningOption)}
+            {formatPollOptionTime(winningOption.starts_at)}
           </Text>
           <Text style={styles.winningCount}>
             {winningOption.yes_count} yes vote
@@ -166,7 +153,7 @@ const PollVotingBanner: React.FC<PollVotingBannerProps> = ({
             <View key={option.id} style={styles.optionCard}>
               <View style={styles.optionHeader}>
                 <Text style={styles.optionDateTime}>
-                  {formatOptionDateTime(option)}
+                  {formatPollOptionTime(option.starts_at)}
                 </Text>
                 <Text style={styles.optionCounts}>
                   {option.yes_count} yes · {option.no_count} no
