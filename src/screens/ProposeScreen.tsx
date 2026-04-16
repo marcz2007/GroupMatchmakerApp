@@ -829,7 +829,7 @@ const ProposeScreen = () => {
                   size={18}
                   color={smartScheduling ? colors.primary : colors.text.tertiary}
                 />
-                <View style={{ marginLeft: spacing.sm }}>
+                <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                   <Text style={[styles.smartToggleText, smartScheduling && styles.smartToggleTextActive]}>
                     Find best time
                   </Text>
@@ -867,7 +867,7 @@ const ProposeScreen = () => {
                   size={18}
                   color={pollVoting ? colors.primary : colors.text.tertiary}
                 />
-                <View style={{ marginLeft: spacing.sm }}>
+                <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                   <Text style={[styles.smartToggleText, pollVoting && styles.smartToggleTextActive]}>
                     Poll specific dates
                   </Text>
