@@ -252,11 +252,13 @@ export default function PublicEventPage() {
       }
       setRsvpSuccess(true);
 
-      // If the user ticked "Sync my Google Calendar" and they don't
-      // already have one connected, kick off OAuth. This is a full-page
-      // redirect — the callback will land us back on this event page
-      // with ?calendar_connected=true.
-      if (syncCalendar && userId && !alreadyConnected) {
+      // For smart events, sync-on-RSVP is the core flow: the app needs
+      // the guest's calendar busy times to pick the best slot. For poll
+      // events the next step is voting, so redirecting out to OAuth
+      // here would steal focus from the poll and they'd never vote —
+      // offer sync *after* they've voted instead.
+      const rsvpIsPoll = event?.scheduling_mode === "poll";
+      if (syncCalendar && userId && !alreadyConnected && !rsvpIsPoll) {
         const started = await startCalendarOAuth(userId);
         if (started) return; // redirecting — stop work here
         // On failure we fall through to the normal success UI.
@@ -371,6 +373,7 @@ export default function PublicEventPage() {
   const showPollVoting =
     isPoll &&
     !pollFinalized &&
+    !voteSuccess &&
     (rsvpSuccess || event.already_rsvpd) &&
     event.poll_options &&
     event.poll_options.length > 0;
@@ -474,19 +477,21 @@ export default function PublicEventPage() {
               disabled={rsvpSubmitting}
               required
             />
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                className={styles.checkbox}
-                checked={syncCalendar}
-                onChange={(e) => setSyncCalendar(e.target.checked)}
-                disabled={rsvpSubmitting}
-              />
-              <span className={styles.checkboxLabel}>
-                Sync my Google Calendar so Grapple can find a time that works
-                for everyone.
-              </span>
-            </label>
+            {!isPoll && (
+              <label className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={syncCalendar}
+                  onChange={(e) => setSyncCalendar(e.target.checked)}
+                  disabled={rsvpSubmitting}
+                />
+                <span className={styles.checkboxLabel}>
+                  Sync my Google Calendar so Grapple can find a time that works
+                  for everyone.
+                </span>
+              </label>
+            )}
             {rsvpError && <p className={styles.error}>{rsvpError}</p>}
             <button
               type="submit"
@@ -494,7 +499,9 @@ export default function PublicEventPage() {
               disabled={rsvpSubmitting}
             >
               {rsvpSubmitting
-                ? syncCalendar
+                ? isPoll
+                  ? "Joining..."
+                  : syncCalendar
                   ? "Joining & connecting calendar..."
                   : "Joining..."
                 : isPoll
@@ -552,9 +559,6 @@ export default function PublicEventPage() {
               })}
             </div>
             {voteError && <p className={styles.error}>{voteError}</p>}
-            {voteSuccess && (
-              <p className={styles.successText}>Votes submitted!</p>
-            )}
             <button
               type="button"
               className={styles.primaryButton}
@@ -562,6 +566,21 @@ export default function PublicEventPage() {
               onClick={handleSubmitVotes}
             >
               {voteSubmitting ? "Submitting..." : "Submit votes"}
+            </button>
+          </section>
+        )}
+
+        {isPoll && voteSuccess && (
+          <section className={styles.successBox}>
+            <h2 className={styles.successTitle}>Thanks for voting!</h2>
+            <p className={styles.description}>
+              We&apos;ll let everyone know once the final time is picked.
+            </p>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => router.push("/signup")}
+            >
+              Create a Grapple account to track this event
             </button>
           </section>
         )}
