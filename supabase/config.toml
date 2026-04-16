@@ -78,3 +78,16 @@ enabled = false
 # Functions settings
 [functions]
 # Add specific function settings if needed
+
+# Guest-facing endpoints — anyone with a share link can hit these, so
+# the Supabase gateway's default JWT check must be off. The functions
+# themselves still read the Authorization header when present to
+# recognise logged-in Grapple users.
+[functions.get-public-event]
+verify_jwt = false
+
+[functions.web-rsvp]
+verify_jwt = false
+
+[functions.web-poll-vote]
+verify_jwt = false

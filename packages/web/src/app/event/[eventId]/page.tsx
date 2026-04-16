@@ -91,13 +91,11 @@ export default function PublicEventPage() {
         throw new Error("Supabase URL not configured");
       }
 
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
       const response = await fetch(
         `${supabaseUrl}/functions/v1/get-public-event?event_room_id=${eventId}`,
         {
           headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
           },
         }
       );
@@ -224,13 +222,11 @@ export default function PublicEventPage() {
         throw new Error("Supabase URL not configured");
       }
 
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
       const response = await fetch(`${supabaseUrl}/functions/v1/web-rsvp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
         },
         body: JSON.stringify({
           event_room_id: eventId,
@@ -309,15 +305,13 @@ export default function PublicEventPage() {
         throw new Error("Supabase URL not configured");
       }
 
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
       const response = await fetch(
         `${supabaseUrl}/functions/v1/web-poll-vote`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
           },
           body: JSON.stringify({
             event_room_id: eventId,
