@@ -194,6 +194,25 @@ const SmartScheduleSetupScreen = () => {
   const handleCreate = async () => {
     if (!canCreate || isCreating) return;
 
+    const now = new Date();
+    // Guard against nonsense deadlines. These produced confusing server
+    // behaviour (either nothing ever collected, or the scheduler
+    // picked a slot that had already passed).
+    if (deadline <= now) {
+      Alert.alert(
+        "Pick a deadline in the future",
+        "The sync deadline needs to be after right now."
+      );
+      return;
+    }
+    if (deadline >= dateRangeStart) {
+      Alert.alert(
+        "Deadline is too late",
+        "The sync deadline needs to be before the earliest possible event date."
+      );
+      return;
+    }
+
     setIsCreating(true);
 
     try {

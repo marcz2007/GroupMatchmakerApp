@@ -349,22 +349,47 @@ const ProposeScreen = () => {
       });
       setDirectEventRoomId(directResult.id);
 
-      // Create proposal in each selected group, linking to the shared event room
-      const createPromises = selectedGroups.map((groupId) =>
-        createProposal({
-          group_id: groupId,
-          title: ideaTitle.trim(),
-          description,
-          starts_at: startsAt?.toISOString(),
-          vote_window_ends_at: voteWindowEndsAt.toISOString(),
-          threshold: computedThreshold,
-          is_anonymous: !showMyName,
-          estimated_cost: estimatedCost,
-          event_room_id: directResult.id,
-        })
+      // Create proposal in each selected group, linking to the shared event room.
+      // `allSettled` so one flaky group doesn't blow up the whole launch —
+      // we surface partial failures to the user instead of silently rolling
+      // back the proposals that did post.
+      const settled = await Promise.allSettled(
+        selectedGroups.map((groupId) =>
+          createProposal({
+            group_id: groupId,
+            title: ideaTitle.trim(),
+            description,
+            starts_at: startsAt?.toISOString(),
+            vote_window_ends_at: voteWindowEndsAt.toISOString(),
+            threshold: computedThreshold,
+            is_anonymous: !showMyName,
+            estimated_cost: estimatedCost,
+            event_room_id: directResult.id,
+          })
+        )
       );
 
-      await Promise.all(createPromises);
+      const failed = settled.filter((r) => r.status === "rejected").length;
+      const succeeded = settled.length - failed;
+
+      if (succeeded === 0) {
+        // Nothing posted — surface the first error and bail out of the
+        // success animation entirely.
+        const firstRejection = settled.find(
+          (r): r is PromiseRejectedResult => r.status === "rejected"
+        );
+        throw firstRejection?.reason instanceof Error
+          ? firstRejection.reason
+          : new Error("Couldn't post your idea to any of the selected groups.");
+      }
+
+      if (failed > 0) {
+        Alert.alert(
+          "Posted to some groups",
+          `Your idea went out to ${succeeded} group${succeeded === 1 ? "" : "s"}, ` +
+            `but ${failed} didn't go through. You can re-share from the event room.`
+        );
+      }
 
       // Success! Show confetti
       setCurrentStep("success");

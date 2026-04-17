@@ -195,6 +195,35 @@ export default function NewEventPage() {
   const handleCreate = async () => {
     if (!canCreate || isCreating) return;
     setError(null);
+
+    const now = new Date();
+    // Catch common foot-guns before we hit the server: a deadline in
+    // the past (nothing to collect for), or a deadline after the
+    // earliest possible event time (the app would pick a slot that's
+    // already gone by the time collecting closes).
+    if (deadline <= now) {
+      setError("Pick a deadline in the future.");
+      return;
+    }
+    if (mode === "smart" && deadline >= dateRangeStart) {
+      setError(
+        "The sync deadline needs to be before the earliest possible event date."
+      );
+      return;
+    }
+    if (mode === "poll") {
+      const earliestOption = validPollOptions.reduce<Date | null>((min, o) => {
+        const d = new Date(o.starts_at);
+        return !min || d < min ? d : min;
+      }, null);
+      if (earliestOption && deadline >= earliestOption) {
+        setError(
+          "The voting deadline needs to be before the earliest option."
+        );
+        return;
+      }
+    }
+
     setIsCreating(true);
 
     try {

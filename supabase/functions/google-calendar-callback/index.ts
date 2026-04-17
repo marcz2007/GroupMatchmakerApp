@@ -36,17 +36,20 @@ if (
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Fetch event times from Google Calendar (excluding private events) and store them
+// Fetch event times from Google Calendar (excluding private / cancelled /
+// "show as free" events) and store them.
 async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Promise<void> {
   try {
     const now = new Date();
+    // 60 days is plenty for a fresh OAuth — smart-scheduling re-fetches
+    // with its own window before it runs anyway. Fetching a full year
+    // here burned API quota and risked maxResults=2500 truncation.
     const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
+    endDate.setDate(endDate.getDate() + 60);
 
     const eventTimes: Array<{ start: string; end: string }> = [];
     let pageToken: string | undefined;
 
-    // Paginate through all events for the next 12 months
     do {
       const params = new URLSearchParams({
         timeMin: now.toISOString(),
@@ -54,7 +57,8 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
         singleEvents: "true",
         orderBy: "startTime",
         maxResults: "2500",
-        fields: "items(start,end,visibility),nextPageToken",
+        fields:
+          "items(start,end,visibility,transparency,status),nextPageToken",
       });
       if (pageToken) {
         params.set("pageToken", pageToken);
@@ -78,8 +82,16 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
       pageToken = data.nextPageToken;
 
       for (const event of data.items || []) {
-        // Skip private events
+        // Skip private events.
         if (event.visibility === "private" || event.visibility === "confidential") {
+          continue;
+        }
+        // Skip events the user marked "Show as Free".
+        if (event.transparency === "transparent") {
+          continue;
+        }
+        // Skip cancelled instances.
+        if (event.status === "cancelled") {
           continue;
         }
 
@@ -210,11 +222,26 @@ async function markEventSyncIfApplicable(
   }
 }
 
+// Sanitize a caller-supplied return path so it can only redirect within
+// the Grapple web app. `new URL(path, base)` treats an absolute URL in
+// `path` as authoritative and throws away the base — without this check
+// an attacker could call google-calendar-auth with
+// `returnPath: "https://evil.com/..."` and hijack the post-OAuth
+// redirect.
+function safeWebReturnPath(returnPath: string | undefined): string {
+  if (!returnPath) return "/";
+  // Must be a single-leading-slash path (not "//other-host/...", not a
+  // protocol-relative URL, not an absolute http(s) URL).
+  if (!returnPath.startsWith("/")) return "/";
+  if (returnPath.startsWith("//")) return "/";
+  return returnPath;
+}
+
 function createResponse(message: string, redirectUrl: string, success: boolean, isWeb: boolean, returnPath?: string) {
   // For web: redirect straight to the web app — user returns to the event they came from
   if (isWeb) {
-    const path = returnPath || "";
-    const url = new URL(path, WEB_APP_URL);
+    const safePath = safeWebReturnPath(returnPath);
+    const url = new URL(safePath, WEB_APP_URL);
     url.searchParams.set("calendar_connected", success ? "true" : "false");
     if (!success) url.searchParams.set("calendar_error", message);
     return new Response(null, {

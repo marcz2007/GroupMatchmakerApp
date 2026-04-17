@@ -172,6 +172,29 @@ const PollSetupScreen = () => {
 
   const handleCreate = async () => {
     if (!canCreate || isCreating) return;
+
+    const now = new Date();
+    if (deadline <= now) {
+      Alert.alert(
+        "Pick a deadline in the future",
+        "The voting deadline needs to be after right now."
+      );
+      return;
+    }
+    // Deadline must be before the earliest option, otherwise voting
+    // would still be open after the event was supposed to start.
+    const earliestOption = validOptions.reduce<Date | null>((min, o) => {
+      const d = new Date(o.starts_at);
+      return !min || d < min ? d : min;
+    }, null);
+    if (earliestOption && deadline >= earliestOption) {
+      Alert.alert(
+        "Deadline is too late",
+        "The voting deadline needs to be before the earliest poll option."
+      );
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -494,7 +517,7 @@ const PollSetupScreen = () => {
             )}
           </View>
 
-          {validOptions.length > 0 && (
+          {validOptions.length > 0 ? (
             <View style={styles.summaryBox}>
               <Ionicons
                 name="checkbox-outline"
@@ -507,7 +530,23 @@ const PollSetupScreen = () => {
                 {validOptions.length === 1 ? "" : "s"} ready to share
               </Text>
             </View>
-          )}
+          ) : options.length > 0 ? (
+            // Poll options silently filtered when the date/time is in the
+            // past. Without this banner the "Create poll" button just sits
+            // disabled and the user has no idea why.
+            <View style={styles.summaryBox}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={colors.warning}
+                style={{ marginRight: spacing.sm }}
+              />
+              <Text style={styles.summaryText}>
+                Move your options to a future date/time — the poll needs at
+                least one option that hasn't already passed.
+              </Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[

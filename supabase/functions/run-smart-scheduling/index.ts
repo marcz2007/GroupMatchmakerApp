@@ -54,7 +54,22 @@ serve(async (req) => {
 
     for (const eventRoomId of eventRoomIds) {
       try {
-        // 1. Refresh calendar busy times for all synced Google Calendar users
+        // 1. Refresh calendar busy times for all synced Google Calendar users.
+        //    Scope the fetch to this event's date window (plus a day buffer)
+        //    so we don't re-fetch a year of events every run.
+        const { data: eventRow } = await supabase
+          .from("event_rooms")
+          .select("scheduling_date_range_end")
+          .eq("id", eventRoomId)
+          .single();
+
+        let windowEnd: string | undefined;
+        if (eventRow?.scheduling_date_range_end) {
+          const end = new Date(eventRow.scheduling_date_range_end);
+          end.setDate(end.getDate() + 1); // buffer past the last candidate
+          windowEnd = end.toISOString();
+        }
+
         const { data: syncs } = await supabase
           .from("scheduling_calendar_syncs")
           .select("user_id, calendar_provider")
@@ -64,7 +79,7 @@ serve(async (req) => {
           if (sync.calendar_provider === "google") {
             try {
               await supabase.functions.invoke("refresh-calendar-busy-times", {
-                body: { userId: sync.user_id },
+                body: { userId: sync.user_id, windowEnd },
               });
             } catch (refreshErr) {
               console.error(`Failed to refresh calendar for user ${sync.user_id}:`, refreshErr);

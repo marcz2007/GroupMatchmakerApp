@@ -110,28 +110,63 @@ serve(async (req) => {
         );
       } else {
         // Create an anonymous auth user, then create their profile
+        const normalizedEmail = guest_email.toLowerCase().trim();
         const { data: anonAuth, error: anonError } = await supabase.auth.admin.createUser({
-          email: guest_email.toLowerCase().trim(),
+          email: normalizedEmail,
           email_confirm: true,
           user_metadata: { full_name: guest_name.trim(), is_guest: true },
         });
 
         if (anonError || !anonAuth.user) {
-          console.error("Error creating guest user:", anonError);
-          return new Response(
-            JSON.stringify({ error: "Failed to create guest account" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          // Two guests hitting RSVP at the same time race each other:
+          // both see no existing profile, both try to createUser, one
+          // wins and the other gets "email already registered". Recover
+          // by re-reading the profile and reusing the now-existing guest.
+          const msg = anonError?.message?.toLowerCase() || "";
+          const looksLikeDuplicate =
+            msg.includes("already") || msg.includes("registered");
+
+          if (looksLikeDuplicate) {
+            const { data: reread } = await supabase
+              .from("profiles")
+              .select("id, is_guest")
+              .eq("email", normalizedEmail)
+              .maybeSingle();
+            if (reread?.is_guest === true) {
+              userId = reread.id;
+            } else {
+              console.error("Guest create raced to non-guest profile:", anonError);
+              return new Response(
+                JSON.stringify({
+                  error:
+                    "This email already has an account. Please sign in to RSVP.",
+                }),
+                { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          } else {
+            console.error("Error creating guest user:", anonError);
+            return new Response(
+              JSON.stringify({ error: "Failed to create guest account" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          userId = anonAuth.user.id;
+
+          // Upsert on `id` so a retried request (or a profile row
+          // created by a database trigger on auth.users) doesn't fail
+          // the whole RSVP.
+          await supabase.from("profiles").upsert(
+            {
+              id: userId,
+              display_name: guest_name.trim(),
+              email: normalizedEmail,
+              is_guest: true,
+            },
+            { onConflict: "id" }
           );
         }
-
-        userId = anonAuth.user.id;
-
-        await supabase.from("profiles").insert({
-          id: userId,
-          display_name: guest_name.trim(),
-          email: guest_email.toLowerCase().trim(),
-          is_guest: true,
-        });
       }
     }
 

@@ -47,16 +47,29 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-async function fetchEventTimes(accessToken: string): Promise<Array<{ start: string; end: string }>> {
+async function fetchEventTimes(
+  accessToken: string,
+  windowEnd?: Date
+): Promise<Array<{ start: string; end: string }>> {
   try {
     const now = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
+    // Default to 60 days out. Callers that know the event's date range
+    // (e.g. run-smart-scheduling) should pass a tighter bound — fetching
+    // a year of events wastes API quota and risks hitting Google's
+    // maxResults=2500 cap, which would silently truncate a heavy user's
+    // calendar and produce phantom "free" slots.
+    const endDate = windowEnd
+      ? new Date(windowEnd)
+      : (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 60);
+          return d;
+        })();
 
     const results: Array<{ start: string; end: string }> = [];
     let pageToken: string | undefined;
+    let totalRaw = 0;
 
-    // Paginate through all events
     do {
       const params = new URLSearchParams({
         timeMin: now.toISOString(),
@@ -64,7 +77,11 @@ async function fetchEventTimes(accessToken: string): Promise<Array<{ start: stri
         singleEvents: "true",
         orderBy: "startTime",
         maxResults: "2500",
-        fields: "items(start,end,visibility),nextPageToken",
+        // `transparency` tells us if the user marked the event "Show as
+        // Free" — those shouldn't block scheduling. `status` lets us
+        // drop cancelled events, which Google still returns.
+        fields:
+          "items(start,end,visibility,transparency,status),nextPageToken",
       });
       if (pageToken) {
         params.set("pageToken", pageToken);
@@ -86,10 +103,21 @@ async function fetchEventTimes(accessToken: string): Promise<Array<{ start: stri
 
       const data = await response.json();
       pageToken = data.nextPageToken;
+      totalRaw += (data.items || []).length;
 
       for (const event of data.items || []) {
-        // Skip private events
+        // Skip private events — the caller asked not to look at these.
         if (event.visibility === "private" || event.visibility === "confidential") {
+          continue;
+        }
+        // Skip events the user marked "Show as Free" — they explicitly
+        // said this doesn't block them.
+        if (event.transparency === "transparent") {
+          continue;
+        }
+        // Skip cancelled events. Google still returns these in
+        // singleEvents expansions (especially recurring cancellations).
+        if (event.status === "cancelled") {
           continue;
         }
 
@@ -103,6 +131,9 @@ async function fetchEventTimes(accessToken: string): Promise<Array<{ start: stri
       }
     } while (pageToken);
 
+    console.log(
+      `Calendar fetch: ${totalRaw} raw events → ${results.length} busy blocks`
+    );
     return results;
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -119,11 +150,16 @@ serve(async (req) => {
   try {
     console.log("=== Refresh Calendar Busy Times Started ===");
 
-    const { userId } = await req.json();
+    const { userId, windowEnd } = await req.json();
 
     if (!userId) {
       throw new Error("User ID is required");
     }
+
+    // `windowEnd` is an optional ISO string. Callers with a known
+    // scheduling horizon (e.g. run-smart-scheduling) pass it so we
+    // don't fetch a year of events.
+    const parsedWindowEnd = windowEnd ? new Date(windowEnd) : undefined;
 
     // Get user's calendar credentials
     const { data: profile, error: profileError } = await supabase
@@ -163,9 +199,9 @@ serve(async (req) => {
         .eq("id", userId);
     }
 
-    // Fetch event times (excludes private events)
+    // Fetch event times (excludes private / free / cancelled events)
     console.log("Fetching calendar events...");
-    const eventTimes = await fetchEventTimes(accessToken);
+    const eventTimes = await fetchEventTimes(accessToken, parsedWindowEnd);
     console.log(`Found ${eventTimes.length} event time blocks`);
 
     // Clear existing busy times for this user
