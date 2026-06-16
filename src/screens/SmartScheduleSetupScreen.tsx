@@ -232,6 +232,7 @@ const SmartScheduleSetupScreen = () => {
         dateRangeEnd: dateRangeEnd.toISOString().split("T")[0],
         schedulingDeadline: deadline.toISOString(),
         slots,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
 
       setCreatedEventId(result.event_room_id);

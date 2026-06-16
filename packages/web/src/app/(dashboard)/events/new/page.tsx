@@ -245,6 +245,7 @@ export default function NewEventPage() {
           schedulingDeadline: deadline.toISOString(),
           slots,
           minSyncedUsers: minSyncedEnabled ? minSyncedUsers : undefined,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
 
         setCreatedEventId(result.event_room_id);

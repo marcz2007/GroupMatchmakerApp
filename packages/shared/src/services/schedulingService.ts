@@ -54,6 +54,9 @@ export async function createSmartEvent(params: {
   schedulingDeadline?: string;
   slots: SchedulingSlot[];
   minSyncedUsers?: number;
+  // IANA timezone the slot wall-clock times are expressed in (the creator's
+  // local zone). The server anchors candidate times to this zone.
+  timezone?: string;
 }) {
   const { data, error } = await supabase.rpc("create_smart_event", {
     p_title: params.title,
@@ -63,6 +66,7 @@ export async function createSmartEvent(params: {
     p_scheduling_deadline: params.schedulingDeadline || null,
     p_slots: params.slots,
     p_min_synced_users: params.minSyncedUsers ?? null,
+    p_timezone: params.timezone || "UTC",
   });
 
   if (error) throw error;
