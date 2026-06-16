@@ -73,8 +73,29 @@ serve(async (req) => {
 
     console.log("State stored successfully:", state);
 
-    // Construct the Google OAuth authorization URL
-    // Request only calendar.readonly scope for privacy - we only need to see busy/free times
+    // Only force Google's consent screen on first connect (when we have no
+    // refresh token for this user yet). For an already-connected user
+    // re-authing, omitting `prompt` lets Google skip consent and redirect
+    // back near-instantly — the "returning user" fast path. We keep
+    // access_type=offline so the first consent still yields a refresh token.
+    let hasRefreshToken = false;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (serviceKey) {
+      try {
+        const admin = createClient(supabaseUrl, serviceKey);
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("calendar_refresh_token")
+          .eq("id", userId)
+          .maybeSingle();
+        hasRefreshToken = !!prof?.calendar_refresh_token;
+      } catch (e) {
+        console.error("refresh-token lookup failed (defaulting to consent):", e);
+      }
+    }
+
+    // Construct the Google OAuth authorization URL.
+    // Request only calendar.readonly scope for privacy - we only need busy/free.
     const scopes = [
       "https://www.googleapis.com/auth/calendar.readonly",
     ].join(" ");
@@ -86,7 +107,9 @@ serve(async (req) => {
     authUrl.searchParams.append("state", state);
     authUrl.searchParams.append("scope", scopes);
     authUrl.searchParams.append("access_type", "offline");
-    authUrl.searchParams.append("prompt", "consent");
+    if (!hasRefreshToken) {
+      authUrl.searchParams.append("prompt", "consent");
+    }
 
     console.log("Generated auth URL:", authUrl.toString());
 

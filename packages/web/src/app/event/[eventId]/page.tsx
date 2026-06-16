@@ -129,6 +129,14 @@ export default function PublicEventPage() {
     try {
       const stored = localStorage.getItem(`grapple.rsvp.${eventId}`);
       if (stored) setSubmittedEmail(stored);
+
+      // Pre-fill the form for returning users so they don't retype — the
+      // "faster returning-user" path. They keep a connected profile, so on
+      // submit web-rsvp reuses it and we skip OAuth entirely.
+      const lastEmail = localStorage.getItem("grapple.lastEmail");
+      const lastName = localStorage.getItem("grapple.lastName");
+      if (lastEmail) setGuestEmail(lastEmail);
+      if (lastName) setGuestName(lastName);
     } catch {
       // localStorage disabled — poll voting post-OAuth just won't work.
     }
@@ -248,10 +256,24 @@ export default function PublicEventPage() {
       setSubmittedEmail(cleanEmail);
       try {
         localStorage.setItem(`grapple.rsvp.${eventId}`, cleanEmail);
+        // Remember globally so the next event link pre-fills the form.
+        localStorage.setItem("grapple.lastEmail", cleanEmail);
+        localStorage.setItem("grapple.lastName", cleanName);
       } catch {
         // localStorage may be unavailable — non-fatal.
       }
       setRsvpSuccess(true);
+
+      // Returning user with a calendar already connected: no OAuth needed —
+      // the server auto-counts their availability for this event. Reassure
+      // them and skip the Google round-trip entirely.
+      if (alreadyConnected) {
+        setCalendarBanner({
+          kind: "success",
+          message:
+            "You're already synced — we'll use your availability to pick the best time.",
+        });
+      }
 
       // For smart events, sync-on-RSVP is the core flow: the app needs
       // the guest's calendar busy times to pick the best slot. For poll
