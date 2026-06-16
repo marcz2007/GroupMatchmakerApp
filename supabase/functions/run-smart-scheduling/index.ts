@@ -75,18 +75,49 @@ serve(async (req) => {
           .select("user_id, calendar_provider")
           .eq("event_room_id", eventRoomId);
 
-        for (const sync of syncs || []) {
-          if (sync.calendar_provider === "google") {
+        const googleUserIds = (syncs || [])
+          .filter((s: any) => s.calendar_provider === "google")
+          .map((s: any) => s.user_id);
+        // iOS local calendars are uploaded at sync time, no refresh needed.
+
+        if (googleUserIds.length > 0) {
+          // Freshness gate: the persistent store is kept warm by the daily
+          // refresh-all-calendars cron and by on-connect syncs. Only hit
+          // Google for users whose store is stale or doesn't cover this
+          // event's window — most runs now skip the round-trips entirely.
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, calendar_last_refreshed_at, calendar_synced_through")
+            .in("id", googleUserIds);
+          const metaById = new Map(
+            (profs || []).map((p: any) => [p.id, p])
+          );
+
+          const FRESH_MS = 2 * 60 * 60 * 1000; // trust store refreshed <2h ago
+          const nowMs = Date.now();
+          const windowEndMs = windowEnd ? new Date(windowEnd).getTime() : nowMs;
+
+          for (const userId of googleUserIds) {
+            const meta = metaById.get(userId);
+            const refreshedAt = meta?.calendar_last_refreshed_at
+              ? new Date(meta.calendar_last_refreshed_at).getTime()
+              : 0;
+            const syncedThrough = meta?.calendar_synced_through
+              ? new Date(meta.calendar_synced_through).getTime()
+              : 0;
+            const isFresh =
+              nowMs - refreshedAt < FRESH_MS && syncedThrough >= windowEndMs;
+            if (isFresh) continue; // warm store covers it — skip Google
+
             try {
               await supabase.functions.invoke("refresh-calendar-busy-times", {
-                body: { userId: sync.user_id, windowEnd },
+                body: { userId, windowEnd },
               });
             } catch (refreshErr) {
-              console.error(`Failed to refresh calendar for user ${sync.user_id}:`, refreshErr);
+              console.error(`Failed to refresh calendar for user ${userId}:`, refreshErr);
               // Continue — use whatever data we have
             }
           }
-          // iOS local calendars are uploaded at sync time, no refresh needed
         }
 
         // 2. Run the scheduling algorithm via RPC

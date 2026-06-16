@@ -199,6 +199,24 @@ serve(async (req) => {
       }
     }
 
+    // Stamp refresh-tracking columns so the scheduler's freshness gate can
+    // skip a redundant Google round-trip when this store already covers the
+    // event window.
+    const horizonEnd =
+      parsedWindowEnd ??
+      (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 60);
+        return d;
+      })();
+    await supabase
+      .from("profiles")
+      .update({
+        calendar_last_refreshed_at: new Date().toISOString(),
+        calendar_synced_through: horizonEnd.toISOString(),
+      })
+      .eq("id", userId);
+
     console.log("=== Refresh Calendar Busy Times Completed ===");
 
     return new Response(

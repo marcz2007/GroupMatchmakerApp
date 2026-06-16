@@ -118,6 +118,15 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
         console.error("Error inserting busy times:", error);
       }
     }
+
+    // Stamp refresh-tracking columns (used by the scheduler's freshness gate).
+    await supabase
+      .from("profiles")
+      .update({
+        calendar_last_refreshed_at: new Date().toISOString(),
+        calendar_synced_through: endDate.toISOString(),
+      })
+      .eq("id", userId);
   } catch (error) {
     console.error("Error fetching busy times:", error);
   }
