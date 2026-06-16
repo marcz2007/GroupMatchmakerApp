@@ -38,6 +38,7 @@ import { colors, spacing, borderRadius } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 import { getUserGroups, createProposal, createDirectEvent } from "@grapple/shared";
 import { RootStackParamList } from "../navigation/AppNavigator";
+import { WEB_APP_URL } from "../config";
 
 type Step = "idea" | "details" | "groups" | "launching" | "success";
 
@@ -480,7 +481,7 @@ const ProposeScreen = () => {
 
   const handleShareInviteLink = async () => {
     if (!directEventRoomId) return;
-    const url = `https://group-matchmaker-app-web.vercel.app/event/${directEventRoomId}`;
+    const url = `${WEB_APP_URL}/event/${directEventRoomId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);

@@ -36,75 +36,64 @@ if (
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Fetch event times from Google Calendar (excluding private / cancelled /
-// "show as free" events) and store them.
+// Query the Google Calendar FreeBusy API for the user's primary calendar and
+// return the busy intervals within [timeMin, timeMax].
+//
+// FreeBusy is the right tool for availability: it returns busy blocks
+// REGARDLESS of an event's visibility — so private/confidential events still
+// count as busy (a private appointment still means you're unavailable). It
+// also excludes "Show as Free" events automatically, returns no event details
+// (keeping us aligned with our privacy promise — we never see titles), and has
+// no maxResults cap, so there's no silent truncation for heavy calendars.
+async function fetchFreeBusy(
+  accessToken: string,
+  timeMin: Date,
+  timeMax: Date
+): Promise<Array<{ start: string; end: string }>> {
+  const response = await fetch(
+    "https://www.googleapis.com/calendar/v3/freeBusy",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        items: [{ id: "primary" }],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    console.error("Failed to fetch free/busy:", await response.text());
+    return [];
+  }
+
+  const data = await response.json();
+  const primary = data.calendars?.primary;
+  if (primary?.errors?.length) {
+    console.error("FreeBusy returned errors:", JSON.stringify(primary.errors));
+  }
+  const busy: Array<{ start?: string; end?: string }> = primary?.busy ?? [];
+  return busy
+    .filter((b) => b.start && b.end)
+    .map((b) => ({ start: b.start as string, end: b.end as string }));
+}
+
+// Fetch the user's busy intervals from Google Calendar and store them.
 async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Promise<void> {
   try {
     const now = new Date();
     // 60 days is plenty for a fresh OAuth — smart-scheduling re-fetches
-    // with its own window before it runs anyway. Fetching a full year
-    // here burned API quota and risked maxResults=2500 truncation.
+    // with its own window before it runs anyway.
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 60);
 
-    const eventTimes: Array<{ start: string; end: string }> = [];
-    let pageToken: string | undefined;
+    const eventTimes = await fetchFreeBusy(accessToken, now, endDate);
 
-    do {
-      const params = new URLSearchParams({
-        timeMin: now.toISOString(),
-        timeMax: endDate.toISOString(),
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: "2500",
-        fields:
-          "items(start,end,visibility,transparency,status),nextPageToken",
-      });
-      if (pageToken) {
-        params.set("pageToken", pageToken);
-      }
-
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        console.error("Failed to fetch events:", await response.text());
-        break;
-      }
-
-      const data = await response.json();
-      pageToken = data.nextPageToken;
-
-      for (const event of data.items || []) {
-        // Skip private events.
-        if (event.visibility === "private" || event.visibility === "confidential") {
-          continue;
-        }
-        // Skip events the user marked "Show as Free".
-        if (event.transparency === "transparent") {
-          continue;
-        }
-        // Skip cancelled instances.
-        if (event.status === "cancelled") {
-          continue;
-        }
-
-        const start = event.start?.dateTime || event.start?.date;
-        const end = event.end?.dateTime || event.end?.date;
-
-        if (start && end) {
-          eventTimes.push({ start, end });
-        }
-      }
-    } while (pageToken);
-
-    console.log(`Found ${eventTimes.length} event time blocks`);
+    console.log(`Found ${eventTimes.length} busy blocks`);
 
     // Clear existing busy times for this user
     await supabase
@@ -130,11 +119,11 @@ async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Prom
       }
     }
   } catch (error) {
-    console.error("Error fetching events:", error);
+    console.error("Error fetching busy times:", error);
   }
 }
 
-const WEB_APP_URL = "https://group-matchmaker-app-web.vercel.app";
+const WEB_APP_URL = Deno.env.get("WEB_APP_URL") ?? "https://grappleapp.co.uk";
 
 function parseState(state: string): { isWeb: boolean; returnPath: string } {
   // State format: "uuid:platform" or "uuid:platform:base64returnPath"

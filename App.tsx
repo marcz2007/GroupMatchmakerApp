@@ -16,6 +16,7 @@ import AppNavigator, {
   RootStackParamList,
 } from "./src/navigation/AppNavigator";
 import { colors } from "./src/theme";
+import { WEB_APP_URL, LEGACY_WEB_APP_URL } from "./src/config";
 
 // Configure Google Sign-In — safe to fail in Expo Go (native module not available)
 try {
@@ -36,7 +37,8 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     "groupmatchmakerapp://",
     "https://nqtycfrgzjiehatokmfn.supabase.co",
-    "https://group-matchmaker-app-web.vercel.app",
+    WEB_APP_URL,
+    LEGACY_WEB_APP_URL,
   ],
   config: {
     screens: {

@@ -39,6 +39,21 @@
           "data": [
             {
               "scheme": "https",
+              "host": "grappleapp.co.uk",
+              "pathPrefix": "/event/"
+            },
+            {
+              "scheme": "https",
+              "host": "grappleapp.co.uk",
+              "pathPrefix": "/group/invite/"
+            },
+            {
+              "scheme": "https",
+              "host": "grappleapp.co.uk",
+              "pathPrefix": "/reset-password"
+            },
+            {
+              "scheme": "https",
               "host": "group-matchmaker-app-web.vercel.app",
               "pathPrefix": "/event/"
             },
@@ -97,6 +112,7 @@
   "_iosUniversalLinksTemplate": {
     "_comment": "PARKED: iOS Universal Links config. Activate this when you pay for the Apple Developer account. Steps: (1) Copy `associatedDomains` into expo.ios above (as a sibling of `bundleIdentifier`). (2) Set APPLE_TEAM_ID on Vercel (Settings → Environment Variables). Optionally set APPLE_BUNDLE_ID if you ever change the bundle. (3) Redeploy the web app so /.well-known/apple-app-site-association starts serving the JSON (route handler at packages/web/src/app/api/well-known/apple-app-site-association/route.ts). (4) Run `eas build --platform ios --profile production` — associatedDomains is a native entitlement, so an OTA update via expo-updates WILL NOT pick it up, you need a fresh native build submitted to TestFlight/App Store. (5) Wait a few minutes after the new build is installed on a device — iOS fetches the AASA file asynchronously the first time. This root-level key is ignored by Expo's config loader since it only reads the `expo` object.",
     "associatedDomains": [
+      "applinks:grappleapp.co.uk",
       "applinks:group-matchmaker-app-web.vercel.app"
     ]
   }

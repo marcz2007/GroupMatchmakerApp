@@ -32,6 +32,7 @@ import { colors, spacing, borderRadius } from "../theme";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
 import PollVotingBanner from "../components/PollVotingBanner";
+import { WEB_APP_URL } from "../config";
 
 type EventRoomScreenRouteProp = RouteProp<RootStackParamList, "EventRoom">;
 type EventRoomScreenNavigationProp = StackNavigationProp<
@@ -73,7 +74,7 @@ const EventRoomScreen: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const url = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
+    const url = `${WEB_APP_URL}/event/${eventRoomId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);

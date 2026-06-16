@@ -28,6 +28,7 @@ import Starfield from "../components/propose/Starfield";
 import { colors, spacing, borderRadius } from "../theme";
 import { createPollEvent, PollOptionInput } from "@grapple/shared";
 import { RootStackParamList } from "../navigation/AppNavigator";
+import { WEB_APP_URL } from "../config";
 
 type RouteParams = RouteProp<RootStackParamList, "PollSetup">;
 
@@ -251,7 +252,7 @@ const PollSetupScreen = () => {
 
   const handleShareInviteLink = async () => {
     if (!createdEventId) return;
-    const url = `https://group-matchmaker-app-web.vercel.app/event/${createdEventId}`;
+    const url = `${WEB_APP_URL}/event/${createdEventId}`;
     if (Platform.OS === "web" && navigator?.clipboard) {
       try {
         await navigator.clipboard.writeText(url);

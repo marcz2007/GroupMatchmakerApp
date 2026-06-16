@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
+import { WEB_APP_URL } from "../config";
 import {
   getEventDetails,
   getEventMessages,
@@ -30,7 +31,7 @@ import {
   ChatExtensionStatus,
 } from "@grapple/shared";
 
-const INVITE_LINK_REGEX = /https:\/\/group-matchmaker-app\.vercel\.app\/event\/[a-f0-9-]+/;
+const INVITE_LINK_REGEX = /https:\/\/(?:grappleapp\.co\.uk|group-matchmaker-app(?:-web)?\.vercel\.app)\/event\/[a-f0-9-]+/;
 const EXTENSION_MESSAGE_ID = "00000000-0000-0000-0000-000000000001";
 
 interface EventChatScreenProps {
@@ -130,7 +131,7 @@ const EventChatScreen = ({ eventRoomIdProp, isDesktopPane }: EventChatScreenProp
   };
 
   const handleCopyLink = async () => {
-    const link = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
+    const link = `${WEB_APP_URL}/event/${eventRoomId}`;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await Share.share({ message: link });

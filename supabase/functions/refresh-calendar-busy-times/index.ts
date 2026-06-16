@@ -47,6 +47,15 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
+// Query the Google Calendar FreeBusy API for the user's primary calendar and
+// return busy intervals.
+//
+// FreeBusy returns busy blocks REGARDLESS of event visibility, so
+// private/confidential events still count as busy (a private appointment still
+// means you're unavailable — skipping them produced phantom "free" slots and
+// let scheduling book over real commitments). It also excludes "Show as Free"
+// events automatically, returns no event details (we never see titles), and has
+// no maxResults cap, so there's no silent truncation for heavy calendars.
 async function fetchEventTimes(
   accessToken: string,
   windowEnd?: Date
@@ -54,10 +63,7 @@ async function fetchEventTimes(
   try {
     const now = new Date();
     // Default to 60 days out. Callers that know the event's date range
-    // (e.g. run-smart-scheduling) should pass a tighter bound — fetching
-    // a year of events wastes API quota and risks hitting Google's
-    // maxResults=2500 cap, which would silently truncate a heavy user's
-    // calendar and produce phantom "free" slots.
+    // (e.g. run-smart-scheduling) should pass a tighter bound.
     const endDate = windowEnd
       ? new Date(windowEnd)
       : (() => {
@@ -66,77 +72,41 @@ async function fetchEventTimes(
           return d;
         })();
 
-    const results: Array<{ start: string; end: string }> = [];
-    let pageToken: string | undefined;
-    let totalRaw = 0;
-
-    do {
-      const params = new URLSearchParams({
-        timeMin: now.toISOString(),
-        timeMax: endDate.toISOString(),
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: "2500",
-        // `transparency` tells us if the user marked the event "Show as
-        // Free" — those shouldn't block scheduling. `status` lets us
-        // drop cancelled events, which Google still returns.
-        fields:
-          "items(start,end,visibility,transparency,status),nextPageToken",
-      });
-      if (pageToken) {
-        params.set("pageToken", pageToken);
+    const response = await fetch(
+      "https://www.googleapis.com/calendar/v3/freeBusy",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timeMin: now.toISOString(),
+          timeMax: endDate.toISOString(),
+          items: [{ id: "primary" }],
+        }),
       }
-
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        console.error("Failed to fetch events:", await response.text());
-        return results;
-      }
-
-      const data = await response.json();
-      pageToken = data.nextPageToken;
-      totalRaw += (data.items || []).length;
-
-      for (const event of data.items || []) {
-        // Skip private events — the caller asked not to look at these.
-        if (event.visibility === "private" || event.visibility === "confidential") {
-          continue;
-        }
-        // Skip events the user marked "Show as Free" — they explicitly
-        // said this doesn't block them.
-        if (event.transparency === "transparent") {
-          continue;
-        }
-        // Skip cancelled events. Google still returns these in
-        // singleEvents expansions (especially recurring cancellations).
-        if (event.status === "cancelled") {
-          continue;
-        }
-
-        // Use dateTime for timed events, date for all-day events
-        const start = event.start?.dateTime || event.start?.date;
-        const end = event.end?.dateTime || event.end?.date;
-
-        if (start && end) {
-          results.push({ start, end });
-        }
-      }
-    } while (pageToken);
-
-    console.log(
-      `Calendar fetch: ${totalRaw} raw events → ${results.length} busy blocks`
     );
+
+    if (!response.ok) {
+      console.error("Failed to fetch free/busy:", await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+    const primary = data.calendars?.primary;
+    if (primary?.errors?.length) {
+      console.error("FreeBusy returned errors:", JSON.stringify(primary.errors));
+    }
+    const busy: Array<{ start?: string; end?: string }> = primary?.busy ?? [];
+    const results = busy
+      .filter((b) => b.start && b.end)
+      .map((b) => ({ start: b.start as string, end: b.end as string }));
+
+    console.log(`FreeBusy: ${results.length} busy blocks`);
     return results;
   } catch (error) {
-    console.error("Error fetching events:", error);
+    console.error("Error fetching free/busy:", error);
     return [];
   }
 }

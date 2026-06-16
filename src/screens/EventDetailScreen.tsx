@@ -19,6 +19,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import SmartSchedulingBanner from "../components/SmartSchedulingBanner";
 import PollVotingBanner from "../components/PollVotingBanner";
 import { usePublicEventDetails, useJoinEventRoom } from "../hooks/queries";
+import { WEB_APP_URL } from "../config";
 
 const EventDetailScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -65,7 +66,7 @@ const EventDetailScreen = () => {
 
   const handleShare = async () => {
     if (!details) return;
-    const url = `https://group-matchmaker-app-web.vercel.app/event/${eventRoomId}`;
+    const url = `${WEB_APP_URL}/event/${eventRoomId}`;
     const eventDate = formatDate(details.event_room.starts_at);
     const dateText = eventDate ? ` on ${eventDate}` : "";
     try {

@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Public web app URL used in notification email links. Override via the
+// WEB_APP_URL env var (set on the function) when the domain changes.
+const WEB_APP_URL = Deno.env.get("WEB_APP_URL") ?? "https://grappleapp.co.uk";
+
 // Reads notifications with email_sent_at IS NULL and sends them via
 // Resend. Safe to call on a cron (e.g. every minute) or on demand.
 // Gracefully no-ops when RESEND_API_KEY is not configured.
@@ -122,7 +126,7 @@ serve(async (req) => {
           ${
             notification.event_room_id
               ? `<p style="margin: 24px 0 0;">
-                  <a href="https://group-matchmaker-app-web.vercel.app/event/${notification.event_room_id}"
+                  <a href="${WEB_APP_URL}/event/${notification.event_room_id}"
                      style="display: inline-block; padding: 10px 18px; background: #5762b7; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
                     View event
                   </a>

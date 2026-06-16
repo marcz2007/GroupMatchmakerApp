@@ -14,6 +14,7 @@ import { RootStackNavigationProp } from "../../App";
 import { Button } from "../components/Button";
 import { supabase } from "@grapple/shared";
 import { twoButtonAlert } from "../utils/alertHelper";
+import { WEB_APP_URL } from "../config";
 
 // Set to true to see debug alerts
 const DEBUG_AUTH = false;
@@ -159,7 +160,7 @@ const LoginScreen = () => {
 
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: "https://group-matchmaker-app-web.vercel.app",
+        redirectTo: WEB_APP_URL,
       });
 
       debugAlert("Reset response", {
