@@ -56,6 +56,13 @@ const formatTime12 = (hours: number, minutes: number): string => {
   return `${displayHour}${displayMin} ${period}`;
 };
 
+// Local YYYY-MM-DD. toISOString() would convert to UTC first and can shift the
+// date by a day for users picking near midnight in non-UTC zones (e.g. BST).
+const toLocalDateStr = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+
 const SmartScheduleSetupScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteParams>();
@@ -228,8 +235,8 @@ const SmartScheduleSetupScreen = () => {
       const result = await createSmartEvent({
         title: title.trim(),
         description: location ? `📍 ${location}` : undefined,
-        dateRangeStart: dateRangeStart.toISOString().split("T")[0],
-        dateRangeEnd: dateRangeEnd.toISOString().split("T")[0],
+        dateRangeStart: toLocalDateStr(dateRangeStart),
+        dateRangeEnd: toLocalDateStr(dateRangeEnd),
         schedulingDeadline: deadline.toISOString(),
         slots,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,

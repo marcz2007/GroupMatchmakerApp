@@ -46,7 +46,10 @@ function formatTime12(hours: number, minutes: number): string {
 }
 
 function toInputDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Format from local components — toISOString() would convert to UTC first
+  // and shift the date by a day for users picking near midnight in non-UTC
+  // zones (e.g. BST), generating candidates for the wrong calendar day.
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function toInputDateTime(d: Date): string {
