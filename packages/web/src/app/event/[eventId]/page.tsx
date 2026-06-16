@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatDate } from "@grapple/shared";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import OpenInAppBanner from "@/components/OpenInAppBanner";
 import styles from "./publicEvent.module.css";
 
 interface PollOption {
@@ -381,6 +382,7 @@ export default function PublicEventPage() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
+        <OpenInAppBanner deepLink={`groupmatchmakerapp://event/${eventId}`} />
         <header className={styles.header}>
           {event.group_name && (
             <span className={styles.groupBadge}>{event.group_name}</span>
