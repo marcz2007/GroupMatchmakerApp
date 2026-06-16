@@ -90,14 +90,53 @@ export async function fetchFreeBusy(
     .map((b) => ({ start: b.start as string, end: b.end as string }));
 }
 
-// Refresh one user's busy-time store over a rolling horizon (replacing the
-// existing rows). Also stamps the per-user refresh-tracking columns. Returns
-// the number of busy blocks written, or null if the user couldn't be refreshed.
+// Replace a user's busy-time store for a rolling window and stamp the
+// refresh-tracking columns (used by the scheduler's freshness gate). Returns
+// the number of busy blocks written. Throws if the insert fails.
+export async function writeBusyTimes(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  userId: string,
+  busy: BusyInterval[],
+  horizonEnd: Date
+): Promise<number> {
+  const now = new Date().toISOString();
+  await supabase.from("calendar_busy_times").delete().eq("user_id", userId);
+
+  if (busy.length > 0) {
+    const rows = busy.map((b) => ({
+      user_id: userId,
+      start_time: b.start,
+      end_time: b.end,
+      fetched_at: now,
+    }));
+    const { error } = await supabase.from("calendar_busy_times").insert(rows);
+    if (error) {
+      console.error(`Insert busy times failed for ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  await supabase
+    .from("profiles")
+    .update({
+      calendar_last_refreshed_at: now,
+      calendar_synced_through: horizonEnd.toISOString(),
+    })
+    .eq("id", userId);
+
+  return busy.length;
+}
+
+// Refresh one user's busy-time store over a rolling horizon, refreshing the
+// access token first if it has expired. Returns the number of busy blocks
+// written, or null if the user couldn't be refreshed. Pass `horizonEnd` for an
+// explicit bound (e.g. an event's window) or `horizonDays` (default 60).
 export async function refreshUserBusyTimes(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   profile: CalendarProfile,
-  horizonDays: number
+  opts: { horizonDays?: number; horizonEnd?: Date } = {}
 ): Promise<number | null> {
   if (!profile.calendar_connected || !profile.calendar_refresh_token) {
     return null;
@@ -122,36 +161,19 @@ export async function refreshUserBusyTimes(
       .eq("id", profile.id);
   }
 
-  const now = new Date();
-  const horizonEnd = new Date();
-  horizonEnd.setDate(horizonEnd.getDate() + horizonDays);
+  const horizonEnd =
+    opts.horizonEnd ??
+    (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + (opts.horizonDays ?? 60));
+      return d;
+    })();
 
-  const busy = await fetchFreeBusy(accessToken, now, horizonEnd);
+  const busy = await fetchFreeBusy(accessToken, new Date(), horizonEnd);
 
-  // Replace the user's store for the rolling window.
-  await supabase.from("calendar_busy_times").delete().eq("user_id", profile.id);
-
-  if (busy.length > 0) {
-    const rows = busy.map((b) => ({
-      user_id: profile.id,
-      start_time: b.start,
-      end_time: b.end,
-      fetched_at: now.toISOString(),
-    }));
-    const { error } = await supabase.from("calendar_busy_times").insert(rows);
-    if (error) {
-      console.error(`Insert busy times failed for ${profile.id}:`, error);
-      return null;
-    }
+  try {
+    return await writeBusyTimes(supabase, profile.id, busy, horizonEnd);
+  } catch {
+    return null;
   }
-
-  await supabase
-    .from("profiles")
-    .update({
-      calendar_last_refreshed_at: now.toISOString(),
-      calendar_synced_through: horizonEnd.toISOString(),
-    })
-    .eq("id", profile.id);
-
-  return busy.length;
 }

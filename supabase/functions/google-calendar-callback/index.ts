@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchFreeBusy, writeBusyTimes } from "../_shared/googleCalendar.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,97 +37,19 @@ if (
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Query the Google Calendar FreeBusy API for the user's primary calendar and
-// return the busy intervals within [timeMin, timeMax].
-//
-// FreeBusy is the right tool for availability: it returns busy blocks
-// REGARDLESS of an event's visibility — so private/confidential events still
-// count as busy (a private appointment still means you're unavailable). It
-// also excludes "Show as Free" events automatically, returns no event details
-// (keeping us aligned with our privacy promise — we never see titles), and has
-// no maxResults cap, so there's no silent truncation for heavy calendars.
-async function fetchFreeBusy(
-  accessToken: string,
-  timeMin: Date,
-  timeMax: Date
-): Promise<Array<{ start: string; end: string }>> {
-  const response = await fetch(
-    "https://www.googleapis.com/calendar/v3/freeBusy",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        timeMin: timeMin.toISOString(),
-        timeMax: timeMax.toISOString(),
-        items: [{ id: "primary" }],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    console.error("Failed to fetch free/busy:", await response.text());
-    return [];
-  }
-
-  const data = await response.json();
-  const primary = data.calendars?.primary;
-  if (primary?.errors?.length) {
-    console.error("FreeBusy returned errors:", JSON.stringify(primary.errors));
-  }
-  const busy: Array<{ start?: string; end?: string }> = primary?.busy ?? [];
-  return busy
-    .filter((b) => b.start && b.end)
-    .map((b) => ({ start: b.start as string, end: b.end as string }));
-}
-
-// Fetch the user's busy intervals from Google Calendar and store them.
+// Fetch the user's busy intervals from Google Calendar (FreeBusy) and store
+// them. The OAuth exchange just handed us a fresh access token, so no token
+// refresh is needed here. Shared logic lives in _shared/googleCalendar.ts.
 async function fetchAndStoreBusyTimes(accessToken: string, userId: string): Promise<void> {
   try {
-    const now = new Date();
-    // 60 days is plenty for a fresh OAuth — smart-scheduling re-fetches
-    // with its own window before it runs anyway.
+    // 60 days is plenty for a fresh OAuth — smart-scheduling re-fetches with
+    // its own window before it runs anyway.
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 60);
 
-    const eventTimes = await fetchFreeBusy(accessToken, now, endDate);
-
-    console.log(`Found ${eventTimes.length} busy blocks`);
-
-    // Clear existing busy times for this user
-    await supabase
-      .from("calendar_busy_times")
-      .delete()
-      .eq("user_id", userId);
-
-    // Insert new busy times
-    if (eventTimes.length > 0) {
-      const busyTimeRecords = eventTimes.map((event) => ({
-        user_id: userId,
-        start_time: event.start,
-        end_time: event.end,
-        fetched_at: new Date().toISOString(),
-      }));
-
-      const { error } = await supabase
-        .from("calendar_busy_times")
-        .insert(busyTimeRecords);
-
-      if (error) {
-        console.error("Error inserting busy times:", error);
-      }
-    }
-
-    // Stamp refresh-tracking columns (used by the scheduler's freshness gate).
-    await supabase
-      .from("profiles")
-      .update({
-        calendar_last_refreshed_at: new Date().toISOString(),
-        calendar_synced_through: endDate.toISOString(),
-      })
-      .eq("id", userId);
+    const busy = await fetchFreeBusy(accessToken, new Date(), endDate);
+    console.log(`Found ${busy.length} busy blocks`);
+    await writeBusyTimes(supabase, userId, busy, endDate);
   } catch (error) {
     console.error("Error fetching busy times:", error);
   }

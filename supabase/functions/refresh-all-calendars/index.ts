@@ -50,11 +50,9 @@ serve(async (req) => {
       const batch = profiles!.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map((p) =>
-          refreshUserBusyTimes(
-            supabase,
-            p as CalendarProfile,
-            HORIZON_DAYS
-          ).catch((e) => {
+          refreshUserBusyTimes(supabase, p as CalendarProfile, {
+            horizonDays: HORIZON_DAYS,
+          }).catch((e) => {
             console.error(`Refresh failed for ${p.id}:`, e);
             return null;
           })
