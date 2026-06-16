@@ -82,9 +82,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // onAuthStateChange fires INITIAL_SESSION once Supabase finishes
     // initializing, giving us the session without a separate getSession()
     // call (which would compete for the same internal lock).
+    //
+    // IMPORTANT: this callback must NOT await other Supabase calls — the
+    // auth client holds an internal lock while it runs, so an awaited query
+    // here deadlocks any concurrent query (e.g. getUserGroups) on cold
+    // start. We only do synchronous state updates; the profile is fetched
+    // in a separate effect below, after the lock is released.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Auth] onAuthStateChange:", _event);
       clearTimeout(timeout);
 
@@ -96,10 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // their own loading states.
       setLoading(false);
 
-      if (session?.user?.id) {
-        const profileData = await fetchProfile(session.user.id);
-        setProfile(profileData);
-      } else {
+      if (!session?.user?.id) {
         setProfile(null);
       }
     });
@@ -108,7 +111,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, []);
+
+  // Fetch the profile outside the auth-state callback so it never runs while
+  // the Supabase auth lock is held (which would deadlock cold-start queries).
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    fetchProfile(user.id).then((profileData) => {
+      if (!cancelled) setProfile(profileData);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, fetchProfile]);
 
   const calendarConnected = profile?.calendar_connected ?? false;
   const isGuest = profile?.is_guest ?? false;
