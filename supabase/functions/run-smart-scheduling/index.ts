@@ -27,19 +27,18 @@ serve(async (req) => {
     }
 
     if (eventRoomIds.length === 0) {
-      // Find all smart events past their scheduling deadline still collecting
-      const { data: overdueEvents, error } = await supabase
-        .from("event_rooms")
-        .select("id")
-        .eq("scheduling_mode", "smart")
-        .eq("scheduling_status", "collecting")
-        .lte("scheduling_deadline", new Date().toISOString());
+      // Reconciler: every collecting smart event that should finalize now —
+      // deadline passed, min_synced reached, OR all participants synced. This
+      // catches events whose trigger pg_net call failed, not just overdue ones.
+      const { data: readyEvents, error } = await supabase.rpc(
+        "find_ready_smart_events"
+      );
 
       if (error) {
-        throw new Error(`Failed to fetch overdue events: ${error.message}`);
+        throw new Error(`Failed to fetch ready events: ${error.message}`);
       }
 
-      eventRoomIds = (overdueEvents || []).map((e: any) => e.id);
+      eventRoomIds = (readyEvents || []).map((e: any) => e.event_room_id);
     }
 
     if (eventRoomIds.length === 0) {
