@@ -440,6 +440,17 @@ export default function PublicEventPage() {
           </section>
         )}
 
+        {!event.starts_at && event.scheduling_status === "collecting" && (
+          <section className={styles.section}>
+            <span className={styles.label}>When</span>
+            <span className={styles.value}>
+              {isPoll
+                ? "🗳️ Being decided by vote — pick the times that work for you below."
+                : "⏳ Still being scheduled — sync your calendar and Grapple will lock in a time that works for everyone."}
+            </span>
+          </section>
+        )}
+
         <section className={styles.section}>
           <span className={styles.label}>
             {event.participant_count} going
