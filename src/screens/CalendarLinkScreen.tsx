@@ -102,8 +102,10 @@ const CalendarLinkScreen = () => {
         <View style={styles.privacyBox}>
           <Text style={styles.privacyTitle}>🔒 Your Privacy is Protected</Text>
           <Text style={styles.privacyText}>
-            We only see when you're busy or free. We never see your event
-            titles, descriptions, or who you're meeting with.
+            We only see when you're busy or free — never your event titles,
+            descriptions, or who you're meeting with. We also use your Google
+            email to recognise you next time, so you never have to set this up
+            again.
           </Text>
         </View>
 

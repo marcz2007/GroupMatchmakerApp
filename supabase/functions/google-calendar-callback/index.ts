@@ -279,6 +279,28 @@ function createResponse(message: string, redirectUrl: string, success: boolean, 
   );
 }
 
+// Decode the (unverified) payload of a Google id_token JWT to read the
+// account's stable `sub` and verified `email`. The token comes straight from
+// Google's token endpoint over our server-to-server TLS exchange, so we don't
+// re-verify the signature here.
+function decodeIdToken(idToken: string | undefined): {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean;
+} {
+  if (!idToken) return {};
+  try {
+    const payload = idToken.split(".")[1];
+    if (!payload) return {};
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+    return JSON.parse(json);
+  } catch (e) {
+    console.error("Failed to decode id_token:", e);
+    return {};
+  }
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -381,20 +403,54 @@ serve(async (req: Request) => {
     const tokenData = await tokenResponse.json();
     console.log("Token exchange successful");
 
-    // Update the user's profile with calendar connection
+    // Resolve the durable Google identity. If this Google account already
+    // belongs to another profile (returning user on a new device), this
+    // re-points the current event's records to that canonical profile and
+    // returns its id; otherwise it claims the account on the current profile.
+    let effectiveUserId = userId;
+    const eventRoomId = extractEventRoomId(returnPath);
+    try {
+      const claims = decodeIdToken(tokenData.id_token);
+      if (claims.sub) {
+        const { data: linked, error: linkError } = await supabase.rpc(
+          "link_google_identity",
+          {
+            p_user_id: userId,
+            p_google_sub: claims.sub,
+            p_google_email: claims.email ?? null,
+            p_event_room_id: eventRoomId,
+          }
+        );
+        if (linkError) {
+          console.error("link_google_identity failed:", linkError);
+        } else if (linked) {
+          effectiveUserId = linked as string;
+        }
+      }
+    } catch (e) {
+      console.error("Google identity linking error (continuing):", e);
+    }
+
+    // Update the (effective) user's profile with calendar connection.
     console.log("Updating user profile with calendar connection...");
+    const profileUpdate: Record<string, unknown> = {
+      calendar_provider: "google",
+      calendar_connected: true,
+      calendar_access_token: tokenData.access_token,
+      calendar_token_expires_at: new Date(
+        Date.now() + tokenData.expires_in * 1000
+      ).toISOString(),
+    };
+    // Google only returns a refresh token on first consent (and we now omit
+    // the consent prompt for already-connected users). Don't overwrite a
+    // stored refresh token with null on a no-consent re-auth.
+    if (tokenData.refresh_token) {
+      profileUpdate.calendar_refresh_token = tokenData.refresh_token;
+    }
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({
-        calendar_provider: "google",
-        calendar_connected: true,
-        calendar_access_token: tokenData.access_token,
-        calendar_refresh_token: tokenData.refresh_token,
-        calendar_token_expires_at: new Date(
-          Date.now() + tokenData.expires_in * 1000
-        ).toISOString(),
-      })
-      .eq("id", userId);
+      .update(profileUpdate)
+      .eq("id", effectiveUserId);
 
     if (updateError) {
       console.error("Error updating profile:", updateError);
@@ -409,12 +465,12 @@ serve(async (req: Request) => {
 
     // Fetch and store initial busy times
     console.log("Fetching initial busy times...");
-    await fetchAndStoreBusyTimes(tokenData.access_token, userId);
+    await fetchAndStoreBusyTimes(tokenData.access_token, effectiveUserId);
 
     // If the OAuth flow was kicked off from a public event RSVP, record
     // a scheduling_calendar_syncs row so the event's min_synced_users
     // finalization trigger counts this participant.
-    await markEventSyncIfApplicable(userId, returnPath);
+    await markEventSyncIfApplicable(effectiveUserId, returnPath);
 
     console.log("Profile updated successfully");
     console.log("=== Google Calendar Callback Function Completed Successfully ===");

@@ -95,8 +95,12 @@ serve(async (req) => {
     }
 
     // Construct the Google OAuth authorization URL.
-    // Request only calendar.readonly scope for privacy - we only need busy/free.
+    // `openid email` lets us capture the user's stable Google account id +
+    // verified email so we can recognize returning users across devices.
+    // calendar.readonly stays minimal — we only ever read busy/free.
     const scopes = [
+      "openid",
+      "email",
       "https://www.googleapis.com/auth/calendar.readonly",
     ].join(" ");
 
