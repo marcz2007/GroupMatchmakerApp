@@ -11,8 +11,13 @@ module.exports = function (api) {
           path: ".env",
           blacklist: null,
           whitelist: null,
-          safe: true,
-          allowUndefined: false,
+          // Don't fail the BUILD when an @env var is missing (e.g. CI has no
+          // .env, or GOOGLE_PLACES_API_KEY isn't set) — resolve to `undefined`
+          // instead. Real builds still supply the required vars
+          // (SUPABASE_URL/ANON) via .env / EAS secrets; optional ones like
+          // GOOGLE_PLACES_API_KEY just degrade gracefully.
+          safe: false,
+          allowUndefined: true,
         },
       ],
     ],

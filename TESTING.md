@@ -15,6 +15,40 @@ heavier tooling.
 
 ---
 
+## Quick manual testing — `yarn sim`
+
+Spin up users + events to poke at in the real app, with **no inboxes and no new
+passwords**. Every test user shares one password (`Test123456!`) and a
+predictable email (`name@grapple.test`), and they're pre-confirmed — so you just
+type them into the app's normal login.
+
+```bash
+yarn sim users alice bob cara      # create them (all password Test123456!)
+yarn sim event smart alice         # smart event owned by alice → prints share link
+yarn sim event poll alice          # or a poll event
+yarn sim sync bob <eventId>        # fake-sync bob's calendar (busy times) — no Google
+yarn sim list                      # all test users + their events + links
+yarn sim clean                     # delete ALL @grapple.test test data
+```
+
+**Log into the app:** email `alice@grapple.test`, password `Test123456!` (works
+on web and the mobile dev build; email/password also works in Expo Go — only
+Google sign-in needs the dev build).
+
+**Common loops:**
+- *Link → RSVP:* `yarn sim event smart alice` → open the printed link → RSVP as
+  a guest, or open an **incognito window** logged in as `bob@grapple.test` to be
+  a second person. Separate/incognito windows = multiple people at once.
+- *"Find when everyone's free" without Google:* `yarn sim users alice bob cara`
+  → `yarn sim event smart alice` → `yarn sim sync alice <id>` / `bob` / `cara`.
+  Once enough sync, it auto-schedules and the picked time shows on the event.
+- *Real in-app "Sync my calendar" button (no Google):* open the event link with
+  `?test_calendar=1` appended, then tick the sync box — hits the TEST_MODE
+  bypass (on for the dev project, off in prod).
+- *Reset:* `yarn sim clean` wipes every `@grapple.test` user + their events.
+
+---
+
 ## Part 1 — Manual test scenarios
 
 Legend: **Setup → Steps → Expect**. "Organiser" = the person creating the
