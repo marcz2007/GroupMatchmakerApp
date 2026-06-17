@@ -47,8 +47,20 @@ const SignupScreen = () => {
         });
         if (error) Alert.alert("Error", error.message);
       } else {
-        // Native: Use native Google Sign-In module
-        const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+        // Native: Use native Google Sign-In module. It isn't bundled in Expo
+        // Go, so guard the require and show a clear message instead of a
+        // crash (TurboModule 'RNGoogleSignin' not found).
+        let GoogleSignin;
+        try {
+          GoogleSignin = require("@react-native-google-signin/google-signin")
+            .GoogleSignin;
+        } catch {
+          Alert.alert(
+            "Use the dev build",
+            "Google Sign-In isn't available in Expo Go. Open Grapple via the development build, or sign in with email for now."
+          );
+          return;
+        }
         await GoogleSignin.hasPlayServices();
         const userInfo = await GoogleSignin.signIn();
         const idToken = userInfo.data?.idToken;
