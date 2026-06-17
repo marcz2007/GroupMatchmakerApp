@@ -215,12 +215,23 @@ Files:
 > `20260617000001_poll_finalize_auth_fix.sql` (internal finalize for the
 > trigger/cron; creator guard kept on the public RPC).
 
-**Remaining build order:**
-1. More Layer-1 scenarios: guest RSVP via `web-rsvp` (new + returning by email),
-   `link_google_identity` re-point, `find_ready_smart_events` reconciler,
-   "no one synced → earliest conflict-free" pick.
-2. **Layer 2** — Playwright web E2E with seeded availability (+ optional
-   `TEST_MODE` calendar bypass) for link → RSVP → vote → result.
-3. **Layer 3** — a couple of Maestro mobile flows for the deep-link guest path.
-4. When there's real data, move tests to a dedicated test project (set
-   `SUPABASE_PROJECT_REF`).
+**Layer 2 is built** (`e2e/`) — Playwright against the **deployed site**:
+```
+yarn test:e2e          # default BASE_URL=https://grappleapp.co.uk
+BASE_URL=http://localhost:3000 yarn test:e2e   # against a local `yarn web`
+```
+Events are seeded into the same Supabase via the integration harness, then
+driven through a real browser; browser-created guests are cleaned up.
+`e2e/public-event.spec.mjs` covers: new guest RSVP to a smart event (calendar
+sync unchecked, so no Google redirect); new guest RSVP + poll vote → "Thanks
+for voting!"; mobile visitor sees the "Open in the Grapple app" banner.
+
+> Calendar-sync-through-the-browser still needs the Google step handled — add
+> an env-gated `TEST_MODE` bypass in `google-calendar-auth` (mark synced + seed
+> dummy busy-times instead of redirecting) to E2E the real "sync" button.
+
+**Remaining:**
+- **Layer 3** — a couple of Maestro mobile flows for the deep-link guest path.
+- The `TEST_MODE` calendar bypass, to E2E the calendar-sync click.
+- When there's real data, move tests to a dedicated test project (set
+  `SUPABASE_PROJECT_REF`).
