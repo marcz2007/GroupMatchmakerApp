@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  SafeAreaView,
   Text,
   Keyboard,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import {
   Modal,
   Share,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 const DateTimePicker = Platform.OS !== "web"
   ? require("@react-native-community/datetimepicker").default
