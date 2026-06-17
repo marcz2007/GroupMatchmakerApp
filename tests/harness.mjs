@@ -33,6 +33,25 @@ const TEST_PASSWORD = "Test123456!";
 const createdUsers = [];
 const createdEvents = [];
 export const trackEvent = (id) => id && createdEvents.push(id);
+// Register a user created outside the factory (e.g. a guest made by web-rsvp)
+// so cleanup removes it too.
+export const trackUser = (id) => id && createdUsers.push(id);
+
+// Call a deployed edge function as an anonymous guest (apikey only, no
+// Authorization — matching the web app's guest path; an Authorization header
+// would make functions like web-rsvp treat it as a user token).
+export async function callFunction(name, body) {
+  const res = await fetch(`${URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: ANON },
+    body: JSON.stringify(body),
+  });
+  try {
+    return await res.json();
+  } catch {
+    return { error: `HTTP ${res.status}` };
+  }
+}
 
 // --- user factory ---
 export async function createTestUser(firstName = "Tester") {

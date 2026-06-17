@@ -157,15 +157,22 @@ serve(async (req) => {
           // Upsert on `id` so a retried request (or a profile row
           // created by a database trigger on auth.users) doesn't fail
           // the whole RSVP.
-          await supabase.from("profiles").upsert(
-            {
-              id: userId,
-              display_name: guest_name.trim(),
-              email: normalizedEmail,
-              is_guest: true,
-            },
-            { onConflict: "id" }
-          );
+          const { error: guestProfileError } = await supabase
+            .from("profiles")
+            .upsert(
+              {
+                id: userId,
+                first_name: guest_name.trim(),
+                email: normalizedEmail,
+                is_guest: true,
+              },
+              { onConflict: "id" }
+            );
+          if (guestProfileError) {
+            // Don't fail the RSVP, but surface it — if this silently fails the
+            // guest isn't flagged is_guest and a returning RSVP gets rejected.
+            console.error("Error upserting guest profile:", guestProfileError);
+          }
         }
       }
     }

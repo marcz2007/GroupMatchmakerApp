@@ -2,11 +2,13 @@
 import { cleanup, summary } from "./harness.mjs";
 import { run as runSmart } from "./smart.test.mjs";
 import { run as runPoll } from "./poll.test.mjs";
+import { run as runIdentity } from "./identity.test.mjs";
 
 let ok = false;
 try {
   await runSmart();
   await runPoll();
+  await runIdentity();
 } catch (e) {
   console.error("\nFATAL:", e.message);
 } finally {
