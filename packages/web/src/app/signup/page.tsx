@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import styles from "../login/login.module.css";
 
 export default function SignupPage() {
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -22,6 +23,19 @@ export default function SignupPage() {
     }
   }, [user, authLoading, router]);
 
+  // Pre-fill from a prior guest RSVP so users arriving via "Create an account"
+  // don't retype their details.
+  useEffect(() => {
+    try {
+      const lastName = localStorage.getItem("grapple.lastName");
+      const lastEmail = localStorage.getItem("grapple.lastEmail");
+      if (lastName) setFirstName(lastName);
+      if (lastEmail) setEmail(lastEmail);
+    } catch {
+      // localStorage unavailable — non-fatal.
+    }
+  }, []);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -32,7 +46,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          data: { username },
+          data: { username, first_name: firstName.trim() },
         },
       });
 
@@ -56,6 +70,19 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className={styles.form}>
           {error && <div className={styles.error}>{error}</div>}
+
+          <div className={styles.field}>
+            <label className={styles.label}>First name</label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className={styles.input}
+              placeholder="Your first name"
+              autoComplete="given-name"
+              required
+            />
+          </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Username</label>

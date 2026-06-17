@@ -19,6 +19,7 @@ import { twoButtonAlert } from "../utils/alertHelper";
 const DEBUG_AUTH = false;
 
 const SignupScreen = () => {
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -79,7 +80,12 @@ const SignupScreen = () => {
   const handleSignup = async () => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password;
+    const cleanFirstName = firstName.trim();
 
+    if (!cleanFirstName) {
+      Alert.alert("Error", "Please enter your first name.");
+      return;
+    }
     if (!cleanEmail) {
       Alert.alert("Error", "Please enter your email address.");
       return;
@@ -108,6 +114,7 @@ const SignupScreen = () => {
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
+        options: { data: { first_name: cleanFirstName } },
       });
 
       // Debug: show full response
@@ -181,6 +188,17 @@ const SignupScreen = () => {
         <Text style={styles.dividerText}>or sign up with email</Text>
         <View style={styles.dividerLine} />
       </View>
+
+      <TextInput
+        style={styles.input}
+        placeholder="First name"
+        placeholderTextColor="#b0b0b0"
+        value={firstName}
+        onChangeText={setFirstName}
+        autoCapitalize="words"
+        autoComplete="given-name"
+        editable={!isDisabled}
+      />
 
       <TextInput
         style={styles.input}
