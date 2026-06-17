@@ -13,7 +13,8 @@
     "ios": "expo run:ios",
     "web:mobile": "expo start --web",
     "web": "cd packages/web && npm run dev",
-    "web:build": "cd packages/web && npm run build"
+    "web:build": "cd packages/web && npm run build",
+    "test:integration": "bash tests/run.sh"
   },
   "main": "index.ts",
   "dependencies": {
