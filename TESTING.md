@@ -230,8 +230,22 @@ for voting!"; mobile visitor sees the "Open in the Grapple app" banner.
 > an env-gated `TEST_MODE` bypass in `google-calendar-auth` (mark synced + seed
 > dummy busy-times instead of redirecting) to E2E the real "sync" button.
 
+**Layer 3 is set up** (`maestro/`) — mobile deep-link guest flow:
+```
+yarn test:mobile        # seeds an event, runs the flow, cleans up
+```
+Files: `guest-rsvp.yaml` (deep link → guest form → sync off → submit → left the
+screen), `smoke.yaml` (boots + screenshots), `seed-event.mjs` / `cleanup.mjs`,
+`run.sh`. GuestEntry inputs got `testID`s (`guest-first-name`, `guest-email`)
+for reliable selection.
+
+> Running it needs **your** device: a booted Android emulator
+> (`emulator -avd Pixel_7_API_34`) or a phone on adb, **with the Grapple
+> dev/prod build installed**, and `maestro` on PATH (`~/.maestro/bin`). The
+> seed/cleanup scripts are verified; the Maestro flow can't run headless here.
+
 **Remaining:**
-- **Layer 3** — a couple of Maestro mobile flows for the deep-link guest path.
-- The `TEST_MODE` calendar bypass, to E2E the calendar-sync click.
-- When there's real data, move tests to a dedicated test project (set
-  `SUPABASE_PROJECT_REF`).
+- Point the web E2E at a Vercel **preview deploy** (or local `yarn web`) so
+  page-code tests don't lag the production deploy.
+- Move tests to a dedicated test project once there's real data
+  (`SUPABASE_PROJECT_REF`).

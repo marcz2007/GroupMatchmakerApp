@@ -1,0 +1,30 @@
+# Mobile deep-link guest RSVP flow.
+#
+# Opens an event deep link on a fresh app, fills the guest form, turns calendar
+# sync OFF (so we don't bounce to Google), submits, and checks we leave the
+# guest screen (RSVP succeeded → navigated into the event).
+#
+# Needs: the Grapple dev/prod build installed on a booted device/emulator, and
+# EVENT_ID + GUEST_EMAIL passed in (the runner seeds these). Run via:
+#   bash maestro/run.sh      (seeds an event, runs, cleans up)
+# or manually:
+#   maestro test -e EVENT_ID=<id> -e GUEST_EMAIL=<email> maestro/guest-rsvp.yaml
+appId: com.marcz2007.GroupMatchmakerApp
+---
+- launchApp:
+    clearState: true
+- openLink: "groupmatchmakerapp://event/${EVENT_ID}"
+- assertVisible: "Join this event"
+- tapOn:
+    id: "guest-first-name"
+- inputText: "Maestro Tester"
+- tapOn:
+    id: "guest-email"
+- inputText: "${GUEST_EMAIL}"
+- assertVisible: "Sync my Google Calendar"
+# Toggle sync OFF → the primary button becomes "Continue" (no Google redirect).
+- tapOn: "Sync my Google Calendar"
+- tapOn:
+    text: "^Continue$"
+# RSVP done → we should have navigated away from the guest entry screen.
+- assertNotVisible: "Join this event"

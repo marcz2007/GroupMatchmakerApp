@@ -216,6 +216,7 @@ const GuestEntryScreen = () => {
       </Text>
 
       <TextInput
+        testID="guest-first-name"
         style={styles.input}
         placeholder="First name"
         placeholderTextColor="#b0b0b0"
@@ -227,6 +228,7 @@ const GuestEntryScreen = () => {
       />
 
       <TextInput
+        testID="guest-email"
         style={styles.input}
         placeholder="Email"
         placeholderTextColor="#b0b0b0"

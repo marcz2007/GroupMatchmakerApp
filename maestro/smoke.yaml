@@ -1,0 +1,7 @@
+# Smoke: the app boots. Captures a launch screenshot (always works, gives a
+# visual). Run: maestro test maestro/smoke.yaml
+appId: com.marcz2007.GroupMatchmakerApp
+---
+- launchApp:
+    clearState: true
+- takeScreenshot: launch
