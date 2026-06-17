@@ -1,13 +1,19 @@
 name: EAS Update (Mobile OTA)
 
+# Manual only. This used to run on every push to main and failed each time
+# (the "Push EAS Update" step exits 1 — most likely a missing/invalid
+# EXPO_TOKEN secret, or no EAS build/runtime to update), which spammed failure
+# emails. Run it from the Actions tab ("Run workflow") when you actually want to
+# push an OTA JS update. To re-enable auto-updates: confirm `eas update` works
+# locally, set the EXPO_TOKEN repo secret, then restore the `push:` trigger
+# below.
 on:
-  push:
-    branches:
-      - main
-      - 'claude/**'
-    paths-ignore:
-      - 'packages/web/**'
-      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths-ignore:
+  #     - 'packages/web/**'
+  #     - '.github/workflows/deploy-web.yml'
 
 jobs:
   eas-update:
