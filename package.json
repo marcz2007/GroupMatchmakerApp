@@ -16,7 +16,8 @@
     "web:build": "cd packages/web && npm run build",
     "test:integration": "bash tests/run.sh",
     "test:e2e": "bash e2e/run.sh",
-    "test:mobile": "bash maestro/run.sh"
+    "test:mobile": "bash maestro/run.sh",
+    "sim": "bash scripts/dev.sh"
   },
   "main": "index.ts",
   "dependencies": {
