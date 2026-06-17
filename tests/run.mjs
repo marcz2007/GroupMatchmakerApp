@@ -4,6 +4,7 @@ import { run as runSmart } from "./smart.test.mjs";
 import { run as runPoll } from "./poll.test.mjs";
 import { run as runIdentity } from "./identity.test.mjs";
 import { run as runReconciler } from "./reconciler.test.mjs";
+import { run as runCalendar } from "./calendar.test.mjs";
 
 let ok = false;
 try {
@@ -11,6 +12,7 @@ try {
   await runPoll();
   await runIdentity();
   await runReconciler();
+  await runCalendar();
 } catch (e) {
   console.error("\nFATAL:", e.message);
 } finally {

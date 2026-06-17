@@ -181,6 +181,13 @@ export default function PublicEventPage() {
               userId,
               platform: "web",
               returnPath: `/event/${eventId}`,
+              // E2E only: triggers the server's test bypass (which itself is
+              // gated on the CALENDAR_TEST_MODE env, off in production).
+              testMode:
+                typeof window !== "undefined" &&
+                new URLSearchParams(window.location.search).get(
+                  "test_calendar"
+                ) === "1",
             }),
           }
         );

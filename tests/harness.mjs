@@ -37,13 +37,16 @@ export const trackEvent = (id) => id && createdEvents.push(id);
 // so cleanup removes it too.
 export const trackUser = (id) => id && createdUsers.push(id);
 
-// Call a deployed edge function as an anonymous guest (apikey only, no
-// Authorization — matching the web app's guest path; an Authorization header
-// would make functions like web-rsvp treat it as a user token).
-export async function callFunction(name, body) {
+// Call a deployed edge function. Default: apikey only (the web app's guest
+// path; an Authorization header would make web-rsvp treat it as a user token).
+// Pass { auth: true } for functions that don't read it as a user token but may
+// require a JWT (e.g. google-calendar-auth).
+export async function callFunction(name, body, { auth = false } = {}) {
+  const headers = { "Content-Type": "application/json", apikey: ANON };
+  if (auth) headers.Authorization = `Bearer ${ANON}`;
   const res = await fetch(`${URL}/functions/v1/${name}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", apikey: ANON },
+    headers,
     body: JSON.stringify(body),
   });
   try {

@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, platform, returnPath } = await req.json();
+    const { userId, platform, returnPath, testMode } = await req.json();
     console.log("Received user ID:", userId);
 
     if (!userId) {
@@ -38,6 +38,68 @@ serve(async (req) => {
 
     if (!supabaseUrl || !supabaseAnonKey || !clientId || !redirectUri) {
       throw new Error("Missing required environment variables");
+    }
+
+    // Test-only calendar bypass: skip Google entirely and fake a synced
+    // calendar so the E2E can exercise the real "sync" button. Double-gated —
+    // only fires when the server env CALENDAR_TEST_MODE is "true" AND the
+    // request asked for it. Never enable CALENDAR_TEST_MODE in production.
+    if (testMode && Deno.env.get("CALENDAR_TEST_MODE") === "true") {
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (serviceKey) {
+        const adminClient = createClient(supabaseUrl, serviceKey);
+        await adminClient
+          .from("profiles")
+          .update({ calendar_connected: true, calendar_provider: "google" })
+          .eq("id", userId);
+
+        // Seed a couple of busy blocks so availability isn't empty.
+        const seedNow = new Date();
+        const busy = [0, 1].map((d) => {
+          const start = new Date(seedNow);
+          start.setDate(start.getDate() + d + 1);
+          start.setHours(9, 0, 0, 0);
+          const end = new Date(start);
+          end.setHours(10, 0, 0, 0);
+          return {
+            user_id: userId,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            fetched_at: new Date().toISOString(),
+          };
+        });
+        await adminClient.from("calendar_busy_times").delete().eq("user_id", userId);
+        await adminClient.from("calendar_busy_times").insert(busy);
+
+        // Mark the event sync if we came from an /event/<id> page.
+        const m = (returnPath || "").match(/\/event\/([0-9a-f-]{36})/i);
+        if (m) {
+          await adminClient
+            .from("event_room_participants")
+            .upsert(
+              { event_room_id: m[1], user_id: userId },
+              { onConflict: "event_room_id,user_id" }
+            );
+          await adminClient
+            .from("scheduling_calendar_syncs")
+            .upsert(
+              { event_room_id: m[1], user_id: userId, calendar_provider: "google" },
+              { onConflict: "event_room_id,user_id" }
+            );
+        }
+      }
+
+      const webBase = Deno.env.get("WEB_APP_URL") ?? "https://grappleapp.co.uk";
+      const safePath =
+        returnPath && returnPath.startsWith("/") && !returnPath.startsWith("//")
+          ? returnPath
+          : "/";
+      const back = new URL(safePath, webBase);
+      back.searchParams.set("calendar_connected", "true");
+      return new Response(JSON.stringify({ authUrl: back.toString() }), {
+        status: 200,
+        headers: corsHeaders,
+      });
     }
 
     console.log("Creating Supabase client...");

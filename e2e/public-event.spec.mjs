@@ -104,6 +104,24 @@ test("new guest can RSVP and vote on a poll event", async ({ page }) => {
   await expect(page.getByText("Thanks for voting!")).toBeVisible();
 });
 
+test("guest can sync calendar via the TEST_MODE bypass (no Google)", async ({ page }) => {
+  const email = `e2e-${Date.now()}-sync@grapple.test`;
+  guestEmails.push(email);
+
+  await page.goto(`/event/${smartEventId}?test_calendar=1`);
+  await expect(page.getByPlaceholder("First name")).toBeVisible();
+  await page.getByPlaceholder("First name").fill("Sync");
+  await page.getByPlaceholder("Email").fill(email);
+  // leave the calendar-sync checkbox CHECKED → hits the bypass, not Google
+  await page
+    .getByRole("button", { name: "Count me in & connect calendar" })
+    .click();
+
+  await expect(
+    page.getByText(/your google calendar is now synced/i)
+  ).toBeVisible();
+});
+
 test("mobile visitor sees the Open-in-app banner", async ({ browser }) => {
   const ctx = await browser.newContext({ ...devices["Pixel 7"] });
   const page = await ctx.newPage();
