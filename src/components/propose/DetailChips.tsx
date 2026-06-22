@@ -639,7 +639,17 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                 </TouchableOpacity>
               </View>
             ) : (
-              <GooglePlacesAutocomplete
+              <>
+                {location ? (
+                  <View style={styles.currentLocationBox}>
+                    <Text style={styles.currentLocationLabel}>Current location</Text>
+                    <Text style={styles.currentLocationValue}>{location}</Text>
+                    <TouchableOpacity onPress={clearLocation} style={styles.currentLocationClear}>
+                      <Text style={styles.pickerCancel}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                <GooglePlacesAutocomplete
                 placeholder="Search for a place..."
                 onPress={(data: any) => {
                   onLocationChange(data.description);
@@ -695,7 +705,8 @@ export const DetailChips: React.FC<DetailChipsProps> = ({
                     height: 0,
                   },
                 }}
-              />
+                />
+              </>
             )}
           </KeyboardAvoidingView>
         </SafeAreaView>
@@ -730,6 +741,8 @@ const styles = StyleSheet.create({
   },
   chipWide: {
     minWidth: 170,
+    maxWidth: "100%",
+    flexShrink: 1,
   },
   chipIcon: {
     fontSize: 18,
@@ -737,6 +750,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 17,
     color: colors.text.tertiary,
+    flexShrink: 1,
   },
   chipTextFilled: {
     color: colors.text.primary,
@@ -799,6 +813,29 @@ const styles = StyleSheet.create({
   },
   locationContent: {
     flex: 1,
+  },
+  currentLocationBox: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  currentLocationLabel: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: "600",
+    marginBottom: spacing.xs,
+  },
+  currentLocationValue: {
+    fontSize: 15,
+    color: colors.text.primary,
+    lineHeight: 22,
+  },
+  currentLocationClear: {
+    marginTop: spacing.sm,
+    alignSelf: "flex-start",
   },
   webLocationContainer: {
     padding: spacing.lg,
