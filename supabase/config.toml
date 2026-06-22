@@ -91,3 +91,9 @@ verify_jwt = false
 
 [functions.web-poll-vote]
 verify_jwt = false
+
+# Google redirects the user's browser straight here with ?code&state and no
+# JWT, so the gateway check must be off or the OAuth callback 401s. The
+# function validates the request via the signed `state` it issued earlier.
+[functions.google-calendar-callback]
+verify_jwt = false
