@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatDate } from "@grapple/shared";
+import { supabase } from "@/lib/supabase";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import OpenInAppBanner from "@/components/OpenInAppBanner";
 import styles from "./publicEvent.module.css";
@@ -64,11 +65,13 @@ export default function PublicEventPage() {
   // RSVP form state
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [guestPassword, setGuestPassword] = useState("");
   const [syncCalendar, setSyncCalendar] = useState(true);
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   // Calendar return-from-OAuth banner state. We read the query params
   // from window.location inside a useEffect (rather than using
@@ -224,9 +227,14 @@ export default function PublicEventPage() {
 
     const cleanName = guestName.trim();
     const cleanEmail = guestEmail.trim().toLowerCase();
+    const cleanPassword = guestPassword;
 
     if (!cleanName || !cleanEmail) {
       setRsvpError("Please enter your name and email.");
+      return;
+    }
+    if (cleanPassword.length < 8) {
+      setRsvpError("Password must be at least 8 characters.");
       return;
     }
 
@@ -246,8 +254,9 @@ export default function PublicEventPage() {
         },
         body: JSON.stringify({
           event_room_id: eventId,
-          guest_name: cleanName,
-          guest_email: cleanEmail,
+          first_name: cleanName,
+          email: cleanEmail,
+          password: cleanPassword,
         }),
       });
 
@@ -259,6 +268,16 @@ export default function PublicEventPage() {
       const body = await response.json().catch(() => ({}));
       const userId: string | undefined = body?.user_id;
       const alreadyConnected: boolean = body?.calendar_connected === true;
+      setNeedsVerification(body?.needs_verification === true);
+
+      // Establish a real session so they stay signed in and can return /
+      // change their RSVP. Best-effort: if the email already had an account
+      // with a different password this no-ops, but they're still RSVP'd and
+      // will get a verification/recovery email.
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword,
+      });
 
       setSubmittedEmail(cleanEmail);
       try {
@@ -476,14 +495,10 @@ export default function PublicEventPage() {
           <section className={styles.successBox}>
             <h2 className={styles.successTitle}>You&apos;re in!</h2>
             <p className={styles.description}>
-              You&apos;ll get an update when the event time is confirmed.
+              {needsVerification
+                ? "We've sent you an email to verify your account — verify to unlock creating your own groups and events. You'll also get an update when the time is confirmed."
+                : "You'll get an update when the event time is confirmed."}
             </p>
-            <button
-              className={styles.secondaryButton}
-              onClick={() => router.push("/signup")}
-            >
-              Create a Grapple account to track this event
-            </button>
           </section>
         ) : event.already_rsvpd && !rsvpSuccess && !showPollVoting ? (
           <section className={styles.section}>
@@ -498,8 +513,8 @@ export default function PublicEventPage() {
             </h2>
             <p className={styles.formSubtitle}>
               {isPoll
-                ? "Enter your details — then pick the times that work."
-                : "Enter your details to RSVP. No account required."}
+                ? "Set up your account — then pick the times that work."
+                : "RSVP in seconds. We'll set up your Grapple account so you can come back any time."}
             </p>
             <input
               type="text"
@@ -508,6 +523,7 @@ export default function PublicEventPage() {
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
               disabled={rsvpSubmitting}
+              autoComplete="given-name"
               required
             />
             <input
@@ -517,6 +533,18 @@ export default function PublicEventPage() {
               value={guestEmail}
               onChange={(e) => setGuestEmail(e.target.value)}
               disabled={rsvpSubmitting}
+              autoComplete="email"
+              required
+            />
+            <input
+              type="password"
+              className={styles.input}
+              placeholder="Create a password (min 8 characters)"
+              value={guestPassword}
+              onChange={(e) => setGuestPassword(e.target.value)}
+              disabled={rsvpSubmitting}
+              autoComplete="new-password"
+              minLength={8}
               required
             />
             {!isPoll && (
@@ -616,14 +644,10 @@ export default function PublicEventPage() {
           <section className={styles.successBox}>
             <h2 className={styles.successTitle}>Thanks for voting!</h2>
             <p className={styles.description}>
-              We&apos;ll let everyone know once the final time is picked.
+              {needsVerification
+                ? "We've sent you an email to verify your account. We'll let everyone know once the final time is picked."
+                : "We'll let everyone know once the final time is picked."}
             </p>
-            <button
-              className={styles.secondaryButton}
-              onClick={() => router.push("/signup")}
-            >
-              Create a Grapple account to track this event
-            </button>
           </section>
         )}
 

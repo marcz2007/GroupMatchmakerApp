@@ -77,6 +77,7 @@ test("new guest can RSVP to a smart event (no calendar sync)", async ({ page }) 
   await expect(page.getByPlaceholder("First name")).toBeVisible();
   await page.getByPlaceholder("First name").fill("Ella");
   await page.getByPlaceholder("Email").fill(email);
+  await page.getByPlaceholder(/password/i).fill("Test123456!");
 
   const sync = page.getByRole("checkbox");
   if (await sync.isChecked()) await sync.uncheck(); // avoid the Google redirect
@@ -93,6 +94,7 @@ test("new guest can RSVP and vote on a poll event", async ({ page }) => {
   await expect(page.getByPlaceholder("First name")).toBeVisible();
   await page.getByPlaceholder("First name").fill("Pat");
   await page.getByPlaceholder("Email").fill(email);
+  await page.getByPlaceholder(/password/i).fill("Test123456!");
   await page.getByRole("button", { name: "Continue to vote" }).click();
 
   await expect(
@@ -112,6 +114,7 @@ test("guest can sync calendar via the TEST_MODE bypass (no Google)", async ({ pa
   await expect(page.getByPlaceholder("First name")).toBeVisible();
   await page.getByPlaceholder("First name").fill("Sync");
   await page.getByPlaceholder("Email").fill(email);
+  await page.getByPlaceholder(/password/i).fill("Test123456!");
   // leave the calendar-sync checkbox CHECKED → hits the bypass, not Google
   await page
     .getByRole("button", { name: "Count me in & connect calendar" })

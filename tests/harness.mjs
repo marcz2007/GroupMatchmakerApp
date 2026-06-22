@@ -69,6 +69,13 @@ export async function createTestUser(firstName = "Tester") {
   const id = data.user.id;
   createdUsers.push(id);
 
+  // Mark verified so the user has full access (creating events, groups, etc.).
+  // The handle_new_user trigger has already created the profile row.
+  await admin
+    .from("profiles")
+    .update({ email_verified_at: new Date().toISOString() })
+    .eq("id", id);
+
   // A client signed in AS this user, so RPCs see the right auth.uid().
   const client = createClient(URL, ANON, {
     auth: { persistSession: false, autoRefreshToken: false },

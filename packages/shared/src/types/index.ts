@@ -54,4 +54,5 @@ export interface Profile {
   calendar_connected?: boolean;
   calendar_provider?: string;
   is_guest?: boolean;
+  email_verified_at?: string | null;
 }

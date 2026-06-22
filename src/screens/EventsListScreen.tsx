@@ -14,6 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 import { colors, spacing, borderRadius, typography } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
 import NotificationsBell from "../components/NotificationsBell";
+import VerifyEmailBanner from "../components/VerifyEmailBanner";
 import {
   getUserEvents,
   subscribeToUserEvents,
@@ -189,6 +190,8 @@ const EventsListScreen = ({ onSelectEvent, selectedEventId }: EventsListScreenPr
           <Text style={styles.headerTitle}>Events</Text>
           <NotificationsBell />
         </View>
+
+        <VerifyEmailBanner />
 
         {/* Events List */}
         {loading ? (

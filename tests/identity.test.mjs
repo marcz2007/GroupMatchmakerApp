@@ -31,26 +31,29 @@ async function createSmartEvent(creator) {
 export async function run() {
   console.log("\nGuest RSVP & identity:");
 
-  // web-rsvp: brand-new guest creates a profile + participant.
-  await test("web-rsvp creates a guest profile + participant", async () => {
+  // web-rsvp: brand-new RSVP creates a REAL but UNVERIFIED account + participant.
+  await test("web-rsvp creates a real unverified account + participant", async () => {
     const host = await createTestUser("Host");
     const eventId = await createSmartEvent(host);
     const email = `guest-${Date.now()}-a@grapple.test`;
 
     const r = await callFunction("web-rsvp", {
       event_room_id: eventId,
-      guest_name: "Gwen",
-      guest_email: email,
+      first_name: "Gwen",
+      email,
+      password: "Test123456!",
     });
     assert(r.user_id, `no user_id: ${JSON.stringify(r)}`);
+    assert(r.needs_verification === true, "new account should need verification");
     trackUser(r.user_id);
 
     const { data: prof } = await admin
       .from("profiles")
-      .select("is_guest, email")
+      .select("is_guest, email, email_verified_at")
       .eq("id", r.user_id)
       .single();
-    assert(prof.is_guest === true, "not marked guest");
+    assert(prof.is_guest === false, "should be a real (non-guest) account");
+    assert(prof.email_verified_at === null, "should start unverified");
     assert(prof.email === email, `email mismatch: ${prof.email}`);
 
     const { data: part } = await admin
@@ -62,7 +65,7 @@ export async function run() {
     assert(part, "guest was not added as a participant");
   });
 
-  // web-rsvp: the same email returns the SAME profile (reuse, not duplicate).
+  // web-rsvp: the same (still-unverified) email returns the SAME profile.
   await test("web-rsvp reuses the profile for a returning email", async () => {
     const host = await createTestUser("Host");
     const eventId = await createSmartEvent(host);
@@ -70,16 +73,19 @@ export async function run() {
 
     const r1 = await callFunction("web-rsvp", {
       event_room_id: eventId,
-      guest_name: "Gwen",
-      guest_email: email,
+      first_name: "Gwen",
+      email,
+      password: "Test123456!",
     });
     assert(r1.user_id, `no user_id: ${JSON.stringify(r1)}`);
     trackUser(r1.user_id);
 
+    // Returning with the same unverified email reuses the account — no password
+    // needed the second time (we never overwrite an existing account's password).
     const r2 = await callFunction("web-rsvp", {
       event_room_id: eventId,
-      guest_name: "Gwen Again",
-      guest_email: email,
+      first_name: "Gwen Again",
+      email,
     });
     assert(r2.user_id === r1.user_id, `expected reuse, got ${r2.user_id}`);
   });

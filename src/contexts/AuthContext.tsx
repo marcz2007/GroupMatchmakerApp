@@ -15,6 +15,7 @@ interface Profile {
   calendar_connected?: boolean;
   calendar_provider?: string;
   is_guest?: boolean;
+  email_verified_at?: string | null;
 }
 
 interface AuthContextType {
@@ -24,6 +25,7 @@ interface AuthContextType {
   loading: boolean;
   calendarConnected: boolean;
   isGuest: boolean;
+  isEmailVerified: boolean;
   refreshProfile: () => Promise<void>;
 }
 
@@ -34,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   calendarConnected: false,
   isGuest: false,
+  isEmailVerified: false,
   refreshProfile: async () => {},
 });
 
@@ -49,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, username, email, first_name, last_name, avatar_url, calendar_connected, calendar_provider, is_guest")
+        .select("id, username, email, first_name, last_name, avatar_url, calendar_connected, calendar_provider, is_guest, email_verified_at")
         .eq("id", userId)
         .single();
 
@@ -128,9 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const calendarConnected = profile?.calendar_connected ?? false;
   const isGuest = profile?.is_guest ?? false;
+  const isEmailVerified = !!profile?.email_verified_at;
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, calendarConnected, isGuest, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, calendarConnected, isGuest, isEmailVerified, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

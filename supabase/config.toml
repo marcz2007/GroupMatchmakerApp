@@ -97,3 +97,13 @@ verify_jwt = false
 # function validates the request via the signed `state` it issued earlier.
 [functions.google-calendar-callback]
 verify_jwt = false
+
+# The verification email links the user's browser straight here with ?token and
+# no JWT; the function validates the one-time token itself.
+[functions.verify-email]
+verify_jwt = false
+
+# Called from the public event page (anon) and from the app (session). Returns a
+# generic response so it can't be used to probe which emails exist.
+[functions.resend-verification]
+verify_jwt = false

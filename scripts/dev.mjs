@@ -27,16 +27,30 @@ async function ensureUser(name) {
     email_confirm: true,
     user_metadata: { first_name: name[0].toUpperCase() + name.slice(1) },
   });
+  let id, existed;
   if (error) {
     const { data: prof } = await admin
       .from("profiles")
       .select("id")
       .eq("email", email)
       .maybeSingle();
-    if (prof?.id) return { id: prof.id, email, existed: true };
-    throw new Error(`ensureUser ${email}: ${error.message}`);
+    if (!prof?.id) throw new Error(`ensureUser ${email}: ${error.message}`);
+    id = prof.id;
+    existed = true;
+  } else {
+    id = data.user.id;
+    existed = false;
   }
-  return { id: data.user.id, email, existed: false };
+
+  // Sim/test users are "verified" so they get full app access (create events,
+  // groups, etc.) without going through the email-verification flow.
+  await admin
+    .from("profiles")
+    .update({ email_verified_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("email_verified_at", null);
+
+  return { id, email, existed };
 }
 
 async function userClient(email) {
